@@ -1,86 +1,107 @@
-# pip-tools Template
+# Froth monitor
+---
+Froth monitor is an interactive GUI application for analyzing froth videos in real-time or offline. It allows users to draw Regions of Interest (ROIs), track froth movement using optical flow algorithm (more algorithms in the future), and export detailed analysis results, including velocity data, timestamps, and average velocity.
 
-[![Test and build](https://github.com/ImperialCollegeLondon/pip-tools-template/actions/workflows/ci.yml/badge.svg)](https://github.com/ImperialCollegeLondon/pip-tools-template/actions/workflows/ci.yml)
+## Features
+- Real-time froth movement tracking via live camera input.
+- Supports video imports in popular formats (e.g., MP4, AVI).
+- Draw, manage, and analyze multiple Regions of Interest (ROIs).
+- Advanced velocity analysis using dense optical flow (Farneback method) (more algorithms in the future).
+- Real-time visualization of movement and scrolling axis for velocities.
+- Data export in CSV and Excel formats, with customizable settings.
+- Automatically save and load application data.
+- Integrated video recording for live camera input.
 
-This is a minimal Python 3.12 application that uses [`pip-tools`] for packaging and dependency management. It also provides [`pre-commit`](https://pre-commit.com/) hooks (for for [ruff](https://pypi.org/project/ruff/) and [`mypy`](https://mypy.readthedocs.io/en/stable/)) and automated tests using [`pytest`](https://pytest.org/) and [GitHub Actions](https://github.com/features/actions). Pre-commit hooks are automatically kept updated with a dedicated GitHub Action, this can be removed and replace with [pre-commit.ci](https://pre-commit.ci) if using an public repo. It was developed by the [Imperial College Research Computing Service](https://www.imperial.ac.uk/admin-services/ict/self-service/research-support/rcs/).
 
-[`pip-tools`] is chosen as a lightweight dependency manager that adheres to the [latest standards](https://peps.python.org/pep-0621/) using `pyproject.toml`.
+## Demo
 
-## Usage
 
-To use this repository as a template for your own application:
 
-1. Click the green "Use this template" button above
-2. Name and create your repository
-3. Clone your new repository and make it your working directory
-4. Replace instances of `myproject` with your own application name. Edit:
-   - `pyproject.toml` (also change the list of authors here)
-   - `tests/test_myproject.py`
-   - Rename `myproject` directory
-5. Create and activate a Virtual Environment:
+## Installation
 
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate # with Powershell on Windows: `.venv\Scripts\Activate.ps1`
+1. Clone the repository:
+   ```
+   git clone https://github.com/gyyyno1/Froth_monitor.git
+
+2. Navigate to the project directory:
+   ```
+   cd your-repo
+
+3. Install dependencies by poetry
+   ```
+   pipx install poetry
+   poetry install
+   ```
+   , or to build the environment without using poetry:
+   ```
+   pip install -r requirements.txt
    ```
 
-6. Install development requirements:
-
-   ```bash
-   pip install -r dev-requirements.txt
+4. Make sure the package is installed in editable mode:
    ```
-
-7. Install the git hooks:
-
-   ```bash
-   pre-commit install
+   pip install -e .
    ```
-
-8. Run the main app:
-
-   ```bash
-   python -m myproject
+   
+5. Run the application by poetry
    ```
-
-9. Run the tests:
-
-   ```bash
-   pytest
+   poetry run python -m froth_monitor
    ```
+   , or to run it in the local environment
+   ```
+   python -m froth_monitor
+   ```
+__________________________________________________________________________________________________________________________________________________________________
+# Update: 21st Nov 2024
+### Work in Progress
 
-### Updating Dependencies
+A dynamic and interactive application designed to analyze and visualize froth movement from video data using advanced image processing and data visualization techniques.
 
-To add or remove dependencies:
+# Features
+## 1. Arrow Direction Analysis:
 
-1. Edit the `dependencies` variables in the `pyproject.toml` file (aim to keep develpment tools separate from the project requirements).
-2. Update the requirements files:
-   - `pip-compile` for `requirements.txt` - the project requirements.
-   - `pip-compile --extra dev -o dev-requirements.txt` for `dev-requirements.txt` - the development requirements.
-3. Sync the files with your installation (install packages):
-   - `pip-sync dev-requirements.txt requirements.txt`
+Draw, lock, and display an arrow indicating the direction of froth overflow.
+Customizable and adjustable arrow direction for flexible analysis.
+## 2. Region of Interest (ROI) Detection:
 
-To upgrade pinned versions, use the `--upgrade` flag with `pip-compile`.
+Draw multiple ROIs on the video canvas.
+Real-time movement analysis for each ROI.
+Axis visualization (X and Y axes) within each ROI to track movement.
+## 3. Video Processing:
 
-Versions can be restricted from updating within the `pyproject.toml` using standard python package version specifiers, i.e. `"black<23"` or `"pip-tools!=6.12.2"`
+Frame-by-frame video display with integrated image analysis.
+Supports both local video files and live camera input.
+## 4. Data Export:
 
-### Customising
+Export analysis results as Excel files.
+Customizable file naming and export directory.
+Separate sheets for each ROI in the Excel output.
+## 5. Replay and Reset:
 
-All configuration can be customised to your preferences. The key places to make changes
-for this are:
+Save and end the current session, clearing ROIs and resetting the interface for a new analysis.
+## 6. Visualizations:
 
-- The `pyproject.toml` file, where you can edit:
-  - The build system (change from setuptools to other packaging tools like [Hatch](https://hatch.pypa.io/) or [flit](https://flit.pypa.io/)).
-  - The python version.
-  - The project dependencies. Extra optional dependencies can be added by adding another list under `[project.optional-dependencies]` (i.e. `doc = ["mkdocs"]`).
-  - The `mypy` and `pytest` configurations.
-- The `.pre-commit-config.yaml` for pre-commit settings.
-- The `.github` directory for all the CI configuration.
-  - This repo uses `pre-commit.ci` to update pre-commit package versions and automatically merges those PRs with the `auto-merge.yml` workflow.
-  - Note that `pre-commit.ci` is an external service and free for open source repos. For private repos uncomment the commented portion of the `pre-commit_autoupdate.yml` workflow.
+Real-time animation of velocity changes over frames.
+Dedicated arrow canvas to display locked arrow direction.
 
-[`pip-tools`]: https://pip-tools.readthedocs.io/en/latest/
+__________________________________________________________________________________________________________________________________________________________________
+# Update: 23rd Oct 2023
+### Work in Progress
 
-### Publishing
+### To be realised (* means already done)
+1. csv*
+2. stop and restart new databook*
+3. angle in degrees with manual typing (pre-set value choices)
+4. programmed video with disappearing bubbles
 
-The GitHub workflow includes an action to publish on release.
-To run this action, uncomment the commented portion of `publish.yml`, and modify the steps for the desired behaviour (publishing a Docker image, publishing to PyPI, deploying documentation etc.)
+
+# How to run the program from source code
+
+1. Directly run the 'main_GUI.py' file in a suitable python environment
+
+2. A UI should pop up with buttons. Click the 'Export' Menu to choose the file path you want the data to be stored, and edit the name you want to use.
+
+3. Click the 'Import' menu option on the top left corner and choose to input a video by a local file or a real time webcam. If it is webcam, the video will be directly displaying on the canvas. If it is a local video, you need to click 'pause/play' button to start the video.
+
+4. After input a video, by clicking 'add overflow direction', you should draw an arrow on the canvas indicating the direction of overflow of the froths. Or you can use the default value by directly going to step 4, the default value (-0.5pi) means direction goes vertically downwards.
+
+5. Movement analysis is executed within each region of interest (ROI). You can draw one ROI on the video after click the 'Add ROI' button. You are not allowed to do so before inputting a video source.
