@@ -21,7 +21,7 @@ Froth monitor is an interactive GUI application for analyzing froth videos in re
 
 1. Clone the repository:
    ```
-   git clone https://github.com/ImperialCollegeLondon/froth_monitor.git
+   git clone https://github.com/gyyyno1/Froth_monitor.git
 
 2. Navigate to the project directory:
    ```
@@ -105,3 +105,7 @@ ________________________________________________________________________________
 4. After input a video, by clicking 'add overflow direction', you should draw an arrow on the canvas indicating the direction of overflow of the froths. Or you can use the default value by directly going to step 4, the default value (-0.5pi) means direction goes vertically downwards.
 
 5. Movement analysis is executed within each region of interest (ROI). You can draw one ROI on the video after click the 'Add ROI' button. You are not allowed to do so before inputting a video source.
+
+6. A simple real-time data graph will display in Cartesian coordinate system, which the y values shows the average velocities per second w.r.t. overflow direction.
+
+7. After a video is finished, click the button 'export' to produce a excel databook, with each sheet refers to an ROI.
