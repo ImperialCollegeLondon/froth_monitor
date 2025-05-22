@@ -21,7 +21,7 @@ Froth monitor is an interactive GUI application for analyzing froth videos in re
 
 1. Clone the repository:
    ```
-   git clone https://github.com/gyyyno1/Froth_monitor.git
+   git clone https://github.com/ImperialCollegeLondon/froth_monitor.git
 
 2. Navigate to the project directory:
    ```
