@@ -129,7 +129,11 @@ class ROI:
 
         else:
             self.timestamp_buffer = self.timestamp
+
+            if len(self.delta_history) == 1:
+                self.delta_history[0][-1] = self.current_velocity
             self.delta_history[-1][-1] = self.current_velocity
+            
             self.velo_only_history.append(self.current_velocity)
             self.current_velocity = delta
 

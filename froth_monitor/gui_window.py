@@ -86,7 +86,8 @@ class MainGUIWindow(QMainWindow):
         
         # Main content area
         content_widget = QWidget()
-        content_widget.setStyleSheet("background-color: #f0f0f0;")
+        content_widget.setStyleSheet("background-color: #f0f0f0; font-weight: bold; font-size: 16px; \
+            color: black")
         content_layout = QHBoxLayout(content_widget)
         content_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.addWidget(content_widget)
@@ -149,6 +150,9 @@ class MainGUIWindow(QMainWindow):
         roi_group = self._create_roi_controls()
         left_layout.addWidget(roi_group)
         
+        # Add export settings
+        export_group = self._create_export_settings()
+        left_layout.addWidget(export_group)
         # Add reset buttons
         self._add_reset_buttons(left_layout)
         
@@ -165,15 +169,15 @@ class MainGUIWindow(QMainWindow):
             QGroupBox: The video source group box with radio buttons.
         """
         source_group = QGroupBox("Video Source")
-        source_group.setStyleSheet("font-weight: bold; font-size: 16px;")
+        source_group.setStyleSheet("font-weight: bold; font-size: 16px; color: black")
         source_layout = QVBoxLayout(source_group)
         source_layout.setSpacing(10)
         
         # Radio buttons for video source
         self.webcam_radio = QRadioButton("Webcam")
-        self.webcam_radio.setStyleSheet("font-weight: normal; font-size: 14px;")
+        self.webcam_radio.setStyleSheet("font-weight: normal; font-size: 14px; color: black")
         self.prerecorded_radio = QRadioButton("Pre-recorded")
-        self.prerecorded_radio.setStyleSheet("font-weight: normal; font-size: 14px;")
+        self.prerecorded_radio.setStyleSheet("font-weight: normal; font-size: 14px; color: black")
         self.webcam_radio.setChecked(True)
         self.import_button = QPushButton("Import")
         self.import_button.setStyleSheet(
@@ -193,8 +197,9 @@ class MainGUIWindow(QMainWindow):
         Returns:
             QGroupBox: The calibration group box with button and text input.
         """
-        calibration_group = QGroupBox("Calibration")
-        calibration_group.setStyleSheet("font-weight: bold; font-size: 16px;")
+        calibration_group = QGroupBox("Calibration/ROI")
+        calibration_group.setStyleSheet("font-weight: bold; font-size: 16px; \
+            color: black")
         calibration_layout = QVBoxLayout(calibration_group)
         calibration_layout.setSpacing(10)
 
@@ -217,7 +222,8 @@ class MainGUIWindow(QMainWindow):
         arrow_layout = QHBoxLayout()
         self.add_arrow_button = QPushButton("Draw Arrow")
         self.add_arrow_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
+            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px;\
+             border-radius: 4px;"
         )
         self.add_arrow_button.setFixedWidth(100)
         
@@ -227,16 +233,19 @@ class MainGUIWindow(QMainWindow):
             "background-color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
         )
         self.direction_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.confirm_arrow_button = QPushButton("Confirm calibration")
+        self.confirm_arrow_button.setStyleSheet(
+            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px;\
+             border-radius: 4px;"
+        )
         arrow_layout.addWidget(self.add_arrow_button)
         arrow_layout.addWidget(self.direction_textbox)
 
         calibration_layout.addLayout(roi_layout)
         calibration_layout.addLayout(arrow_layout)
+        calibration_layout.addWidget(self.confirm_arrow_button)
 
-        
-        # calibration_layout.addWidget(self.add_roi_button)
-        # calibration_layout.addWidget(self.px2mm_textbox)
-        
         return calibration_group
 
     def _create_roi_controls(self) -> QGroupBox:
@@ -246,26 +255,34 @@ class MainGUIWindow(QMainWindow):
         Returns:
             QGroupBox: The ROI group box with add and delete buttons.
         """
-        roi_group = QGroupBox("ROI")
-        roi_group.setStyleSheet("font-weight: bold; font-size: 16px;")
+        roi_group = QGroupBox()
+        roi_group.setStyleSheet("font-weight: bold; font-size: 16px; color: black")
         roi_layout = QHBoxLayout(roi_group)
         
         # Add spacer to push buttons to the right
-        roi_layout.addStretch()
-        
+        # roi_layout.addStretch()
+        self.roi_text = QLabel("ROI")
+        self.roi_text.setStyleSheet(
+            "background-color: #3c4043; color: white; font-size: 14px; \
+            font-weight: bold; padding: 8px; border-radius: 4px;"
+        )
+
         # Add + and - buttons for ROI
         self.add_roi_button = QPushButton("+")
         self.add_roi_button.setStyleSheet(
-            "background-color: #3c4043; color: white; font-size: 18px; font-weight: bold; padding: 5px; border-radius: 4px;"
+            "background-color: #4285f4; color: white; font-size: 18px; \
+            font-weight: bold; padding: 5px; border-radius: 4px;"
         )
         self.add_roi_button.setFixedSize(40, 40)
         
         self.delete_roi_button = QPushButton("-")
         self.delete_roi_button.setStyleSheet(
-            "background-color: #3c4043; color: white; font-size: 18px; font-weight: bold; padding: 5px; border-radius: 4px;"
+            "background-color: #4285f4; color: white; font-size: 18px; \
+            font-weight: bold; padding: 5px; border-radius: 4px;"
         )
         self.delete_roi_button.setFixedSize(40, 40)
         
+        roi_layout.addWidget(self.roi_text)
         roi_layout.addWidget(self.add_roi_button)
         roi_layout.addWidget(self.delete_roi_button)
         
@@ -279,11 +296,11 @@ class MainGUIWindow(QMainWindow):
             layout: The layout to add the reset buttons to.
         """
         # Reset button with camera icon
-        self.reset_button = QPushButton(" Reset")
+        self.reset_button = QPushButton("  Start Recording")
         self.reset_button.setIcon(QIcon("froth_monitor/resources/camera_icon.svg"))
         self.reset_button.setIconSize(QSize(24, 24))
         self.reset_button.setStyleSheet(
-            "background-color: #3c4043; color: white; font-size: 14px; padding: 10px; border-radius: 4px; text-align: left;"
+            "background-color: red; color: white; font-size: 14px; padding: 10px; border-radius: 4px; text-align: left;"
         )
         self.reset_button.setFixedHeight(50)
         layout.addWidget(self.reset_button)
@@ -291,7 +308,7 @@ class MainGUIWindow(QMainWindow):
         # Simple Reset button (as shown in the image)
         self.simple_reset_button = QPushButton("Reset")
         self.simple_reset_button.setStyleSheet(
-            "background-color: #3c4043; color: white; font-size: 14px; padding: 10px; border-radius: 4px;"
+            "background-color: #4285f4; color: white; font-size: 14px; padding: 10px; border-radius: 4px;"
         )
         layout.addWidget(self.simple_reset_button)
 
@@ -339,6 +356,34 @@ class MainGUIWindow(QMainWindow):
         # Add media controls below the video canvas
         self._create_media_controls(layout)
 
+    def _create_export_settings(self) -> QGroupBox:
+        """
+        Create the calibration controls.
+        
+        Returns:
+            QGroupBox: The calibration group box with button and text input.
+        """
+        export_group = QGroupBox("Export Settings")
+        export_group.setStyleSheet("font-weight: bold; font-size: 16px; color: black")
+        export_layout = QVBoxLayout(export_group)
+        export_layout.setSpacing(10)
+
+        # roi_layout = QHBoxLayout()
+        self.export_button = QPushButton("Export/Recording Settings")
+        self.export_button.setStyleSheet(
+            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
+        )
+        # self.calibration_button.setFixedWidth(100)
+        
+        self.save_button = QPushButton("Save")
+        self.save_button.setStyleSheet(
+            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
+        )
+        export_layout.addWidget(self.export_button)
+        export_layout.addWidget(self.save_button)
+        
+        return export_group
+
     def _create_graph_display(self, layout: QVBoxLayout) -> None:
         """
         Create the graph display for velocity vs time and add it to the given layout.
@@ -348,7 +393,8 @@ class MainGUIWindow(QMainWindow):
         """
         # Velocity vs Time label
         velocity_label = QLabel("Velocity vs Time")
-        velocity_label.setStyleSheet("font-weight: bold; font-size: 16px;")
+        velocity_label.setStyleSheet("font-weight: bold; font-size: 16px; \
+            color: black")
         layout.addWidget(velocity_label)
         
         # ROI Movements Canvas (graph)
@@ -392,7 +438,8 @@ class MainGUIWindow(QMainWindow):
         self.play_pause_button.setIcon(QIcon("froth_monitor/resources/pause_icon.svg"))
         self.play_pause_button.setIconSize(QSize(24, 24))
         self.play_pause_button.setStyleSheet(
-            "background-color: #3c4043; color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
+            "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
+            border-radius: 4px;"
         )
         self.play_pause_button.setFixedSize(40, 40)
         self.play_pause_button.setToolTip("Play/Pause Video")
@@ -410,6 +457,14 @@ class MainGUIWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setStyleSheet("""
+        QLabel, QLineEdit, QRadioButton, QPushButton, QGroupBox, QMenuBar, QMenu, QMessageBox {
+            color: black;
+        }
+        QMessageBox QLabel {
+            color: black;
+        }
+    """)
     window = MainGUIWindow()
     window.show()
     sys.exit(app.exec())
