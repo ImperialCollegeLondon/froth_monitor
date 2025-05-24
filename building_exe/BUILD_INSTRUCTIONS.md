@@ -1,6 +1,7 @@
 # Building Froth Monitor Executable
 
-This document provides instructions for building a standalone executable of the Froth Monitor application using PyInstaller.
+This document provides instructions for building a standalone executable of the
+Froth Monitor application using PyInstaller.
 
 ## Prerequisites
 
@@ -13,7 +14,7 @@ This document provides instructions for building a standalone executable of the 
 
 1. Run the build script:
 
-   ```
+   ```bash
    python build.py
    ```
 
@@ -28,13 +29,13 @@ If you prefer to build manually:
 
 1. Install PyInstaller if not already installed:
 
-   ```
+   ```bash
    pip install pyinstaller
    ```
 
 2. Run PyInstaller with the spec file:
 
-   ```
+   ```bash
    pyinstaller froth_monitor.spec
    ```
 
@@ -53,15 +54,16 @@ If you encounter issues during the build process:
 
 1. Ensure all dependencies are installed:
 
-   ```
+   ```bash
    pip install -r requirements.txt
    ```
 
 2. Check for any error messages in the build output
 
-3. Try running PyInstaller with the `--debug=all` flag for more detailed output:
+3. Try running PyInstaller with the `--debug=all` flag for more detailed
+   output:
 
-   ```
+   ```bash
    pyinstaller --debug=all froth_monitor.spec
    ```
 
