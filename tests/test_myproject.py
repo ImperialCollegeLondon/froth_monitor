@@ -1,6 +1,6 @@
 """Tests for the main module."""
 
-from myproject import __version__
+from froth_monitor import __version__
 
 
 def test_version():

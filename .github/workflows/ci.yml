@@ -1,28 +1,49 @@
-name: Test
+ame: Test and build
 
-on: [push, pull_request, workflow_call]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  qa:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pre-commit/action@v3.0.1
-
   test:
-    needs: qa
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{matrix.os}}
     strategy:
       fail-fast: false
       matrix:
-        os: [ windows-latest, ubuntu-latest, macos-latest ]
-        python-version: [ "3.12" ]
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        python-version: ["3.12.3"]
+
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: pip install -r dev-requirements.txt
-    - name: Run tests
-      run: pytest
+      - uses: actions/checkout@v4
+
+      - name: Install poetry
+        run: pipx install poetry==1.8.4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{matrix.python-version}}
+          cache: poetry
+
+      - name: Show Python Version
+        run: python --version
+
+      - name: Install system dependencies in Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt update
+
+          # Without this, PySide6 gives an ImportError
+          sudo apt install libegl1
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Debug Poetry Environment
+        run: poetry env list
+
+      - name: Run tests
+        run: poetry run pytest
+
