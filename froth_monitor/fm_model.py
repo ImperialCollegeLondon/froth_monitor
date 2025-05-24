@@ -33,14 +33,12 @@ print(f"Processing frame {frame_number}")
 ```
 """
 
-import cv2
 import numpy as np
 import time
-import pprint
-from typing import cast
 from datetime import datetime
 from PySide6.QtCore import QRect
 from froth_monitor.image_analysis import VideoAnalysis
+
 
 class ROI:
     def __init__(self, roi_coordinate: QRect, px2mm, degree) -> None:
@@ -53,7 +51,7 @@ class ROI:
         self.delta_history = []
         self.arrow_dir = 0.0
         self.px2mm = px2mm
-        self.mm2px = 1/px2mm
+        self.mm2px = 1 / px2mm
         self.degree = degree
 
         # Initialize timestamp
@@ -65,7 +63,7 @@ class ROI:
     def process_frame(self, frame: np.ndarray) -> None:
         """
         Process a cropped frame using the VideoAnalysis.analyze function and store the results.
-        
+
         Parameters
         ----------
         frame : np.ndarray
@@ -82,19 +80,21 @@ class ROI:
         # Update timestamp
         self.timestamp = time.strftime("%H:%M:%S", time.localtime())
         self.calculate_velocity(self.calibrated_delta)
-        self.delta_history.append([self.timestamp, self.delta_pixels, self.calibrated_delta, None])
+        self.delta_history.append(
+            [self.timestamp, self.delta_pixels, self.calibrated_delta, None]
+        )
         # self.calculate_velocity(self.calibrated_delta)
 
     def calculate_real_delta(self, delta_pixels):
         """
         Calculate the projection of delta_pixels onto the direction specified by self.degree.
-        
+
         Parameters
         ----------
         delta_pixels : tuple or list
             A tuple or list containing (x, y) movement in pixels, where positive x means
             movement to the right and positive y means movement downward.
-            
+
         Returns
         -------
         float
@@ -102,29 +102,28 @@ class ROI:
         """
 
         import math
-        
+
         # Convert degree to radians
         rad = math.radians(self.degree)
-        
+
         # Create a unit vector in the direction of self.degree
         # Note: In the coordinate system, 0 degrees points right, and angles increase counterclockwise
-        # But y-axis is inverted (positive y is downward), so we need to negate the y component 
-        direction_x = math.cos(rad) 
+        # But y-axis is inverted (positive y is downward), so we need to negate the y component
+        direction_x = math.cos(rad)
         direction_y = -math.sin(rad)  # Negative because positive y is downward
-        
+
         # Extract delta_x and delta_y from delta_pixels
         delta_x, delta_y = delta_pixels
-        
+
         # Calculate the dot product (projection)
         projection = delta_x * direction_x + delta_y * direction_y
-        
+
         # Convert from pixels to millimeters
         projection_mm = projection * self.mm2px
-        
+
         return projection_mm
 
     def calculate_velocity(self, delta):
-
         if self.timestamp == self.timestamp_buffer:
             self.current_velocity += delta
 
@@ -133,7 +132,6 @@ class ROI:
             self.delta_history[-1][-1] = self.current_velocity
             self.velo_only_history.append(self.current_velocity)
             self.current_velocity = delta
-
 
 
 class FrameModel:
@@ -166,7 +164,7 @@ class FrameModel:
     get_current_time() -> str
         Returns the current timestamp in the format "dd/mm/yyyy HH:MM:SS.sss".
     """
-    
+
     def __init__(self) -> None:
         """
         Initialize the FrameModel with default values.
@@ -179,19 +177,19 @@ class FrameModel:
 
         self.px2mm = 1.0
         self.degree = -90.0
-        
+
     def process_frame(self, frame: np.ndarray):
         """
         Process a video frame, increment the frame counter, and return the frame number
         along with the processed frame. For each ROI in the roi_list, crop the frame
         according to the ROI coordinates and pass the cropped frame to the ROI's
         process_frame method.
-        
+
         Parameters
         ----------
         frame : np.ndarray
             The video frame to process.
-            
+
         Returns
         -------
         tuple[int, np.ndarray]
@@ -199,20 +197,19 @@ class FrameModel:
         """
         if frame is None:
             return None, None
-            
+
         # Increment the frame counter
         self.frame_count += 1
-        
+
         # Record the current time
         current_time = self.get_current_time()
         self.last_processed_time = current_time
-        
+
         # Store frame information in history
-        self.frame_history.append({
-            "frame_number": self.frame_count,
-            "timestamp": current_time
-        })
-        
+        self.frame_history.append(
+            {"frame_number": self.frame_count, "timestamp": current_time}
+        )
+
         # Process each ROI in the roi_list
         for roi in self.roi_list:
             # Get the ROI coordinates
@@ -220,43 +217,43 @@ class FrameModel:
             y1 = roi.coordinate[1]
             x2 = roi.coordinate[2]
             y2 = roi.coordinate[3]
-            
+
             # Crop the frame according to the ROI coordinates
             # Ensure the coordinates are within the frame boundaries
             if x1 >= 0 and y1 >= 0 and x2 > 0 and y2 > 0:
-                cropped_frame = frame[y1:y1+y2, x1:x1+x2]
-                
+                cropped_frame = frame[y1 : y1 + y2, x1 : x1 + x2]
+
                 # Pass the cropped frame to the ROI's process_frame method
                 roi.process_frame(cropped_frame)
-        
+
         return self.frame_count, self.roi_list
-    
+
     def get_frame_count(self) -> int:
         """
         Return the total number of frames processed.
-        
+
         Returns
         -------
         int
             The number of frames processed.
         """
         return self.frame_count
-    
+
     def get_frame_history(self) -> list:
         """
         Return the history of processed frames.
-        
+
         Returns
         -------
         list
             A list of dictionaries containing information about each processed frame.
         """
         return self.frame_history
-    
+
     def get_current_time(self) -> str:
         """
         Return the current time in the format dd/mm/yyyy HH:MM:SS.sss.
-        
+
         Returns
         -------
         str
@@ -280,7 +277,7 @@ class FrameModel:
         """
 
         # pixels of 20mm
-        self.px2mm = px/20
+        self.px2mm = px / 20
 
     def get_overflow_direction(self, degree: float) -> None:
         self.degree = degree
@@ -292,7 +289,7 @@ class FrameModel:
     def delete_last_roi(self):
         """
         Delete the last ROI from the roi_list and release its memory.
-        
+
         Returns
         -------
         bool
@@ -300,9 +297,8 @@ class FrameModel:
         """
         if not self.roi_list:
             return False
-            
+
         # Remove the last ROI from the list
         self.roi_list.pop()
-        
+
         return True
-        

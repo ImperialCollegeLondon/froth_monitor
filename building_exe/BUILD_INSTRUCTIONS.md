@@ -12,6 +12,7 @@ This document provides instructions for building a standalone executable of the 
 ### Automatic Build (Recommended)
 
 1. Run the build script:
+
    ```
    python build.py
    ```
@@ -26,11 +27,13 @@ This document provides instructions for building a standalone executable of the 
 If you prefer to build manually:
 
 1. Install PyInstaller if not already installed:
+
    ```
    pip install pyinstaller
    ```
 
 2. Run PyInstaller with the spec file:
+
    ```
    pyinstaller froth_monitor.spec
    ```
@@ -49,6 +52,7 @@ After building, you can distribute the executable by:
 If you encounter issues during the build process:
 
 1. Ensure all dependencies are installed:
+
    ```
    pip install -r requirements.txt
    ```
@@ -56,6 +60,7 @@ If you encounter issues during the build process:
 2. Check for any error messages in the build output
 
 3. Try running PyInstaller with the `--debug=all` flag for more detailed output:
+
    ```
    pyinstaller --debug=all froth_monitor.spec
    ```

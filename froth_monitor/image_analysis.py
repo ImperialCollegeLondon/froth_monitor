@@ -28,10 +28,9 @@ the velocity history.
 
 import cv2
 import numpy as np
-import random
 from cv2.typing import MatLike
 from typing import cast
-from datetime import datetime
+
 
 class VideoAnalysis:
     """
@@ -74,13 +73,11 @@ class VideoAnalysis:
     generate_random_color() -> tuple[int, int, int]
         Generates a random RGB color.
     """
-    
-    def __init__(self, 
-                 arrow_dir_x: float, 
-                 arrow_dir_y: float) -> None:
+
+    def __init__(self, arrow_dir_x: float, arrow_dir_y: float) -> None:
         """
         Initialize the VideoAnalysisModule with the given direction for the scrolling axis.
-        
+
         Parameters
         ----------
         arrow_dir_x : float
@@ -88,33 +85,32 @@ class VideoAnalysis:
         arrow_dir_y : float
             The y direction for the scrolling axis (positive is down, negative is up).
         """
-        
+
         self.previous_frame = None  # Store the previous frame for motion analysis
         self.current_velocity = 0
         self.arrow_dir_x = arrow_dir_x
         self.arrow_dir_y = arrow_dir_y
-        
-    def analyze(self, 
-                current_frame: np.ndarray) -> tuple[float, float]:
+
+    def analyze(self, current_frame: np.ndarray) -> tuple[float, float]:
         """
         Analyze the given frame for changes in x and y directions by calculating dense optical flow using the Farneback method.
-        
+
         Parameters
         ----------
         current_frame : np.ndarray
             The frame to analyze.
-        
+
         Returns
         -------
         tuple[float, float]
             The delta pixel values in x and y directions between the current and previous frames.
         """
-        
+
         # Analyze the given frame for changes in x and y directions
         if self.previous_frame is None:
             # If there's no previous frame, store the current frame and return
             self.previous_frame = current_frame
-            return cast(float, None),  cast(float, None)
+            return cast(float, None), cast(float, None)
 
         # Convert both current and previous frames to grayscale
         gray_current: MatLike = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
@@ -122,16 +118,17 @@ class VideoAnalysis:
 
         # Calculate dense optical flow using Farneback method
         flow = cv2.calcOpticalFlowFarneback(
-            prev = gray_previous, 
-            next = gray_current, 
-            flow = cast(MatLike, None), 
-            pyr_scale = 0.5, 
-            levels = 3, 
-            winsize = 25, 
-            iterations = 3, 
-            poly_n = 7, 
-            poly_sigma = 1.5, 
-            flags = 0)
+            prev=gray_previous,
+            next=gray_current,
+            flow=cast(MatLike, None),
+            pyr_scale=0.5,
+            levels=3,
+            winsize=25,
+            iterations=3,
+            poly_n=7,
+            poly_sigma=1.5,
+            flags=0,
+        )
 
         # Extract flow components in x and y directions
         flow_x = flow[..., 0]
@@ -139,9 +136,9 @@ class VideoAnalysis:
 
         avg_flow_x = cast(float, np.mean(flow_x))
         avg_flow_y = cast(float, np.mean(flow_y))
-        
+
         # Update the previous frame to the current frame for the next analysis
-        self.previous_frame = current_frame 
-        
+        self.previous_frame = current_frame
+
         # Return delta pixel values for the current frame
         return avg_flow_x, avg_flow_y

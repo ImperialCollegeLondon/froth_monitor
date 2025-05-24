@@ -27,13 +27,21 @@ Imports:
     For creating and saving Excel files.
 """
 
-from PySide6.QtWidgets import (QMainWindow, QPushButton, QLabel, QFileDialog, 
-                               QVBoxLayout, QMessageBox, QDialog, QLineEdit, QCheckBox,
-                               QHBoxLayout, QFileDialog, QRadioButton, QFrame, QWidget)
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QMainWindow,
+    QPushButton,
+    QLabel,
+    QVBoxLayout,
+    QMessageBox,
+    QDialog,
+    QLineEdit,
+    QCheckBox,
+    QHBoxLayout,
+    QFileDialog,
+    QRadioButton,
+    QFrame,
+)
 from PySide6.QtGui import QFont
-from cv2.gapi.wip.draw import Text
-import numpy as np
 from datetime import datetime
 from openpyxl import Workbook
 
@@ -95,8 +103,8 @@ class Export(QFileDialog):
     write_csv(file_path: str, data: dict) -> None
         Writes the export data to an Excel file with separate sheets for each ROI.
     """
-    def __init__(self, 
-                 gui) -> None:
+
+    def __init__(self, gui) -> None:
         """
         Initializes the Export class with default settings.
 
@@ -120,13 +128,13 @@ class Export(QFileDialog):
         self.export_filename = datetime.now().strftime("%Y%m%d")
         self.video_filename = datetime.now().strftime("%Y%m%d")
         self.velocity_sum = 0.0
-        
+
         self.save_video_in_same_dir = True
         self.record_video = True
-        
+
         self.font_big = QFont("Arial", 13)
         self.font_small = QFont("Arial", 12)
-       
+
     def export_setting_window(self) -> None:
         """
         Opens a dialog window to set export settings.
@@ -134,7 +142,7 @@ class Export(QFileDialog):
         The dialog window consists of input fields for setting the export directory, export filename,
         and video recording settings. The settings are saved when the user clicks the "Save Settings" button.
         """
-        
+
         dialog = QDialog(self.gui)
         dialog.setWindowTitle("Export Settings")
         dialog.setMinimumWidth(400)
@@ -144,14 +152,18 @@ class Export(QFileDialog):
         directory_label = QLabel("Data Export Directory:", dialog)
         directory_label.setFont(self.font_big)
         layout.addWidget(directory_label)
-        
+
         directory_button = QPushButton("Select Data Directory", dialog)
         directory_button.clicked.connect(lambda: self.select_data_directory(dialog))
         layout.addWidget(directory_button)
 
         # Add QLabel to display the selected directory and set an object name
-        directory_display = QLabel(self.export_directory if self.export_directory else "Not selected", dialog)
-        directory_display.setObjectName("directory_display")  # Assign a unique name for findChild
+        directory_display = QLabel(
+            self.export_directory if self.export_directory else "Not selected", dialog
+        )
+        directory_display.setObjectName(
+            "directory_display"
+        )  # Assign a unique name for findChild
         layout.addWidget(directory_display)
 
         # Export Filename Input
@@ -161,7 +173,7 @@ class Export(QFileDialog):
 
         filename_input = QLineEdit(self.export_filename, dialog)
         layout.addWidget(filename_input)
-        
+
         # Separator
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)  # Horizontal line
@@ -172,28 +184,28 @@ class Export(QFileDialog):
 
         # Save Button
         save_button = QPushButton("Save Settings", dialog)
-        save_button.clicked.connect(lambda: self.save_export_settings(dialog, filename_input))
+        save_button.clicked.connect(
+            lambda: self.save_export_settings(dialog, filename_input)
+        )
         layout.addWidget(save_button)
 
         dialog.exec()
 
-    def add_video_selection_section(self, 
-                                    layout: QVBoxLayout, 
-                                    dialog: QDialog) -> None:
+    def add_video_selection_section(self, layout: QVBoxLayout, dialog: QDialog) -> None:
         """
         Add a section to the dialog that allows the user to select whether to save the video in the same directory as the data.
-        
+
         The section includes a QLabel, two radio buttons, a checkbox for video recording, a button to set the recording directory, and a QLabel to display the selected recording directory.
-        
+
         The checkbox for video recording is initially hidden. If the user selects "No" to save the video in the same directory, the checkbox is shown and the value of self.record_video is copied to its state.
-        
+
         If the checkbox is checked, the button to set the recording directory and the display label are shown. Otherwise, they are hidden.
         """
-        
+
         def update_ui() -> None:
             """
             Update the UI based on whether the user selected to save the video in the same directory.
-            
+
             If the user selected "Yes", hide the additional options.
             If the user selected "No", show the additional options and set the "Record Video" checkbox to the current value of self.record_video.
             """
@@ -204,9 +216,8 @@ class Export(QFileDialog):
             print("is_same_dir:", is_same_dir)
             # Show or hide additional options if "No" is selected
             recording_video_checkbox.setVisible(not is_same_dir)
-            
+
             if not is_same_dir:
-                
                 recording_video_checkbox.setChecked(self.record_video)
                 recording_video_directory_button.setVisible(self.record_video)
                 recording_video_directory_display.setVisible(self.record_video)
@@ -220,17 +231,18 @@ class Export(QFileDialog):
             After updating the selection state, invoke the update_ui function to refresh the UI based on the new selection.
             """
             if yes_radio.isChecked():
-
                 self.save_video_in_same_dir = True
                 self.record_video = True
-                
+
             elif no_radio.isChecked():
                 self.record_video = False
                 self.save_video_in_same_dir = False
             update_ui()
 
         # Save Recording Video Options
-        video_label = QLabel("Would you like to save the recording video in the same directory?")
+        video_label = QLabel(
+            "Would you like to save the recording video in the same directory?"
+        )
         video_label.setFont(self.font_big)
         layout.addWidget(video_label)
 
@@ -241,7 +253,7 @@ class Export(QFileDialog):
         video_radio_layout.addWidget(yes_radio)
         video_radio_layout.addWidget(no_radio)
         layout.addLayout(video_radio_layout)
-        
+
         # Set initial state
         if self.save_video_in_same_dir:
             yes_radio.setChecked(True)
@@ -251,11 +263,16 @@ class Export(QFileDialog):
         # Connect signals to the slots
         yes_radio.toggled.connect(on_radio_selection)
         no_radio.toggled.connect(on_radio_selection)
-        
-        recording_video_checkbox = QCheckBox("Tick me to preset video recording \n(otherwise video recording will be disabled in this mission)", dialog)
+
+        recording_video_checkbox = QCheckBox(
+            "Tick me to preset video recording \n(otherwise video recording will be disabled in this mission)",
+            dialog,
+        )
         recording_video_directory_button = QPushButton("Set Recording Directory")
         recording_video_directory_display = QLabel("Not selected", dialog)
-        recording_video_directory_display.setObjectName("recording_video_directory_display")
+        recording_video_directory_display.setObjectName(
+            "recording_video_directory_display"
+        )
 
         recording_video_checkbox.setVisible(False)
         recording_video_directory_button.setVisible(False)
@@ -269,13 +286,19 @@ class Export(QFileDialog):
             lambda: self.enable_video_recording(recording_video_checkbox.isChecked())
         )
         recording_video_checkbox.stateChanged.connect(
-            lambda: recording_video_directory_button.setVisible(recording_video_checkbox.isChecked())
+            lambda: recording_video_directory_button.setVisible(
+                recording_video_checkbox.isChecked()
+            )
         )
         recording_video_checkbox.stateChanged.connect(
-            lambda: recording_video_directory_display.setVisible(recording_video_checkbox.isChecked())
+            lambda: recording_video_directory_display.setVisible(
+                recording_video_checkbox.isChecked()
+            )
         )
-        recording_video_directory_button.clicked.connect(lambda: self.select_video_directory(dialog))
-              
+        recording_video_directory_button.clicked.connect(
+            lambda: self.select_video_directory(dialog)
+        )
+
         video_filename_label = QLabel("Video Filename (without extension):", dialog)
         video_filename_label.setFont(self.font_big)
         layout.addWidget(video_filename_label)
@@ -283,44 +306,47 @@ class Export(QFileDialog):
         video_filename_input = QLineEdit(self.export_filename, dialog)
         video_filename_input.setObjectName("video_filename_input")
         layout.addWidget(video_filename_input)
-    
-    def enable_video_recording(self, 
-                               if_record_video: bool) -> None:
+
+    def enable_video_recording(self, if_record_video: bool) -> None:
         """
         Enables or disables video recording.
-        
+
         Args:
             if_record_video (bool): Flag indicating whether to enable video recording.
         """
         self.record_video = if_record_video
         print(self.record_video)
-        
-    def select_video_directory(self, 
-                               parent_dialog) -> None:
+
+    def select_video_directory(self, parent_dialog) -> None:
         """
         Opens a file dialog to select the video recording directory.
-        
+
         Args:
             parent_dialog (object): The parent dialog containing the QLabel to be updated.
         """
-        directory = QFileDialog.getExistingDirectory(self.gui, "Select Recording Saving Directory")
-        
+        directory = QFileDialog.getExistingDirectory(
+            self.gui, "Select Recording Saving Directory"
+        )
+
         if directory:
             self.video_directory = directory
             # Update directory label in the parent dialog
-            directory_display = parent_dialog.findChild(QLabel, "recording_video_directory_display")
+            directory_display = parent_dialog.findChild(
+                QLabel, "recording_video_directory_display"
+            )
             self.record_video = True
             if directory_display:  # Ensure the QLabel is found
                 print(self.video_directory)
                 directory_display.setText(self.video_directory)
 
-    def select_data_directory(self, 
-                              parent_dialog) -> None:
+    def select_data_directory(self, parent_dialog) -> None:
         """
         Opens a file dialog to select the export directory.
         """
-        directory = QFileDialog.getExistingDirectory(self.gui, "Select Data Saving Directory")
-        
+        directory = QFileDialog.getExistingDirectory(
+            self.gui, "Select Data Saving Directory"
+        )
+
         if directory:
             self.export_directory = directory
 
@@ -329,29 +355,31 @@ class Export(QFileDialog):
             if directory_display:  # Ensure the QLabel is found
                 directory_display.setText(self.export_directory)
 
-    def save_export_settings(self, 
-                             dialog: QDialog, 
-                             filename_input: QLineEdit) -> None:
+    def save_export_settings(self, dialog: QDialog, filename_input: QLineEdit) -> None:
         """
         Saves the export settings.
         """
         # Save the entered filename
         self.export_filename = filename_input.text()
-        
+
         video_filename_input = dialog.findChild(QLineEdit, "video_filename_input")
-        self.video_filename = video_filename_input.text() # pyright: ignore
-        
+        self.video_filename = video_filename_input.text()  # pyright: ignore
+
         # Display a warning if the directory is not set
         if not self.export_directory:
-            QMessageBox.warning(self.gui, "Warning", "Data Export directory is not set.")
+            QMessageBox.warning(
+                self.gui, "Warning", "Data Export directory is not set."
+            )
             return
-        
+
         if self.save_video_in_same_dir and self.record_video:
             self.video_directory = self.export_directory
-        
+
         # Display a warning if the directory is not set
         if not self.video_directory and self.record_video:
-            QMessageBox.warning(self.gui, "Warning", "Recoroding Export directory is not set.")
+            QMessageBox.warning(
+                self.gui, "Warning", "Recoroding Export directory is not set."
+            )
             return
 
         # Display a success message
@@ -360,34 +388,33 @@ class Export(QFileDialog):
                 self.gui,
                 "Settings Saved",
                 f"Data export settings saved:\nDirectory: {self.export_directory}\nFilename: {self.export_filename}\
-                \n\n\n Recording function is disabled"
+                \n\n\n Recording function is disabled",
             )
-        
+
         else:
             QMessageBox.information(
                 self.gui,
                 "Settings Saved",
                 f"Data export settings saved:\nDirectory: {self.export_directory}\nFilename: {self.export_filename}\
-                \n\n\nRecording export settings saved:\nDirectory: {self.video_directory}\nFilename: {self.video_filename}"
+                \n\n\nRecording export settings saved:\nDirectory: {self.video_directory}\nFilename: {self.video_filename}",
             )
-        
+
         dialog.accept()
-        
-    def excel_results(self, 
-                      rois: list, 
-                      arrow_angle: float,
-                      px2mm: float) -> None:
+
+    def excel_results(self, rois: list, arrow_angle: float, px2mm: float) -> None:
         """
         Handles exporting data for the program.
         """
         try:
             # Check if export directory and filename are set
             if not self.export_directory or not self.export_filename:
-                QMessageBox.warning(self.gui,
-                                    "Export Error",
-                                    "Please configure export settings before exporting.")
+                QMessageBox.warning(
+                    self.gui,
+                    "Export Error",
+                    "Please configure export settings before exporting.",
+                )
                 return
-            
+
             # Prepare the full file path
             file_path_csv = f"{self.export_directory}/{self.export_filename}.csv"
 
@@ -404,14 +431,11 @@ class Export(QFileDialog):
             )
 
         except Exception as e:
-            QMessageBox.critical(self.gui,
-                                 "Export Failed",
-                                 f"An error occurred during export: {e}")
+            QMessageBox.critical(
+                self.gui, "Export Failed", f"An error occurred during export: {e}"
+            )
 
-    def collect_export_data(self, 
-                            rois: list, 
-                            arrow_angle: float,
-                            px2mm: float) -> dict:
+    def collect_export_data(self, rois: list, arrow_angle: float, px2mm: float) -> dict:
         """
         Collects and structures export data from the given regions of interest (ROIs).
 
@@ -430,13 +454,13 @@ class Export(QFileDialog):
             organized list of ROI data with movement data, including frame index,
             velocity, timestamp, and average velocity.
         """
-        
+
         data = {
             "Arrow Direction": arrow_angle,  # Convert to degrees
             "Pixels per mm": px2mm,
             "roi_data": [],
         }
-        
+
         for i, roi in enumerate(rois):
             roi_data = {
                 "ROI Index": i + 1,
@@ -444,12 +468,11 @@ class Export(QFileDialog):
             }
 
             for frame_index, frame_data in enumerate(roi.delta_history):
-                
                 timestamp = frame_data[0]
                 delta_pixels = frame_data[1]
                 calibrated_delta = frame_data[2]
                 velocity = frame_data[3]
-                
+
                 # print("frame_index: ", frame_index + 1)
                 # print("delta_pixels: ", delta_pixels)
                 # print("calibrated_delta: ", calibrated_delta)  # Print the calibrated_delta element
@@ -457,38 +480,37 @@ class Export(QFileDialog):
                 # print("timestamp: ", timestamp)
                 # print("\n")
 
-                roi_data["Movement Data"].append({
-                    "Frame Index": frame_index + 1,
-                    "Timestamp": timestamp,
-                    "delta_pixels_x(px/frame)": delta_pixels[0],
-                    "delta_pixels_y(px/frame)": delta_pixels[1],
-                    "calibrated_delta(px/frame)": calibrated_delta,
-                    "Velocity(mm/s)": velocity,
-                })
-
+                roi_data["Movement Data"].append(
+                    {
+                        "Frame Index": frame_index + 1,
+                        "Timestamp": timestamp,
+                        "delta_pixels_x(px/frame)": delta_pixels[0],
+                        "delta_pixels_y(px/frame)": delta_pixels[1],
+                        "calibrated_delta(px/frame)": calibrated_delta,
+                        "Velocity(mm/s)": velocity,
+                    }
+                )
 
             data["roi_data"].append(roi_data)
-            
+
         return data
-        
-    def write_csv(self, 
-                  file_path: str, 
-                  data: dict) -> None:
+
+    def write_csv(self, file_path: str, data: dict) -> None:
         """
         Writes the export data to an Excel file, with each ROI in a separate sheet.
         """
-        
+
         wb = Workbook()
 
         # Add the arrow direction in the first sheet
         # arrow_sheet = wb.active
         first_sheet = wb.active
-        
-        first_sheet.title = "Calibration Data" # pyright: ignore
-        first_sheet.append(["Arrow Direction"]) # pyright: ignore
-        first_sheet.append([data["Arrow Direction"]]) # pyright: ignore
-        first_sheet.append(["Pixels per mm"]) # pyright: ignore
-        first_sheet.append([data["Pixels per mm"]]) # pyright: ignore
+
+        first_sheet.title = "Calibration Data"  # pyright: ignore
+        first_sheet.append(["Arrow Direction"])  # pyright: ignore
+        first_sheet.append([data["Arrow Direction"]])  # pyright: ignore
+        first_sheet.append(["Pixels per mm"])  # pyright: ignore
+        first_sheet.append([data["Pixels per mm"]])  # pyright: ignore
 
         # Create separate sheets for each ROI
         for roi in data["roi_data"]:
@@ -496,23 +518,29 @@ class Export(QFileDialog):
             ws = wb.create_sheet(title=sheet_name)
 
             # Add headers
-            ws.append(["Frame Index", 
-                       "Timestamp",
-                       "delta_pixels_x(px/frame)",
-                       "delta_pixels_y(px/frame)",
-                       "calibrated_delta(px/frame)",
-                       "Velocity(mm/s)"
-                       ])
+            ws.append(
+                [
+                    "Frame Index",
+                    "Timestamp",
+                    "delta_pixels_x(px/frame)",
+                    "delta_pixels_y(px/frame)",
+                    "calibrated_delta(px/frame)",
+                    "Velocity(mm/s)",
+                ]
+            )
 
             # Add movement data
             for movement in roi["Movement Data"]:
-                ws.append([movement["Frame Index"], 
-                           movement["Timestamp"],
-                           movement["delta_pixels_x(px/frame)"],
-                           movement["delta_pixels_y(px/frame)"],
-                           movement["calibrated_delta(px/frame)"],
-                           movement["Velocity(mm/s)"]
-                           ])
+                ws.append(
+                    [
+                        movement["Frame Index"],
+                        movement["Timestamp"],
+                        movement["delta_pixels_x(px/frame)"],
+                        movement["delta_pixels_y(px/frame)"],
+                        movement["calibrated_delta(px/frame)"],
+                        movement["Velocity(mm/s)"],
+                    ]
+                )
 
-        # Save the workbook 
+        # Save the workbook
         wb.save(file_path)
