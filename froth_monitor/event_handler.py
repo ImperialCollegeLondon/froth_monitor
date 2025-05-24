@@ -179,6 +179,10 @@ class EventHandler:
         # Camera selection dropdown
         camera_combo = QComboBox(dialog)
         camera_combo.addItems(available_cameras)
+        camera_combo.setStyleSheet(
+            "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
+            border-radius: 4px;"
+        )
         layout.addWidget(camera_combo)
 
         # Confirm button
@@ -386,13 +390,15 @@ class EventHandler:
         Args:
             resized_frame: The resized frame to process
         """
-        self.current_frame_number, roi_list = self.frame_model.process_frame(
+        self.current_frame_number, roi_list, update_velo_plot = self.frame_model.process_frame(
             resized_frame
         )
         self.display_roi(roi_list)
 
         # Update the velocity plot with the latest data
-        self.update_velocity_plot()
+        if update_velo_plot:
+            print("Update velocity plot")
+            self.update_velocity_plot()
 
     def _display_frame_on_canvas(self, scaled_image):
         """
@@ -779,7 +785,6 @@ class EventHandler:
             self.gui.plot_widget.setYRange(0, max_velocity * 1.1)
 
         # Update the plot
-        self.gui.plot_widget.update()
         self.gui.plot_widget.update()
 
 
