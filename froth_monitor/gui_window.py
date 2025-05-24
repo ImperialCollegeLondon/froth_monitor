@@ -14,10 +14,16 @@ from PySide6.QtWidgets import (
     QMenu,
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
     QGridLayout,
     QLineEdit,
+    QRadioButton,
+    QFrame,
+    QGroupBox,
+    QToolButton,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QIcon, QFont, QColor
 import pyqtgraph as pg
 import sys
 import numpy as np
@@ -42,8 +48,9 @@ class MainGUIWindow(QMainWindow):
         Initializes the main window and sets up the UI elements.
         """
         super(MainGUIWindow, self).__init__()
-        self.setWindowTitle("Froth Tracker")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setWindowTitle("Froth Monitor")
+        self.setGeometry(100, 100, 1000, 800)
+        self.setStyleSheet("background-color: #f0f0f0;")
 
         # Initialize default arrow angle (90 degrees)
         self.arrow_angle = -np.pi / 2
@@ -61,146 +68,344 @@ class MainGUIWindow(QMainWindow):
         """
         Initialize the UI elements of the main window.
 
-        This function sets up the main window's layout, adds a menu bar,
-        a grid layout for buttons and the video canvas, and adds placeholders
-        for the video canvas, arrow canvas, ROI movements canvas, and the
-        overflow direction label and text box.
+        This function sets up the main window's layout by calling specialized methods
+        for creating different parts of the UI, including the header bar, left panel controls,
+        and right panel with video canvas and graph display.
         """
-
         # Main widget and layout
         main_widget = QWidget(self)
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         main_widget.setLayout(main_layout)
 
-        # Menu bar
-        self.createMenuBar()
+        # Create header bar
+        header_bar = self._create_header_bar()
+        main_layout.addWidget(header_bar)
+        
+        # Main content area
+        content_widget = QWidget()
+        content_widget.setStyleSheet("background-color: #f0f0f0;")
+        content_layout = QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.addWidget(content_widget)
+        
+        # Create left panel with controls
+        left_panel = self._create_left_panel()
+        
+        # Create right panel with video canvas and graph
+        right_panel = self._create_right_panel()
+        
+        # Add panels to content layout
+        content_layout.addWidget(left_panel)
+        content_layout.addWidget(right_panel)
 
-        # Grid layout for buttons and canvas
-        grid_layout = QGridLayout()
-        main_layout.addLayout(grid_layout)
-
-        # Video canvas placeholder
-        self.add_canvas_placeholder(grid_layout)
-
-        # ROI Movements Canvas
-        self.add_ROI_movement_placeholder(grid_layout)
-
-        self.add_buttons(grid_layout)
-
-        # Px2mm value label
-        self.px2mm_textbox = QLineEdit(self)
-        self.px2mm_textbox.setText(f"{self.px2mm:.2f}")  # Default to 1.0
-        self.px2mm_textbox.setAlignment(Qt.AlignmentFlag.AlignRight)
-        grid_layout.addWidget(self.px2mm_textbox, 0, 1, 1, 1)
-
-        # Overflow direction value label
-        self.direction_textbox = QLineEdit(self)
-        self.direction_textbox.setText(
-            f"{np.degrees(self.arrow_angle):.2f}"
-        )  # Default to 90 degrees
-        self.direction_textbox.setAlignment(Qt.AlignmentFlag.AlignRight)
-        grid_layout.addWidget(self.direction_textbox, 1, 1, 1, 1)
-
-    def createMenuBar(self) -> None:
+    def _create_header_bar(self) -> QFrame:
         """
-        Create the menu bar for the main window.
-
-        This function creates a menu bar with two menus: "Import" and "Export".
-        The "Import" menu contains two actions: "Import Local Video" and "Load Camera".
-        The "Export" menu contains one action: "Export Settings".
+        Create the header bar with title.
+        
+        Returns:
+            QFrame: The header bar widget.
         """
+        header_bar = QFrame()
+        header_bar.setStyleSheet("background-color: #3c4043; color: white;")
+        header_bar.setFixedHeight(50)
+        header_layout = QHBoxLayout(header_bar)
+        header_layout.setContentsMargins(20, 0, 20, 0)
+        
+        # Add title to header
+        title_label = QLabel("Froth Monitor")
+        title_label.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
+        header_layout.addWidget(title_label)
+        
+        # Add spacer to push window controls to the right
+        header_layout.addStretch()
+        
+        return header_bar
 
-        menu_bar = QMenuBar(self)
-        self.setMenuBar(menu_bar)
-
-        # File menu
-        file_menu = QMenu("Import", self)
-        menu_bar.addMenu(file_menu)
-        self.local_import = file_menu.addAction("Import Local Video")
-        self.live_import = file_menu.addAction("Load Camera")
-
-        # Export menu
-        export_menu = QMenu("Export", self)
-        menu_bar.addMenu(export_menu)
-        self.export_button = export_menu.addAction("Export Settings")
-
-    def add_buttons(self, layout: QGridLayout) -> None:
+    def _create_left_panel(self) -> QFrame:
         """
-        Adds buttons to the layout for adding a ROI, pausing/resuming the video,
-        confirming the arrow direction, saving the current state, resetting the application,
-        and starting video recording.
+        Create the left panel with all control elements.
+        
+        Returns:
+            QFrame: The left panel widget with all controls.
         """
+        left_panel = QFrame()
+        left_panel.setFixedWidth(250)
+        left_panel.setStyleSheet("background-color: #f0f0f0;")
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setSpacing(15)
+        
+        # Add video source controls
+        source_group = self._create_video_source_controls()
+        left_layout.addWidget(source_group)
+        
+        # Add calibration controls
+        calibration_group = self._create_calibration_controls()
+        left_layout.addWidget(calibration_group)
+        
+        # Add ROI controls
+        roi_group = self._create_roi_controls()
+        left_layout.addWidget(roi_group)
+        
+        # Add reset buttons
+        self._add_reset_buttons(left_layout)
+        
+        # Add spacer at the bottom
+        left_layout.addStretch()
+        
+        return left_panel
 
-        self.calibration_button = QPushButton("Calibration (Ruler drawing)", self)
-        layout.addWidget(
-            self.calibration_button, 0, 0, 1, 1
-        )  # Add calibration button at the top left corner
-
-        self.add_arrow_button = QPushButton("Add overflow arrow")
-        layout.addWidget(self.add_arrow_button, 1, 0, 1, 1)
-
-        self.confirm_arrow_button = QPushButton("Confirm Arrow and Ruler", self)
-        layout.addWidget(self.confirm_arrow_button, 2, 0, 1, 2)
-
-        self.add_roi_button = QPushButton("Add One ROI", self)
-        layout.addWidget(self.add_roi_button, 4, 0, 1, 2)
-
-        self.delete_roi_button = QPushButton("Delete Last ROI", self)
-        layout.addWidget(self.delete_roi_button, 5, 0, 1, 2)
-
-        self.pause_play_button = QPushButton("Pause/Play", self)
-        layout.addWidget(self.pause_play_button, 7, 0, 1, 2)
-
-        self.save_end_button = QPushButton("Save", self)
-        layout.addWidget(self.save_end_button, 8, 0, 1, 2)
-
-        self.reset_button = QPushButton("Start a new mission", self)
-        layout.addWidget(self.reset_button, 9, 0, 1, 2)
-
-        self.start_record_button = QPushButton("Start Recording", self)
-        layout.addWidget(self.start_record_button, 11, 0, 1, 2)
-
-    def add_canvas_placeholder(self, layout: QGridLayout) -> None:
+    def _create_video_source_controls(self) -> QGroupBox:
         """
-        Adds a placeholder QLabel to the layout where the video canvas will be drawn.
-        The size of the label is fixed to 700x400.
+        Create the video source selection controls.
+        
+        Returns:
+            QGroupBox: The video source group box with radio buttons.
         """
-        # Create a container for the video canvas and overlay
-        self.video_container = QWidget(self)
-        self.video_container.setFixedSize(1000, 500)
-        layout.addWidget(self.video_container, 0, 4, 16, 4)
+        source_group = QGroupBox("Video Source")
+        source_group.setStyleSheet("font-weight: bold; font-size: 16px;")
+        source_layout = QVBoxLayout(source_group)
+        source_layout.setSpacing(10)
+        
+        # Radio buttons for video source
+        self.webcam_radio = QRadioButton("Webcam")
+        self.webcam_radio.setStyleSheet("font-weight: normal; font-size: 14px;")
+        self.prerecorded_radio = QRadioButton("Pre-recorded")
+        self.prerecorded_radio.setStyleSheet("font-weight: normal; font-size: 14px;")
+        self.webcam_radio.setChecked(True)
+        self.import_button = QPushButton("Import")
+        self.import_button.setStyleSheet(
+            "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
+        )
+        
+        source_layout.addWidget(self.webcam_radio)
+        source_layout.addWidget(self.prerecorded_radio)
+        source_layout.addWidget(self.import_button)
 
+        return source_group
+
+    def _create_calibration_controls(self) -> QGroupBox:
+        """
+        Create the calibration controls.
+        
+        Returns:
+            QGroupBox: The calibration group box with button and text input.
+        """
+        calibration_group = QGroupBox("Calibration")
+        calibration_group.setStyleSheet("font-weight: bold; font-size: 16px;")
+        calibration_layout = QVBoxLayout(calibration_group)
+        calibration_layout.setSpacing(10)
+
+        roi_layout = QHBoxLayout()
+        self.calibration_button = QPushButton("Draw Ruler")
+        self.calibration_button.setStyleSheet(
+            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
+        )
+        self.calibration_button.setFixedWidth(100)
+        
+        self.px2mm_textbox = QLineEdit()
+        self.px2mm_textbox.setText("1.0")  # Default value
+        self.px2mm_textbox.setStyleSheet(
+            "background-color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
+        )
+        self.px2mm_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        roi_layout.addWidget(self.calibration_button)
+        roi_layout.addWidget(self.px2mm_textbox)
+
+        arrow_layout = QHBoxLayout()
+        self.add_arrow_button = QPushButton("Draw Arrow")
+        self.add_arrow_button.setStyleSheet(
+            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
+        )
+        self.add_arrow_button.setFixedWidth(100)
+        
+        self.direction_textbox = QLineEdit()
+        self.direction_textbox.setText("-90.0")  # Default value
+        self.direction_textbox.setStyleSheet(
+            "background-color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
+        )
+        self.direction_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        arrow_layout.addWidget(self.add_arrow_button)
+        arrow_layout.addWidget(self.direction_textbox)
+
+        calibration_layout.addLayout(roi_layout)
+        calibration_layout.addLayout(arrow_layout)
+
+        
+        # calibration_layout.addWidget(self.add_roi_button)
+        # calibration_layout.addWidget(self.px2mm_textbox)
+        
+        return calibration_group
+
+    def _create_roi_controls(self) -> QGroupBox:
+        """
+        Create the ROI (Region of Interest) controls.
+        
+        Returns:
+            QGroupBox: The ROI group box with add and delete buttons.
+        """
+        roi_group = QGroupBox("ROI")
+        roi_group.setStyleSheet("font-weight: bold; font-size: 16px;")
+        roi_layout = QHBoxLayout(roi_group)
+        
+        # Add spacer to push buttons to the right
+        roi_layout.addStretch()
+        
+        # Add + and - buttons for ROI
+        self.add_roi_button = QPushButton("+")
+        self.add_roi_button.setStyleSheet(
+            "background-color: #3c4043; color: white; font-size: 18px; font-weight: bold; padding: 5px; border-radius: 4px;"
+        )
+        self.add_roi_button.setFixedSize(40, 40)
+        
+        self.delete_roi_button = QPushButton("-")
+        self.delete_roi_button.setStyleSheet(
+            "background-color: #3c4043; color: white; font-size: 18px; font-weight: bold; padding: 5px; border-radius: 4px;"
+        )
+        self.delete_roi_button.setFixedSize(40, 40)
+        
+        roi_layout.addWidget(self.add_roi_button)
+        roi_layout.addWidget(self.delete_roi_button)
+        
+        return roi_group
+
+    def _add_reset_buttons(self, layout: QVBoxLayout) -> None:
+        """
+        Add reset buttons to the given layout.
+        
+        Args:
+            layout: The layout to add the reset buttons to.
+        """
+        # Reset button with camera icon
+        self.reset_button = QPushButton(" Reset")
+        self.reset_button.setIcon(QIcon("froth_monitor/resources/camera_icon.svg"))
+        self.reset_button.setIconSize(QSize(24, 24))
+        self.reset_button.setStyleSheet(
+            "background-color: #3c4043; color: white; font-size: 14px; padding: 10px; border-radius: 4px; text-align: left;"
+        )
+        self.reset_button.setFixedHeight(50)
+        layout.addWidget(self.reset_button)
+        
+        # Simple Reset button (as shown in the image)
+        self.simple_reset_button = QPushButton("Reset")
+        self.simple_reset_button.setStyleSheet(
+            "background-color: #3c4043; color: white; font-size: 14px; padding: 10px; border-radius: 4px;"
+        )
+        layout.addWidget(self.simple_reset_button)
+
+    def _create_right_panel(self) -> QFrame:
+        """
+        Create the right panel with video canvas and graph display.
+        
+        Returns:
+            QFrame: The right panel widget with video and graph components.
+        """
+        right_panel = QFrame()
+        right_panel.setStyleSheet("background-color: #f0f0f0;")
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setSpacing(10)
+        
+        # Add video canvas
+        self._create_video_canvas(right_layout)
+        
+        # Add graph display
+        self._create_graph_display(right_layout)
+        
+        return right_panel
+
+    def _create_video_canvas(self, layout: QVBoxLayout) -> None:
+        """
+        Create the video canvas and add it to the given layout.
+        
+        Args:
+            layout: The layout to add the video canvas to.
+        """
+        self.video_container = QWidget()
+        self.video_container.setFixedSize(700, 400)
+        self.video_container.setStyleSheet("background-color: #333333; border-radius: 4px;")
+        video_container_layout = QVBoxLayout(self.video_container)
+        
         # Create the video canvas label
-        self.video_canvas_label = QLabel("VIDEO CANVAS", self.video_container)
+        self.video_canvas_label = QLabel("")
         self.video_canvas_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.video_canvas_label.setStyleSheet("background-color: black;")
-        self.video_canvas_label.setGeometry(0, 0, 1000, 500)
+        self.video_canvas_label.setStyleSheet("background-color: #333333;")
+        self.video_canvas_label.setGeometry(0, 0, 700, 400)
+        video_container_layout.addWidget(self.video_canvas_label)
+        
+        layout.addWidget(self.video_container)
+        
+        # Add media controls below the video canvas
+        self._create_media_controls(layout)
 
-    def add_ROI_movement_placeholder(self, layout: QGridLayout) -> None:
+    def _create_graph_display(self, layout: QVBoxLayout) -> None:
         """
-        Adds a placeholder for the ROI movement curves to the layout.
-
-        Creates a PlotWidget instance and adds it to the layout. The widget is
-        set to have a fixed size of 700x200 and the Y-axis scale is hidden.
-        The X-axis scale is also hidden, and a legend is added to the plot.
+        Create the graph display for velocity vs time and add it to the given layout.
+        
+        Args:
+            layout: The layout to add the graph display to.
         """
-
+        # Velocity vs Time label
+        velocity_label = QLabel("Velocity vs Time")
+        velocity_label.setStyleSheet("font-weight: bold; font-size: 16px;")
+        layout.addWidget(velocity_label)
+        
+        # ROI Movements Canvas (graph)
         self.plot_widget = pg.PlotWidget()
-        self.plot_widget.setBackground("black")
-        self.plot_widget.setFixedSize(1000, 300)
-        # self.plot_widget.hideAxis('left')  # Hide Y-axis scale
-        # self.plot_widget.hideAxis('bottom')  # Hide X-axis scale
-        self.plot_widget.addLegend()
-        # Show axes that were hidden in the GUI setup
+        self.plot_widget.setBackground("white")
+        self.plot_widget.setFixedHeight(200)
         self.plot_widget.showAxis("left")
         self.plot_widget.showAxis("bottom")
-
-        # Set axis labels with proper units
         self.plot_widget.setLabel("left", "Velocity", units="mm/s")
         self.plot_widget.setLabel("bottom", "Time", units="frames")
+        self.plot_widget.addLegend()
+        
+        # Add a sample blue curve for visualization
+        x = np.linspace(0, 10, 100)
+        y = np.sin(x) + np.random.normal(0, 0.1, 100)
+        pen = pg.mkPen(color='#4285f4', width=2)
+        self.plot_widget.plot(x, y, pen=pen)
+        
+        layout.addWidget(self.plot_widget)
+        
+        # Add "Average 30 s" label
+        # avg_label = QLabel("Average 30 s")
+        # avg_label.setStyleSheet("font-size: 14px; color: #333333; text-align: center;")
+        # avg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # layout.addWidget(avg_label)
 
-        layout.addWidget(self.plot_widget, 16, 4, 10, 4)
+    def _create_media_controls(self, layout: QVBoxLayout) -> None:
+        """
+        Create media control buttons (play/pause) below the video canvas.
+        
+        Args:
+            layout: The layout to add the media controls to.
+        """
+        # Create a container for media controls
+        media_controls_container = QWidget()
+        media_controls_layout = QHBoxLayout(media_controls_container)
+        media_controls_layout.setContentsMargins(0, 5, 0, 5)
+        
+        # Create play/pause button
+        self.play_pause_button = QPushButton()
+        self.play_pause_button.setIcon(QIcon("froth_monitor/resources/pause_icon.svg"))
+        self.play_pause_button.setIconSize(QSize(24, 24))
+        self.play_pause_button.setStyleSheet(
+            "background-color: #3c4043; color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
+        )
+        self.play_pause_button.setFixedSize(40, 40)
+        self.play_pause_button.setToolTip("Play/Pause Video")
+        
+        # Add the button to the layout
+        media_controls_layout.addWidget(self.play_pause_button)
+        media_controls_layout.addStretch()
+        
+        # Add the media controls container to the main layout
+        layout.addWidget(media_controls_container)
+    
+    # The createMenuBar, add_buttons, add_canvas_placeholder, and add_ROI_movement_placeholder methods
+    # have been integrated into the new initUI method to create a more modern interface
 
 
 if __name__ == "__main__":
