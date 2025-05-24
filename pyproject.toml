@@ -39,4 +39,3 @@ froth_monitor = "froth_monitor.__main__:main"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-

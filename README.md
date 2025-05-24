@@ -1,8 +1,10 @@
 # Froth monitor
+
 ---
 Froth monitor is an interactive GUI application for analyzing froth videos in real-time or offline. It allows users to draw Regions of Interest (ROIs), track froth movement using optical flow algorithm (more algorithms in the future), and export detailed analysis results, including velocity data, timestamps, and average velocity.
 
 ## Features
+
 - Real-time froth movement tracking via live camera input.
 - Supports video imports in popular formats (e.g., MP4, AVI).
 - Draw, manage, and analyze multiple Regions of Interest (ROIs).
@@ -12,87 +14,104 @@ Froth monitor is an interactive GUI application for analyzing froth videos in re
 - Automatically save and load application data.
 - Integrated video recording for live camera input.
 
-
 ## Demo
-
-
 
 ## Installation
 
 1. Clone the repository:
+
    ```
    git clone https://github.com/gyyyno1/Froth_monitor.git
 
 2. Navigate to the project directory:
+
    ```
    cd your-repo
 
 3. Install dependencies by poetry
+
    ```
    pipx install poetry
    poetry install
    ```
+
    , or to build the environment without using poetry:
+
    ```
    pip install -r requirements.txt
    ```
 
 4. Make sure the package is installed in editable mode:
+
    ```
    pip install -e .
    ```
-   
+
 5. Run the application by poetry
+
    ```
    poetry run python -m froth_monitor
    ```
+
    , or to run it in the local environment
+
    ```
    python -m froth_monitor
    ```
+
 __________________________________________________________________________________________________________________________________________________________________
+
 # Update: 21st Nov 2024
+
 ### Work in Progress
 
 A dynamic and interactive application designed to analyze and visualize froth movement from video data using advanced image processing and data visualization techniques.
 
 # Features
-## 1. Arrow Direction Analysis:
+
+## 1. Arrow Direction Analysis
 
 Draw, lock, and display an arrow indicating the direction of froth overflow.
 Customizable and adjustable arrow direction for flexible analysis.
-## 2. Region of Interest (ROI) Detection:
+
+## 2. Region of Interest (ROI) Detection
 
 Draw multiple ROIs on the video canvas.
 Real-time movement analysis for each ROI.
 Axis visualization (X and Y axes) within each ROI to track movement.
-## 3. Video Processing:
+
+## 3. Video Processing
 
 Frame-by-frame video display with integrated image analysis.
 Supports both local video files and live camera input.
-## 4. Data Export:
+
+## 4. Data Export
 
 Export analysis results as Excel files.
 Customizable file naming and export directory.
 Separate sheets for each ROI in the Excel output.
-## 5. Replay and Reset:
+
+## 5. Replay and Reset
 
 Save and end the current session, clearing ROIs and resetting the interface for a new analysis.
-## 6. Visualizations:
+
+## 6. Visualizations
 
 Real-time animation of velocity changes over frames.
 Dedicated arrow canvas to display locked arrow direction.
 
 __________________________________________________________________________________________________________________________________________________________________
+
 # Update: 23rd Oct 2023
+
 ### Work in Progress
 
 ### To be realised (* means already done)
+
 1. csv*
 2. stop and restart new databook*
 3. angle in degrees with manual typing (pre-set value choices)
 4. programmed video with disappearing bubbles
-
 
 # How to run the program from source code
 

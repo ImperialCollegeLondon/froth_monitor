@@ -2,10 +2,11 @@
 
 from froth_monitor.event_handler import EventHandler
 from froth_monitor.gui_window import MainGUIWindow
+
 # from .gui import MainGUI
 import sys
 from PySide6.QtWidgets import QApplication, QStyleFactory
-from PySide6.QtGui import QImage, QPixmap, QPainter, QFont, QColor, QPen
+from PySide6.QtGui import QFont
 
 
 if __name__ == "__main__":

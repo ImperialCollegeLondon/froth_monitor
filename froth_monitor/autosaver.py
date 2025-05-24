@@ -9,7 +9,7 @@ Classes:
 --------
 AutoSaver
     Handles automatic saving and loading of application state to/from a JSON file.
-    
+
 Imports:
 --------
 - json:
@@ -23,6 +23,7 @@ Imports:
 import json
 import os
 from datetime import datetime
+
 
 class AutoSaver:
     """
@@ -55,32 +56,27 @@ class AutoSaver:
     load_from_file() -> dict
         Loads previously saved data from the file and returns it as a dictionary.
     """
-    
-    def __init__(self, 
-                 file_path: str = "data/auto_save",
-                 file_name: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")) -> None:
-        
+
+    def __init__(
+        self,
+        file_path: str = "data/auto_save",
+        file_name: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+    ) -> None:
         self.file_path = f"{file_path}/{file_name}.json"
-        self.data = {
-            "arrow_direction": None,
-            "roi_data": []
-        }
-    
-    def update_arrow_direction(self, 
-                               arrow_angle: float) -> None:
+        self.data = {"arrow_direction": None, "roi_data": []}
+
+    def update_arrow_direction(self, arrow_angle: float) -> None:
         """
         Updates the overflow direction to the given angle (in radians) in the autosave data.
 
         The angle is stored as a float in the autosave data.
         """
-        
+
         self.data["arrow_direction"] = float(arrow_angle)  # Store as float
-    
-    def add_frame_data(self, 
-                       roi_index: int, 
-                       frame_index: int, 
-                       velocity: float, 
-                       timestamp: str) -> None:
+
+    def add_frame_data(
+        self, roi_index: int, frame_index: int, velocity: float, timestamp: str
+    ) -> None:
         """
         Adds frame data to the given ROI index.
 
@@ -96,27 +92,31 @@ class AutoSaver:
 
         The data is saved to the autosave file after adding.
         """
-        
+
         # Ensure the ROI exists
         while len(self.data["roi_data"]) <= roi_index:
-            self.data["roi_data"].append({"ROI Index": len(self.data["roi_data"]) + 1, "Movement Data": []})
+            self.data["roi_data"].append(
+                {"ROI Index": len(self.data["roi_data"]) + 1, "Movement Data": []}
+            )
 
         velocity = float(velocity)
         roi_index = int(roi_index)
         frame_index = int(frame_index)
-        
+
         # Append movement data
-        self.data["roi_data"][roi_index]["Movement Data"].append({
-            "Frame Index": frame_index,
-            "Velocity": velocity,
-            "Timestamp": timestamp,
-        })
+        self.data["roi_data"][roi_index]["Movement Data"].append(
+            {
+                "Frame Index": frame_index,
+                "Velocity": velocity,
+                "Timestamp": timestamp,
+            }
+        )
         self.save_to_file()  # Save every update
-    
+
     def save_to_file(self) -> None:
         """
         Saves the autosave data to the file path specified during initialization.
-        
+
         If a serialization error occurs, a TypeError is raised, and the problematic data is printed.
         """
         try:
@@ -126,9 +126,8 @@ class AutoSaver:
             print(f"Serialization error: {e}")
             print(f"Problematic data: {self.data}")
             raise
-    
+
     def load_from_file(self) -> None:
-        
         """
         Loads autosave data from the file specified during initialization.
 
@@ -142,5 +141,5 @@ class AutoSaver:
             with open(self.file_path, "r") as f:
                 self.data = json.load(f)
                 return self.data
-            
-        return None        
+
+        return None
