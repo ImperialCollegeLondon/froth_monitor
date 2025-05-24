@@ -14,6 +14,14 @@ if __name__ == "__main__":
     font = QFont("SF Pro", 11)  # You can adjust size as needed
     app.setFont(font)
     app.setStyle(QStyleFactory.create("Macintosh"))
+    app.setStyleSheet("""
+        QLabel, QLineEdit, QRadioButton, QPushButton, QGroupBox, QMenuBar, QMenu, QMessageBox {
+            color: black;
+        }
+        QMessageBox QLabel {
+            color: black;
+        }
+    """)
     window = MainGUIWindow()
     print("starting event handler")
     handler = EventHandler(window)

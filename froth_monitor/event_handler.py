@@ -97,13 +97,13 @@ class EventHandler:
         """Connect GUI signals to their respective handler methods."""
         # Connect menu actions directly
         self.gui.import_button.clicked.connect(self.handle_video_import)
-        # self.gui.export_button.triggered.connect(self.export_settings)
+        self.gui.export_button.clicked.connect(self.export_settings)
 
         # # Connect buttons directly using the gui reference
         self.gui.play_pause_button.clicked.connect(self.pause_play)
         self.gui.add_roi_button.clicked.connect(self.add_roi)
-        # self.gui.confirm_arrow_button.clicked.connect(self.confirm_arrow_n_ruler)
-        # self.gui.save_end_button.clicked.connect(self.save_data)
+        self.gui.confirm_arrow_button.clicked.connect(self.confirm_arrow_n_ruler)
+        self.gui.save_button.clicked.connect(self.save_data)
         # self.gui.reset_button.clicked.connect(self.reset_mission)
         # self.gui.start_record_button.clicked.connect(self.toggle_recording)
         self.gui.add_arrow_button.clicked.connect(self.start_arrow_drawing)
@@ -786,6 +786,14 @@ class EventHandler:
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("macintosh")
+    app.setStyleSheet("""
+        QLabel, QLineEdit, QRadioButton, QPushButton, QGroupBox, QMenuBar, QMenu, QMessageBox {
+            color: black;
+        }
+        QMessageBox QLabel {
+            color: black;
+        }
+    """)
     window = MainGUIWindow()
     handler = EventHandler(window)
     window.show()
