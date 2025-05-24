@@ -15,7 +15,7 @@ pyqtgraph = "^0.13.7"
 PySide6 = "^6.8.0.2"
 pytest = "^8.3.3"
 pytest-qt = "^4.4.0"
-importlib-metadata = "^8.5.0"
+importlib-metadata = "^8.7.0"
 importlib = "^1.0.4"
 
 [tool.poetry.group.docs.dependencies]
