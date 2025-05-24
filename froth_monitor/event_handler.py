@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QTimer, Qt, QRect
 from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QIcon
 
 # Import MainGUIWindow at the beginning
 from froth_monitor.gui_window import MainGUIWindow
@@ -95,20 +96,25 @@ class EventHandler:
     def connect_signals(self):
         """Connect GUI signals to their respective handler methods."""
         # Connect menu actions directly
-        self.gui.local_import.triggered.connect(self.import_local_video)
-        self.gui.live_import.triggered.connect(self.load_camera_dialog)
-        self.gui.export_button.triggered.connect(self.export_settings)
+        self.gui.import_button.clicked.connect(self.handle_video_import)
+        # self.gui.export_button.triggered.connect(self.export_settings)
 
-        # Connect buttons directly using the gui reference
-        self.gui.pause_play_button.clicked.connect(self.pause_play)
+        # # Connect buttons directly using the gui reference
+        self.gui.play_pause_button.clicked.connect(self.pause_play)
         self.gui.add_roi_button.clicked.connect(self.add_roi)
-        self.gui.confirm_arrow_button.clicked.connect(self.confirm_arrow_n_ruler)
-        self.gui.save_end_button.clicked.connect(self.save_data)
-        self.gui.reset_button.clicked.connect(self.reset_mission)
-        self.gui.start_record_button.clicked.connect(self.toggle_recording)
+        # self.gui.confirm_arrow_button.clicked.connect(self.confirm_arrow_n_ruler)
+        # self.gui.save_end_button.clicked.connect(self.save_data)
+        # self.gui.reset_button.clicked.connect(self.reset_mission)
+        # self.gui.start_record_button.clicked.connect(self.toggle_recording)
         self.gui.add_arrow_button.clicked.connect(self.start_arrow_drawing)
         self.gui.calibration_button.clicked.connect(self.start_ruler_calibration)
         self.gui.delete_roi_button.clicked.connect(self.delete_last_roi)
+
+    def handle_video_import(self):
+        if self.gui.webcam_radio.isChecked():
+            self.load_camera_dialog()
+        else:
+            self.import_local_video()
 
     def initialize_for_local_video(self, video_capture: cv2.VideoCapture) -> None:
         """
@@ -231,12 +237,16 @@ class EventHandler:
             self.camera_thread.pause()
             self.playing = False
             self.gui.statusBar().showMessage("Video paused")
+            # Change icon to play icon when paused
+            self.gui.play_pause_button.setIcon(QIcon("froth_monitor/resources/play_icon.svg"))
         else:
             # If the thread is running but paused, just resume it
             if self.camera_thread.is_running() and self.camera_thread.is_paused():
                 self.camera_thread.resume()
                 self.playing = True
                 self.gui.statusBar().showMessage("Video resumed")
+                # Change icon to pause icon when playing
+                self.gui.play_pause_button.setIcon(QIcon("froth_monitor/resources/pause_icon.svg"))
             # If the thread is not running, we need to restart it
             elif hasattr(self, "last_video_source"):
                 self.camera_thread.start_capture(self.last_video_source)
