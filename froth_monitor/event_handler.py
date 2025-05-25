@@ -326,7 +326,12 @@ class EventHandler:
         )
 
         # Process the frame with the frame model
+
+        # Only allow to let frame pass in when the previous frame has been processed
+        # This is to prevent the overstacking of frames
+        self.camera_thread.if_release = False
         self._process_frame_with_model(resized_frame)
+        self.camera_thread.if_release = True
 
         # Display the frame on the canvas
         pixmap = self._display_frame_on_canvas(scaled_image)
