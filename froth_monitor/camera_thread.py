@@ -44,6 +44,11 @@ class CameraThread(QObject):
         self.video_source = (
             None  # Store the video source for pause/resume functionality
         )
+        self.buffer_size = 0
+        self.max_buffer = 5  # Allow 5 frames in buffer
+        self.buffer_lock = threading.Lock()
+
+        self.if_release = True
 
     def start_capture(self, video_source):
         """
@@ -131,13 +136,19 @@ class CameraThread(QObject):
                 self.running = False
                 break
 
+            # Skip frame if buffer is full
+            # with self.buffer_lock:
+            #     if self.buffer_size >= self.max_buffer:
+            #         continue
+            #     self.buffer_size += 1
+
             current_time = time.time()
 
             # For video files, control the frame rate
             if self.is_video_file:
+
                 # Calculate time elapsed since last frame
                 elapsed = current_time - last_frame_time
-
                 # If we need to wait to maintain the correct frame rate
                 if elapsed < self.frame_delay:
                     time.sleep(self.frame_delay - elapsed)
@@ -146,7 +157,9 @@ class CameraThread(QObject):
                 time.sleep(0.001)
 
             # Emit signal with the captured frame
-            self.frame_available.emit(frame)
+            if self.if_release:
+                self.frame_available.emit(frame)
+
 
             # Update last frame time
             last_frame_time = time.time()
@@ -204,3 +217,9 @@ class CameraThread(QObject):
         if self.video_capture and self.video_capture.isOpened():
             return self.video_capture.get(cv2.CAP_PROP_FPS)
         return 0.0
+
+    def release_buffer(self):
+        """Decrement buffer counter when frame processing completes"""
+        with self.buffer_lock:
+            if self.buffer_size > 0:
+                self.buffer_size -= 1
