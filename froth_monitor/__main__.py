@@ -16,9 +16,11 @@ if __name__ == "__main__":
     app.setStyle(QStyleFactory.create("Macintosh"))
     app.setStyleSheet("""
         QLabel, QLineEdit, QRadioButton, QPushButton, QGroupBox, \
-            QMenuBar, QMenu, QMessageBox, QDialog, QComboBox, QCheckBox, QToggleBox  {
+            QMenuBar, QMenu, QMessageBox, QDialog, QComboBox, QCheckBox, QRadioButton 
+            {
             color: black;
         }
+        
         QMessageBox QLabel {
             color: black;
         }

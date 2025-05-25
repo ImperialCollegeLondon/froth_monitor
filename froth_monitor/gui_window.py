@@ -181,9 +181,19 @@ class MainGUIWindow(QMainWindow):
         self.webcam_radio.setChecked(True)
         self.import_button = QPushButton("Import")
         self.import_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 14px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
-        
         source_layout.addWidget(self.webcam_radio)
         source_layout.addWidget(self.prerecorded_radio)
         source_layout.addWidget(self.import_button)
@@ -206,7 +216,18 @@ class MainGUIWindow(QMainWindow):
         roi_layout = QHBoxLayout()
         self.calibration_button = QPushButton("Draw Ruler")
         self.calibration_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         self.calibration_button.setFixedWidth(100)
         
@@ -222,8 +243,18 @@ class MainGUIWindow(QMainWindow):
         arrow_layout = QHBoxLayout()
         self.add_arrow_button = QPushButton("Draw Arrow")
         self.add_arrow_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px;\
-             border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         self.add_arrow_button.setFixedWidth(100)
         
@@ -236,8 +267,18 @@ class MainGUIWindow(QMainWindow):
 
         self.confirm_arrow_button = QPushButton("Confirm calibration")
         self.confirm_arrow_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px;\
-             border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 14px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         arrow_layout.addWidget(self.add_arrow_button)
         arrow_layout.addWidget(self.direction_textbox)
@@ -270,15 +311,29 @@ class MainGUIWindow(QMainWindow):
         # Add + and - buttons for ROI
         self.add_roi_button = QPushButton("+")
         self.add_roi_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 18px; \
-            font-weight: bold; padding: 5px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 18px; \
+            font-weight: bold; padding: 5px; border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         self.add_roi_button.setFixedSize(40, 40)
         
         self.delete_roi_button = QPushButton("-")
         self.delete_roi_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 18px; \
-            font-weight: bold; padding: 5px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 18px; \
+            font-weight: bold; padding: 5px; border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         self.delete_roi_button.setFixedSize(40, 40)
         
@@ -371,13 +426,35 @@ class MainGUIWindow(QMainWindow):
         # roi_layout = QHBoxLayout()
         self.export_button = QPushButton("Export/Recording Settings")
         self.export_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         # self.calibration_button.setFixedWidth(100)
         
         self.save_button = QPushButton("Save")
         self.save_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         export_layout.addWidget(self.export_button)
         export_layout.addWidget(self.save_button)
@@ -438,8 +515,15 @@ class MainGUIWindow(QMainWindow):
         self.play_pause_button.setIcon(QIcon("froth_monitor/resources/pause_icon.svg"))
         self.play_pause_button.setIconSize(QSize(24, 24))
         self.play_pause_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
-            border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
+            border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         self.play_pause_button.setFixedSize(40, 40)
         self.play_pause_button.setToolTip("Play/Pause Video")
@@ -460,6 +544,16 @@ if __name__ == "__main__":
     app.setStyleSheet("""
         QLabel, QLineEdit, QRadioButton, QPushButton, QGroupBox, QMenuBar, QMenu, QMessageBox {
             color: black;
+        }
+        QPushButton {
+            background-color: #4285f4;
+            color: white;
+            font-size: 14px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        QPushButton:hover {
+            background-color: #3367d6;
         }
         QMessageBox QLabel {
             color: black;
