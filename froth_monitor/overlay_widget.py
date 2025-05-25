@@ -112,6 +112,8 @@ class OverlayWidget(QWidget):
             event: The paint event
         """
 
+        time_1 = time.time()
+
         # Create painter
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -207,6 +209,7 @@ class OverlayWidget(QWidget):
                 self.drawROIs(painter)
 
         painter.end()
+        print("OverlayWidget paintEvent time:", time.time() - time_1, "s")
 
     def showEvent(self, event):
         """

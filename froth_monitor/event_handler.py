@@ -396,9 +396,9 @@ class EventHandler:
         self.display_roi(roi_list)
 
         # Update the velocity plot with the latest data
-        if update_velo_plot:
-            print("Update velocity plot")
-            self.update_velocity_plot()
+        # if update_velo_plot:
+        #     print("Update velocity plot")
+        #     self.update_velocity_plot()
 
     def _display_frame_on_canvas(self, scaled_image):
         """
@@ -501,11 +501,21 @@ class EventHandler:
             )
             return
 
+        # Check if calibration is confirmed
+        if not self.confirm_calibration:
+            QMessageBox.warning(
+                self.gui,
+                "Warning",
+                "Please confirm the arrow and ruler before adding ROIs.",
+            )
+            return
+
         # Create overlay widget if it doesn't exist
         if not self.overlay_widget:
             self.overlay_widget = OverlayWidget(self.gui.video_container)
             # Connect the ROI created signal to our handler
             self.overlay_widget.roi_created.connect(self.handle_roi_created)
+        
         # Connect the ruler measurement signal to our handler
         self.overlay_widget.ruler_measured.connect(self.handle_ruler_measurement)
 

@@ -203,6 +203,8 @@ class FrameModel:
         tuple[int, np.ndarray]
             A tuple containing the frame number and the processed frame.
         """
+
+        time_1 = time.time()
         if frame is None:
             return None, None
 
@@ -238,7 +240,7 @@ class FrameModel:
                     if_new_velo += 1
         if if_new_velo >0 :
             update_velo_plot = True
-
+        print("time to process a frame: ", time.time() - time_1, "s")
         return self.frame_count, self.roi_list, update_velo_plot
 
     def get_frame_count(self) -> int:
