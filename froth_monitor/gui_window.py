@@ -235,11 +235,16 @@ class MainGUIWindow(QMainWindow):
         self.px2mm_textbox = QLineEdit()
         self.px2mm_textbox.setText("1.0")  # Default value
         self.px2mm_textbox.setStyleSheet(
-            "background-color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
+            "background-color: white; font-size: 10px; padding: 8px; border-radius: 4px;"
         )
         self.px2mm_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        px2mm_label = QLabel("px/mm")
+        px2mm_label.setStyleSheet(
+            "color: black; font-size: 8px;"
+        )
         roi_layout.addWidget(self.calibration_button)
         roi_layout.addWidget(self.px2mm_textbox)
+        roi_layout.addWidget(px2mm_label)
 
         arrow_layout = QHBoxLayout()
         self.add_arrow_button = QPushButton("Draw Arrow")
@@ -262,9 +267,13 @@ class MainGUIWindow(QMainWindow):
         self.direction_textbox = QLineEdit()
         self.direction_textbox.setText("-90.0")  # Default value
         self.direction_textbox.setStyleSheet(
-            "background-color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
+            "background-color: white; font-size: 10px; padding: 8px; border-radius: 4px;"
         )
         self.direction_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        degree_label = QLabel("degree")
+        degree_label.setStyleSheet(
+            "color: black; font-size: 8px;"
+        )
 
         self.confirm_arrow_button = QPushButton("Confirm calibration")
         self.confirm_arrow_button.setStyleSheet(
@@ -283,6 +292,7 @@ class MainGUIWindow(QMainWindow):
         )
         arrow_layout.addWidget(self.add_arrow_button)
         arrow_layout.addWidget(self.direction_textbox)
+        arrow_layout.addWidget(degree_label)
 
         calibration_layout.addLayout(roi_layout)
         calibration_layout.addLayout(arrow_layout)
@@ -348,7 +358,7 @@ class MainGUIWindow(QMainWindow):
     
     def resource_path(self,relative_path):
         if hasattr(sys, '_MEIPASS'):
-            return os.path.join(sys._MEIPASS, relative_path)
+            return os.path.join(sys._MEIPASS, relative_path) # type: ignore
         return relative_path
         
     def _add_reset_buttons(self, layout: QVBoxLayout) -> None:
@@ -496,6 +506,21 @@ class MainGUIWindow(QMainWindow):
             color: black")
         layout.addWidget(velocity_label)
         
+        horizontal_layout = QHBoxLayout()
+
+
+        example_1d_data = ["N/A"]
+        # ROI Movements Table
+        self.table_widget = pg.TableWidget()
+        self.table_widget.setData(example_1d_data)
+        # self.table_widget.setColumnCount(2)
+        self.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
+        self.table_widget.setFormat("%.2f")
+        self.table_widget.setColumnWidth(0, 120)
+        # self.table_widget.setColumnWidth(1, 100)
+        self.table_widget.setFixedHeight(200)
+
+
         # ROI Movements Canvas (graph)
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setBackground("white")
@@ -505,20 +530,17 @@ class MainGUIWindow(QMainWindow):
         self.plot_widget.setLabel("left", "Velocity", units="mm/s")
         self.plot_widget.setLabel("bottom", "Time", units="secs")
         self.plot_widget.addLegend()
-        
-        # Add a sample blue curve for visualization
-        # x = np.linspace(0, 10, 100)
-        # y = np.sin(x) + np.random.normal(0, 0.1, 100)
-        # pen = pg.mkPen(color='#4285f4', width=2)
-        # self.plot_widget.plot(x, y, pen=pen)
-        
-        layout.addWidget(self.plot_widget)
+        horizontal_layout.addWidget(self.table_widget)
+        horizontal_layout.addWidget(self.plot_widget)
+        layout.addLayout(horizontal_layout)
+
+        # layout.addWidget(self.plot_widget)
         
         # Add "Average 30 s" label
-        # avg_label = QLabel("Average 30 s")
-        # avg_label.setStyleSheet("font-size: 14px; color: #333333; text-align: center;")
-        # avg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # layout.addWidget(avg_label)
+        avg_label = QLabel("Average over past 30s")
+        avg_label.setStyleSheet("font-size: 14px; color: #333333; text-align: center;")
+        avg_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(avg_label)
 
     def _create_media_controls(self, layout: QVBoxLayout) -> None:
         """

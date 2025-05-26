@@ -35,6 +35,7 @@ print(f"Processing frame {frame_number}")
 
 import numpy as np
 import time
+from typing import cast
 from datetime import datetime
 from PySide6.QtCore import QRect
 from froth_monitor.image_analysis import VideoAnalysis
@@ -60,7 +61,7 @@ class ROI:
         self.current_velocity = 0.0
         self.velo_only_history = []
 
-        self.average_velocity_past_30s = 0.0
+        self.average_velocity_past_30s = cast(float, None)
 
     def process_frame(self, frame: np.ndarray) -> tuple[bool, bool]:
         """
