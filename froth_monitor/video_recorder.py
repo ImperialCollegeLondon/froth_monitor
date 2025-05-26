@@ -8,8 +8,9 @@ initialization of the video writer, frame processing, and file management.
 import cv2
 import os
 import time
+import numpy as np
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, cast
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QMessageBox
 
@@ -52,8 +53,13 @@ class VideoRecorder(QObject):
         self.frame_width = 0
         self.frame_height = 0
         self.fps = 30.0  # Default FPS
+        self.frame_interval = 0.0  # Time interval between frames
+        self.is_video_file = False  # Flag to indicate if recording from a video file or camera
+        self.previous_frame = cast(np.ndarray, None)  # Store the previous frame for comparison
 
-    def start_recording(self, directory: str, filename: str, frame_width: int, frame_height: int, fps: float = 30.0) -> bool:
+    def start_recording(self, directory: str, filename: str, 
+    frame_width: int, frame_height: int, fps: float = 30.0,
+    is_video_file: bool = False) -> bool:
         """
         Start recording video frames to a file.
 
@@ -74,6 +80,8 @@ class VideoRecorder(QObject):
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.fps = fps
+        self.frame_interval = 1.0 / fps
+        self.is_video_file = is_video_file
 
         # Create output directory if it doesn't exist
         if not os.path.exists(directory):
@@ -117,10 +125,27 @@ class VideoRecorder(QObject):
         """
         if not self.is_recording or self.video_writer is None:
             return False
+        
+        # Insert previous frames to keep the same pace of the live video feed
+        # As the fps of a realtime camera might not be constant
+        if self.frame_count > 0:
+            # Check if it's time to record the next frame
+            if not self.is_video_file:
+                current_time = time.time()
+                print("Live recording")
+                if current_time - self.previous_frame_time > self.frame_interval:
+                    num_interval = int((current_time - self.previous_frame_time) / self.frame_interval)
+                    for _ in range(num_interval):
+                        self.video_writer.write(self.previous_frame)
+                        self.frame_count += 1
 
         # Ensure frame dimensions match what the writer expects
         if frame.shape[1] != self.frame_width or frame.shape[0] != self.frame_height:
             frame = cv2.resize(frame, (self.frame_width, self.frame_height))
+
+        if not self.is_video_file:
+            self.previous_frame = frame
+            self.previous_frame_time = time.time()
 
         # Write the frame
         self.video_writer.write(frame)
@@ -140,10 +165,6 @@ class VideoRecorder(QObject):
         if not self.is_recording or self.video_writer is None:
             return False, "", 0
 
-        # Calculate recording duration
-        duration = time.time() - self.start_time
-        actual_fps = self.frame_count / duration if duration > 0 else 0
-
         # Release video writer
         self.video_writer.release()
         self.video_writer = None
@@ -152,8 +173,6 @@ class VideoRecorder(QObject):
         # Print recording statistics
         print(f"Recording stopped: {self.output_path}")
         print(f"Frames recorded: {self.frame_count}")
-        print(f"Duration: {duration:.2f} seconds")
-        print(f"Actual FPS: {actual_fps:.2f}")
 
         # Emit signal that recording has stopped
         self.recording_stopped.emit(self.output_path, self.frame_count)

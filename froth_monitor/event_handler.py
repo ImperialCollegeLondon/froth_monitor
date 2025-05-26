@@ -697,6 +697,14 @@ class EventHandler:
             )
             return
 
+        if not self.export.finish_save_setting:
+            QMessageBox.warning(
+                self.gui,
+                "Export Error",
+                "Please configure export settings before recording.",
+            )
+            return
+
         if not self.recording_active:
             # Start recording
             # Get video directory and filename from export settings
@@ -709,16 +717,15 @@ class EventHandler:
                 self.export.video_directory = video_directory
 
             # Get frame dimensions and FPS
+            fps = 120.0
             frame_width, frame_height = self.camera_thread.get_frame_dimensions()
-            fps = self.camera_thread.get_fps()
+            if self.camera_thread.is_video_file:
+                fps = self.camera_thread.get_fps()
             
-            # If FPS is not available (e.g., from webcam), use a default value
-            if fps <= 0:
-                fps = 30.0
-
             # Start recording
             success = self.video_recorder.start_recording(
-                video_directory, video_filename, frame_width, frame_height, fps
+                video_directory, video_filename, frame_width, frame_height, 
+                fps, self.camera_thread.is_video_file
             )
 
             if success:
