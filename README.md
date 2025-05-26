@@ -74,3 +74,7 @@ Separate sheets for each ROI in the Excel output.
 #### 5. Replay and Reset
 
 Save and end the current session, clearing ROIs and resetting the interface for a new analysis.
+
+## Authors
+
+- Mr Yiyang Guan - Department of Earth Science and Engineering, Imperial College London

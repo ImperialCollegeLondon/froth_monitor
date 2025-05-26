@@ -241,6 +241,11 @@ class EventHandler:
         """
         Toggle between playing and pausing the video.
         """
+        def resource_path(relative_path):
+            if hasattr(sys, '_MEIPASS'):
+                return os.path.join(sys._MEIPASS, relative_path)
+            return relative_path
+
         if not self.camera_thread.is_running() and not self.playing:
             QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
             return
@@ -252,7 +257,7 @@ class EventHandler:
             self.playing = False
             self.gui.statusBar().showMessage("Video paused")
             # Change icon to play icon when paused
-            self.gui.play_pause_button.setIcon(QIcon("froth_monitor/resources/play_icon.svg"))
+            self.gui.play_pause_button.setIcon(QIcon(resource_path("froth_monitor/resources/play_icon.ico")))
         else:
             # If the thread is running but paused, just resume it
             if self.camera_thread.is_running() and self.camera_thread.is_paused():
@@ -260,7 +265,8 @@ class EventHandler:
                 self.playing = True
                 self.gui.statusBar().showMessage("Video resumed")
                 # Change icon to pause icon when playing
-                self.gui.play_pause_button.setIcon(QIcon("froth_monitor/resources/pause_icon.svg"))
+                self.gui.play_pause_button.setIcon(QIcon(resource_path("froth_monitor/resources/pause_icon.ico")))
+
             # If the thread is not running, we need to restart it
             elif hasattr(self, "last_video_source"):
                 self.camera_thread.start_capture(self.last_video_source)
@@ -436,15 +442,20 @@ class EventHandler:
         Args:
             resized_frame: The resized frame to process
         """
-        self.current_frame_number, roi_list, update_velo_plot = self.frame_model.process_frame(
+        self.current_frame_number, roi_list, update_velo_plot, update_average_velo\
+             = self.frame_model.process_frame(
             resized_frame
         )
         self.display_roi(roi_list)
 
         # Update the velocity plot with the latest data
         if update_velo_plot:
-            print("Update velocity plot")
             self.update_velocity_plot()
+
+        # Update the average velocity label
+        if update_average_velo:
+            pass
+            # self.update_average_velocity_label()
 
     def _display_frame_on_canvas(self, scaled_image):
         """
