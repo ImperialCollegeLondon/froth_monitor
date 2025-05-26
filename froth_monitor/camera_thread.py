@@ -160,7 +160,6 @@ class CameraThread(QObject):
             if self.if_release:
                 self.frame_available.emit(frame)
 
-
             # Update last frame time
             last_frame_time = time.time()
 

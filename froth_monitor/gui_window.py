@@ -351,19 +351,31 @@ class MainGUIWindow(QMainWindow):
             layout: The layout to add the reset buttons to.
         """
         # Reset button with camera icon
-        self.reset_button = QPushButton("  Start Recording")
-        self.reset_button.setIcon(QIcon("froth_monitor/resources/camera_icon.svg"))
-        self.reset_button.setIconSize(QSize(24, 24))
-        self.reset_button.setStyleSheet(
-            "background-color: red; color: white; font-size: 14px; padding: 10px; border-radius: 4px; text-align: left;"
+        self.record_button = QPushButton("  Start Recording")
+        self.record_button.setIcon(QIcon("froth_monitor/resources/camera_icon.svg"))
+        self.record_button.setIconSize(QSize(24, 24))
+        self.record_button.setStyleSheet(
+            "QPushButton {\
+                background-color: red; color: white; font-size: 15px; \
+                padding: 5px; border-radius: 4px;\
+            }\
+            QPushButton:hover {\
+                background-color: #3367d6;\
+            }"
         )
-        self.reset_button.setFixedHeight(50)
-        layout.addWidget(self.reset_button)
+        self.record_button.setFixedHeight(50)
+        layout.addWidget(self.record_button)
         
         # Simple Reset button (as shown in the image)
         self.simple_reset_button = QPushButton("Reset")
         self.simple_reset_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 14px; padding: 10px; border-radius: 4px;"
+            "QPushButton {\
+                background-color: #4285f4; color: white; font-size: 14px; \
+                padding: 5px; border-radius: 4px;\
+            }\
+            QPushButton:hover {\
+                background-color: #3367d6;\
+            }"
         )
         layout.addWidget(self.simple_reset_button)
 
@@ -481,14 +493,14 @@ class MainGUIWindow(QMainWindow):
         self.plot_widget.showAxis("left")
         self.plot_widget.showAxis("bottom")
         self.plot_widget.setLabel("left", "Velocity", units="mm/s")
-        self.plot_widget.setLabel("bottom", "Time", units="frames")
+        self.plot_widget.setLabel("bottom", "Time", units="secs")
         self.plot_widget.addLegend()
         
         # Add a sample blue curve for visualization
-        x = np.linspace(0, 10, 100)
-        y = np.sin(x) + np.random.normal(0, 0.1, 100)
-        pen = pg.mkPen(color='#4285f4', width=2)
-        self.plot_widget.plot(x, y, pen=pen)
+        # x = np.linspace(0, 10, 100)
+        # y = np.sin(x) + np.random.normal(0, 0.1, 100)
+        # pen = pg.mkPen(color='#4285f4', width=2)
+        # self.plot_widget.plot(x, y, pen=pen)
         
         layout.addWidget(self.plot_widget)
         
