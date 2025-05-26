@@ -27,6 +27,7 @@ from PySide6.QtGui import QIcon, QFont, QColor
 import pyqtgraph as pg
 import sys
 import numpy as np
+import os
 
 
 class MainGUIWindow(QMainWindow):
@@ -343,6 +344,13 @@ class MainGUIWindow(QMainWindow):
         
         return roi_group
 
+        # Helper to get resource path
+    
+    def resource_path(self,relative_path):
+        if hasattr(sys, '_MEIPASS'):
+            return os.path.join(sys._MEIPASS, relative_path)
+        return relative_path
+        
     def _add_reset_buttons(self, layout: QVBoxLayout) -> None:
         """
         Add reset buttons to the given layout.
@@ -350,9 +358,11 @@ class MainGUIWindow(QMainWindow):
         Args:
             layout: The layout to add the reset buttons to.
         """
+
+
         # Reset button with camera icon
         self.record_button = QPushButton("  Start Recording")
-        self.record_button.setIcon(QIcon("froth_monitor/resources/camera_icon.svg"))
+        self.record_button.setIcon(QIcon(self.resource_path("froth_monitor/resources/camera_icon.ico")))
         self.record_button.setIconSize(QSize(24, 24))
         self.record_button.setStyleSheet(
             "QPushButton {\
@@ -524,7 +534,8 @@ class MainGUIWindow(QMainWindow):
         
         # Create play/pause button
         self.play_pause_button = QPushButton()
-        self.play_pause_button.setIcon(QIcon("froth_monitor/resources/pause_icon.svg"))
+        self.play_pause_button.setIcon(QIcon(self.resource_path("froth_monitor/resources/pause_icon.ico")))
+
         self.play_pause_button.setIconSize(QSize(24, 24))
         self.play_pause_button.setStyleSheet(
             """

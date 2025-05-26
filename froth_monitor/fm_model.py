@@ -60,7 +60,9 @@ class ROI:
         self.current_velocity = 0.0
         self.velo_only_history = []
 
-    def process_frame(self, frame: np.ndarray) -> bool:
+        self.average_velocity_past_30s = 0.0
+
+    def process_frame(self, frame: np.ndarray) -> tuple[bool, bool]:
         """
         Process a cropped frame using the VideoAnalysis.analyze function and store the results.
 
@@ -73,18 +75,19 @@ class ROI:
         self.delta_pixels = self.analysis.analyze(frame)
 
         if self.delta_pixels == (None, None):
-            return False
+            return False, False
 
         self.calibrated_delta = self.calculate_real_delta(self.delta_pixels)
 
         # Update timestamp
         self.timestamp = time.strftime("%H:%M:%S", time.localtime())
         if_new_velo = self.calculate_velocity(self.calibrated_delta)
+        if_new_average = self.calculate_average_velocity()
         self.delta_history.append(
             [self.timestamp, self.delta_pixels, self.calibrated_delta, None]
         )
         
-        return if_new_velo
+        return if_new_velo, if_new_average
 
     def calculate_real_delta(self, delta_pixels):
         """
@@ -143,6 +146,14 @@ class ROI:
             self.current_velocity = delta
             return True
 
+    def calculate_average_velocity(self) -> bool:
+
+        if len(self.velo_only_history) % 30 == 0: # Average velocity every 30 seconds
+            sum_last_30 = sum(self.velo_only_history[-30:])
+            self.average_velocity_past_30s = sum_last_30 / 30
+            return True
+        else:
+            return False
 
 class FrameModel:
     """
@@ -188,7 +199,7 @@ class FrameModel:
         self.px2mm = 1.0
         self.degree = -90.0
 
-    def process_frame(self, frame: np.ndarray) -> tuple[int, list[ROI], bool]:
+    def process_frame(self, frame: np.ndarray) -> tuple[int, list[ROI], bool, bool]:
         """
         Process a video frame, increment the frame counter, and return the frame number
         along with the processed frame. For each ROI in the roi_list, crop the frame
@@ -223,7 +234,9 @@ class FrameModel:
         )
 
         if_new_velo = 0
+        if_new_average = 0
         update_velo_plot = False
+        update_average_velo = False
         # Process each ROI in the roi_list
         for roi in self.roi_list:
             # Get the ROI coordinates
@@ -238,13 +251,19 @@ class FrameModel:
                 cropped_frame = frame[y1 : y1 + y2, x1 : x1 + x2]
 
                 # Pass the cropped frame to the ROI's process_frame method
-                if roi.process_frame(cropped_frame) == True:
+                _new_velo, _new_average = roi.process_frame(cropped_frame)
+                if _new_velo == True:
                     if_new_velo += 1
+                if _new_average == True:
+                    if_new_average += 1
+
         if if_new_velo >0 :
             update_velo_plot = True
+        if if_new_average > 0:
+            update_average_velo = True
             
         print("time to process a frame: ", time.time() - time_1, "s")
-        return self.frame_count, self.roi_list, update_velo_plot
+        return self.frame_count, self.roi_list, update_velo_plot, update_average_velo
 
     def get_frame_count(self) -> int:
         """
