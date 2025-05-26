@@ -112,8 +112,6 @@ class OverlayWidget(QWidget):
             event: The paint event
         """
 
-        time_1 = time.time()
-
         # Create painter
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -209,7 +207,6 @@ class OverlayWidget(QWidget):
                 self.drawROIs(painter)
 
         painter.end()
-        print("OverlayWidget paintEvent time:", time.time() - time_1, "s")
 
     def showEvent(self, event):
         """
@@ -552,3 +549,10 @@ class OverlayWidget(QWidget):
                 painter.drawLine(cross_x, y1, cross_x, y1 + y2)
 
                 roi.cross_position = cross_x, cross_y
+
+    def reset(self) -> None:
+        """
+        Reset the overlay to its initial state.
+        """
+        self.roi_list = []
+        self.current_roi_rect = QRect()

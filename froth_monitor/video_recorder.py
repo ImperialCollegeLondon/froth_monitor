@@ -92,8 +92,8 @@ class VideoRecorder(QObject):
                 return False
 
         # Generate output path with timestamp to avoid overwriting
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.output_path = os.path.join(directory, f"{filename}_{timestamp}.mp4")
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.output_path = os.path.join(directory, f"{filename}.mp4")
 
         # Initialize video writer
         # Use H.264 codec (XVID is more widely supported than mp4v)
@@ -199,3 +199,10 @@ class VideoRecorder(QObject):
         """
         duration = time.time() - self.start_time if self.is_recording else 0.0
         return self.output_path, self.frame_count, duration
+    
+    def reset(self) -> None:
+        """
+        Reset the video recorder to its initial state.
+        """
+        if self.is_recording:
+            self.stop_recording()

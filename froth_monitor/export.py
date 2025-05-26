@@ -298,10 +298,6 @@ class Export(QFileDialog):
         yes_radio.toggled.connect(on_radio_selection)
         no_radio.toggled.connect(on_radio_selection)
 
-        # recording_video_checkbox = QCheckBox(
-        #     "Tick me to preset video recording \n(otherwise video recording will be disabled in this mission)",
-        #     dialog,
-        # )
         self.recording_video_directory_button = QPushButton("Set Export Location for Recording")
         self.recording_video_directory_button.setStyleSheet(
             "\
@@ -327,19 +323,6 @@ class Export(QFileDialog):
         layout.addWidget(self.recording_video_directory_button)
         layout.addWidget(recording_video_directory_display)
 
-        # recording_video_checkbox.stateChanged.connect(
-        #     lambda: self.enable_video_recording(recording_video_checkbox.isChecked())
-        # )
-        # recording_video_checkbox.stateChanged.connect(
-        #     lambda: self.recording_video_directory_button.setVisible(
-        #         recording_video_checkbox.isChecked()
-        #     )
-        # )
-        # recording_video_checkbox.stateChanged.connect(
-        #     lambda: recording_video_directory_display.setVisible(
-        #         recording_video_checkbox.isChecked()
-        #     )
-        # )
         self.recording_video_directory_button.clicked.connect(
             lambda: self.select_video_directory(dialog)
         )
@@ -436,7 +419,7 @@ class Export(QFileDialog):
         self.finish_save_setting = True
         dialog.accept()
 
-    def excel_results(self, rois: list, arrow_angle: float, px2mm: float) -> None:
+    def excel_results(self, rois: list, arrow_angle: float, px2mm: float) -> bool:
         """
         Handles exporting data for the program.
         """
@@ -448,7 +431,7 @@ class Export(QFileDialog):
                     "Export Error",
                     "Please configure export settings before exporting.",
                 )
-                return
+                return False
 
             # Prepare the full file path
             file_path_csv = f"{self.export_directory}/{self.export_filename}.csv"
@@ -464,11 +447,13 @@ class Export(QFileDialog):
                 "Export Successful",
                 f"Data successfully exported:\n- CSV: {file_path_csv}\n-",
             )
+            return True
 
         except Exception as e:
             QMessageBox.critical(
                 self.gui, "Export Failed", f"An error occurred during export: {e}"
             )
+            return False
 
     def collect_export_data(self, rois: list, arrow_angle: float, px2mm: float) -> dict:
         """
