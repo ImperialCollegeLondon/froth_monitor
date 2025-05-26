@@ -131,6 +131,7 @@ class Export(QFileDialog):
 
         self.save_video_in_same_dir = True
         self.record_video = True
+        self.finish_save_setting = False
 
         self.font_big = QFont("Arial", 13)
         self.font_small = QFont("Arial", 12)
@@ -149,11 +150,26 @@ class Export(QFileDialog):
         layout = QVBoxLayout(dialog)
 
         # Export Directory Selection
-        directory_label = QLabel("Data Export Directory:", dialog)
+        directory_label = QLabel("Data Export Location:", dialog)
         directory_label.setFont(self.font_big)
+        directory_label.setStyleSheet(
+            "color: black; font-size: 18px; \
+            font-weight:bold; border-radius: 4px;"
+        )
         layout.addWidget(directory_label)
 
-        directory_button = QPushButton("Select Data Directory", dialog)
+        directory_button = QPushButton("Select export location for csv data", dialog)
+        directory_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 15px; \
+            padding: 5px; border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
+        )
         directory_button.clicked.connect(lambda: self.select_data_directory(dialog))
         layout.addWidget(directory_button)
 
@@ -161,13 +177,17 @@ class Export(QFileDialog):
         directory_display = QLabel(
             self.export_directory if self.export_directory else "Not selected", dialog
         )
+        directory_display.setStyleSheet(
+            "color: black; font-size: 15px; \
+            padding: 5px; border-radius: 4px;"
+        )
         directory_display.setObjectName(
             "directory_display"
         )  # Assign a unique name for findChild
         layout.addWidget(directory_display)
 
         # Export Filename Input
-        filename_label = QLabel("Export Filename (without extension):", dialog)
+        filename_label = QLabel("CSV Data Filename (without extension):", dialog)
         filename_label.setFont(self.font_big)
         layout.addWidget(filename_label)
 
@@ -178,12 +198,24 @@ class Export(QFileDialog):
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)  # Horizontal line
         separator.setFrameShadow(QFrame.Shadow.Sunken)  # Sunken style
+        separator.setFixedHeight(10)  # Set the height of the separator
         layout.addWidget(separator)
 
         self.add_video_selection_section(layout, dialog)
 
         # Save Button
         save_button = QPushButton("Save Settings", dialog)
+        save_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 15px; \
+            padding: 5px; border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
+        )
         save_button.clicked.connect(
             lambda: self.save_export_settings(dialog, filename_input)
         )
@@ -213,13 +245,8 @@ class Export(QFileDialog):
             self.save_video_in_same_dir = is_same_dir
             no_radio.setChecked(not is_same_dir)
 
-            print("is_same_dir:", is_same_dir)
-            # Show or hide additional options if "No" is selected
-            recording_video_checkbox.setVisible(not is_same_dir)
-
             if not is_same_dir:
-                recording_video_checkbox.setChecked(self.record_video)
-                recording_video_directory_button.setVisible(self.record_video)
+                self.recording_video_directory_button.setVisible(self.record_video)
                 recording_video_directory_display.setVisible(self.record_video)
 
         def on_radio_selection() -> None:
@@ -232,12 +259,19 @@ class Export(QFileDialog):
             """
             if yes_radio.isChecked():
                 self.save_video_in_same_dir = True
-                self.record_video = True
+                self.recording_video_directory_button.setVisible(False)
 
             elif no_radio.isChecked():
-                self.record_video = False
                 self.save_video_in_same_dir = False
             update_ui()
+
+        title_label = QLabel("Video Recording Options")
+        title_label.setFont(self.font_big)
+        title_label.setStyleSheet(
+            "color: black; font-size: 18px; \
+            font-weight:bold; border-radius: 4px;"
+        )
+        layout.addWidget(title_label)
 
         # Save Recording Video Options
         video_label = QLabel(
@@ -264,38 +298,49 @@ class Export(QFileDialog):
         yes_radio.toggled.connect(on_radio_selection)
         no_radio.toggled.connect(on_radio_selection)
 
-        recording_video_checkbox = QCheckBox(
-            "Tick me to preset video recording \n(otherwise video recording will be disabled in this mission)",
-            dialog,
+        # recording_video_checkbox = QCheckBox(
+        #     "Tick me to preset video recording \n(otherwise video recording will be disabled in this mission)",
+        #     dialog,
+        # )
+        self.recording_video_directory_button = QPushButton("Set Export Location for Recording")
+        self.recording_video_directory_button.setStyleSheet(
+            "\
+            QPushButton {\
+                background-color: #4285f4; color: white; font-size: 15px; \
+            padding: 5px; border-radius: 4px;\
+            }\
+            QPushButton:hover {\
+                background-color: #3367d6;\
+            }\
+            "
         )
-        recording_video_directory_button = QPushButton("Set Recording Directory")
         recording_video_directory_display = QLabel("Not selected", dialog)
         recording_video_directory_display.setObjectName(
             "recording_video_directory_display"
         )
 
-        recording_video_checkbox.setVisible(False)
-        recording_video_directory_button.setVisible(False)
-        recording_video_directory_display.setVisible(False)
+        # recording_video_checkbox.setVisible(False)
+        self.recording_video_directory_button.setVisible(False)
+        # recording_video_directory_display.setVisible(False)
 
-        layout.addWidget(recording_video_checkbox)
-        layout.addWidget(recording_video_directory_button)
+        # layout.addWidget(recording_video_checkbox)
+        layout.addWidget(self.recording_video_directory_button)
         layout.addWidget(recording_video_directory_display)
 
-        recording_video_checkbox.stateChanged.connect(
-            lambda: self.enable_video_recording(recording_video_checkbox.isChecked())
-        )
-        recording_video_checkbox.stateChanged.connect(
-            lambda: recording_video_directory_button.setVisible(
-                recording_video_checkbox.isChecked()
-            )
-        )
-        recording_video_checkbox.stateChanged.connect(
-            lambda: recording_video_directory_display.setVisible(
-                recording_video_checkbox.isChecked()
-            )
-        )
-        recording_video_directory_button.clicked.connect(
+        # recording_video_checkbox.stateChanged.connect(
+        #     lambda: self.enable_video_recording(recording_video_checkbox.isChecked())
+        # )
+        # recording_video_checkbox.stateChanged.connect(
+        #     lambda: self.recording_video_directory_button.setVisible(
+        #         recording_video_checkbox.isChecked()
+        #     )
+        # )
+        # recording_video_checkbox.stateChanged.connect(
+        #     lambda: recording_video_directory_display.setVisible(
+        #         recording_video_checkbox.isChecked()
+        #     )
+        # )
+        self.recording_video_directory_button.clicked.connect(
             lambda: self.select_video_directory(dialog)
         )
 
@@ -315,7 +360,7 @@ class Export(QFileDialog):
             if_record_video (bool): Flag indicating whether to enable video recording.
         """
         self.record_video = if_record_video
-        print(self.record_video)
+        print("if record video:", self.record_video)
 
     def select_video_directory(self, parent_dialog) -> None:
         """
@@ -382,23 +427,13 @@ class Export(QFileDialog):
             )
             return
 
-        # Display a success message
-        if not self.record_video:
-            QMessageBox.information(
-                self.gui,
-                "Settings Saved",
-                f"Data export settings saved:\nDirectory: {self.export_directory}\nFilename: {self.export_filename}\
-                \n\n\n Recording function is disabled",
-            )
-
-        else:
-            QMessageBox.information(
-                self.gui,
-                "Settings Saved",
-                f"Data export settings saved:\nDirectory: {self.export_directory}\nFilename: {self.export_filename}\
-                \n\n\nRecording export settings saved:\nDirectory: {self.video_directory}\nFilename: {self.video_filename}",
-            )
-
+        QMessageBox.information(
+            self.gui,
+            "Settings Saved",
+            f"Data export settings saved:\nDirectory: {self.export_directory}\nFilename: {self.export_filename}\
+            \n\n\nRecording export settings saved:\nDirectory: {self.video_directory}\nFilename: {self.video_filename}",
+        )
+        self.finish_save_setting = True
         dialog.accept()
 
     def excel_results(self, rois: list, arrow_angle: float, px2mm: float) -> None:
