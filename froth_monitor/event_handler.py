@@ -243,7 +243,7 @@ class EventHandler:
         """
         def resource_path(relative_path):
             if hasattr(sys, '_MEIPASS'):
-                return os.path.join(sys._MEIPASS, relative_path)
+                return os.path.join(sys._MEIPASS, relative_path) # type: ignore
             return relative_path
 
         if not self.camera_thread.is_running() and not self.playing:
@@ -454,8 +454,7 @@ class EventHandler:
 
         # Update the average velocity label
         if update_average_velo:
-            pass
-            # self.update_average_velocity_label()
+            self.update_ave_velo_table()
 
     def _display_frame_on_canvas(self, scaled_image):
         """
@@ -937,6 +936,30 @@ class EventHandler:
         # Update the plot
         self.gui.plot_widget.update()
 
+    def update_ave_velo_table(self):
+        """Update the average velocity table with data from all ROIs."""
+        # Clear the table
+        self.gui.table_widget.clear()
+        self.gui.table_widget.setRowCount(len(self.frame_model.roi_list))
+
+        list_data = []
+        # Add data to the table
+        for i, roi in enumerate(self.frame_model.roi_list):
+            # Skip if no velocity history
+            if roi.average_velocity_past_30s is None:
+                list_data.append("N/A")
+                continue
+                
+            print(list_data)
+            # Add average velocity to the table
+            list_data.append(roi.average_velocity_past_30s)
+        
+        self.gui.table_widget.setData(list_data)
+        self.gui.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
+        self.gui.table_widget.setFormat("%.2f")
+        self.gui.table_widget.setColumnWidth(0, 120)
+        # self.table_widget.setColumnWidth(1, 100)
+        self.gui.table_widget.setFixedHeight(200)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
