@@ -7,6 +7,7 @@ data processing and analysis.
 
 import cv2
 import sys
+import os
 from typing import cast
 from PySide6.QtWidgets import (
     QApplication,
@@ -34,6 +35,9 @@ from froth_monitor.overlay_widget import OverlayWidget
 from froth_monitor.camera_thread import CameraThread
 
 from froth_monitor.export import Export
+
+# Import the video recorder module
+from froth_monitor.video_recorder import VideoRecorder
 
 
 class EventHandler:
@@ -85,6 +89,10 @@ class EventHandler:
         self.current_frame_number = 0
         self.export = Export(self.gui)
 
+        # Initialize video recorder
+        self.video_recorder = VideoRecorder()
+        self.recording_active = False
+
         # Overlay related attributes
         self.overlay_widget: OverlayWidget = cast(OverlayWidget, None)
         self.overlay_active = False
@@ -104,8 +112,8 @@ class EventHandler:
         self.gui.add_roi_button.clicked.connect(self.add_roi)
         self.gui.confirm_arrow_button.clicked.connect(self.confirm_arrow_n_ruler)
         self.gui.save_button.clicked.connect(self.save_data)
-        # self.gui.reset_button.clicked.connect(self.reset_mission)
-        # self.gui.start_record_button.clicked.connect(self.toggle_recording)
+        self.gui.record_button.clicked.connect(self.toggle_recording)
+        self.gui.simple_reset_button.clicked.connect(self.reset_mission)
         self.gui.add_arrow_button.clicked.connect(self.start_arrow_drawing)
         self.gui.calibration_button.clicked.connect(self.start_ruler_calibration)
         self.gui.delete_roi_button.clicked.connect(self.delete_last_roi)
@@ -296,9 +304,6 @@ class EventHandler:
         # Bring the overlay to the front
         self.overlay_widget.raise_()
 
-    def delete_last_roi(self):
-        self.frame_model.delete_last_roi()
-
     # -----------------------------------Frame Processing-----------------------------------------------
     def process_new_frame(self, frame):
         """
@@ -338,6 +343,10 @@ class EventHandler:
 
         # Update the overlay position
         self._update_overlay_position(pixmap)
+
+        # Record frame if recording is active
+        if self.recording_active and self.video_recorder.is_active():
+            self.video_recorder.record_frame(frame)
 
         # Update status bar
         self._update_status_bar()
@@ -401,9 +410,9 @@ class EventHandler:
         self.display_roi(roi_list)
 
         # Update the velocity plot with the latest data
-        # if update_velo_plot:
-        #     print("Update velocity plot")
-        #     self.update_velocity_plot()
+        if update_velo_plot:
+            print("Update velocity plot")
+            self.update_velocity_plot()
 
     def _display_frame_on_canvas(self, scaled_image):
         """
@@ -579,6 +588,11 @@ class EventHandler:
             return
         self.overlay_widget.display_roi(roi_list)
 
+    def delete_last_roi(self):
+        self.frame_model.delete_last_roi()
+        self.overlay_widget.update()
+        self.gui.statusBar().showMessage("Last ROI deleted")
+        
     # ------------------------------------Arrow Drawing------------------------------------------------
     def confirm_arrow_n_ruler(self):
         """Confirm the current arrow direction."""
@@ -674,10 +688,85 @@ class EventHandler:
 
     def toggle_recording(self):
         """Start or stop video recording."""
-        # Placeholder for recording functionality
-        QMessageBox.information(
-            self.gui, "Info", "Recording functionality will be implemented."
-        )
+        # Check if video is loaded
+        if not self.camera_thread.is_running():
+            QMessageBox.warning(
+                self.gui,
+                "Warning",
+                "No video source loaded! Please load a video first."
+            )
+            return
+
+        if not self.recording_active:
+            # Start recording
+            # Get video directory and filename from export settings
+            video_directory = self.export.video_directory
+            video_filename = self.export.video_filename
+
+            # If no directory is set, use a default directory
+            if not video_directory:
+                video_directory = os.path.join(os.path.expanduser("~"), "Videos", "FrothMonitor")
+                self.export.video_directory = video_directory
+
+            # Get frame dimensions and FPS
+            frame_width, frame_height = self.camera_thread.get_frame_dimensions()
+            fps = self.camera_thread.get_fps()
+            
+            # If FPS is not available (e.g., from webcam), use a default value
+            if fps <= 0:
+                fps = 30.0
+
+            # Start recording
+            success = self.video_recorder.start_recording(
+                video_directory, video_filename, frame_width, frame_height, fps
+            )
+
+            if success:
+                self.recording_active = True
+                self.gui.record_button.setText("  Stop Recording")
+                self.gui.record_button.setStyleSheet(
+                    "QPushButton {\
+                        background-color: red; color: white; font-size: 15px; \
+                        padding: 5px; border-radius: 4px;\
+                    }\
+                    QPushButton:hover {\
+                        background-color: #3367d6;\
+                    }"
+                )
+                self.gui.statusBar().showMessage(f"Recording started: {self.video_recorder.output_path}")
+            else:
+                QMessageBox.critical(
+                    self.gui, "Error", "Could not start recording! Check if the directory is accessible."
+                )
+        else:
+            # Stop recording
+            success, output_path, frame_count = self.video_recorder.stop_recording()
+            
+            if success:
+                self.recording_active = False
+                self.gui.record_button.setText("  Start Recording")
+                self.gui.record_button.setStyleSheet(
+                    "QPushButton {\
+                        background-color: red; color: white; font-size: 15px; \
+                        padding: 5px; border-radius: 4px;\
+                    }\
+                    QPushButton:hover {\
+                        background-color: #3367d6;\
+                    }"
+                )
+                
+                # Show success message with recording statistics
+                QMessageBox.information(
+                    self.gui,
+                    "Recording Completed",
+                    f"Video saved to: {output_path}\nFrames recorded: {frame_count}"
+                )
+                
+                self.gui.statusBar().showMessage(f"Recording stopped: {output_path}")
+            else:
+                QMessageBox.warning(
+                    self.gui, "Warning", "No active recording to stop."
+                )
 
     def export_settings(self):
         """Open export settings dialog."""
