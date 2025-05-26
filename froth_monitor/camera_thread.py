@@ -222,3 +222,9 @@ class CameraThread(QObject):
         with self.buffer_lock:
             if self.buffer_size > 0:
                 self.buffer_size -= 1
+
+    def reset(self) -> None:
+        """
+        Reset the camera thread to its initial state.
+        """
+        self.stop_capture()

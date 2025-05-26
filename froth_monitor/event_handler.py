@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QTimer, Qt, QRect
 from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import QDialogButtonBox
 from PySide6.QtGui import QIcon
 
 # Import MainGUIWindow at the beginning
@@ -98,6 +99,7 @@ class EventHandler:
         self.overlay_active = False
         self.video_rect = QRect()
 
+        self.if_save = False
         # Connect GUI signals to handler methods
         self.connect_signals()
 
@@ -303,6 +305,36 @@ class EventHandler:
 
         # Bring the overlay to the front
         self.overlay_widget.raise_()
+
+    def reset_mission(self):
+        """Reset the application for a new mission."""
+        # Check if data has been saved
+        if not self.if_save:
+            # Show confirmation dialog
+            reply = QMessageBox.question(
+                self.gui,
+                "Confirmation",
+                "Are you sure you want to reset the application for a new mission? \
+                    \nAll unsaved data will be lost.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,  # Set default button to No
+            )
+            
+            # Only proceed if user explicitly clicked Yes
+            # The X button will return QMessageBox.StandardButton.No by default
+            if reply != QMessageBox.StandardButton.Yes:
+                return  # Exit the function without resetting
+        
+        # If we get here, either data was saved or user confirmed reset
+        QMessageBox.information(self.gui, "Info", "Application reset for new mission.")
+
+        self.if_save = False
+        self.confirm_calibration = False
+        self.camera_thread.reset()
+        self.gui.video_canvas_label.clear()
+        self.gui.plot_widget.clear()
+        self.frame_model.reset()
+        self.overlay_widget.reset()
 
     # -----------------------------------Frame Processing-----------------------------------------------
     def process_new_frame(self, frame):
@@ -681,11 +713,6 @@ class EventHandler:
         # Update the status bar
         self.gui.statusBar().showMessage(f"arrow angle: {degree:.1f} degrees")
 
-    def reset_mission(self):
-        """Reset the application for a new mission."""
-        # Placeholder for reset functionality
-        QMessageBox.information(self.gui, "Info", "Application reset for new mission.")
-
     def toggle_recording(self):
         """Start or stop video recording."""
         # Check if video is loaded
@@ -797,9 +824,10 @@ class EventHandler:
 
     def save_data(self):
         """Save the current analysis data."""
-        self.export.excel_results(
+        self.if_save = self.export.excel_results(
             self.frame_model.roi_list, self.frame_model.degree, self.frame_model.px2mm
         )
+
 
     # ------------------------------------Plotting Functions------------------------------------------
     def update_velocity_plot(self):

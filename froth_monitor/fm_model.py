@@ -320,3 +320,8 @@ class FrameModel:
         self.roi_list.pop()
 
         return True
+
+    def reset(self):
+        self.frame_count = 0
+        self.frame_history = []
+        self.roi_list = []
