@@ -299,7 +299,7 @@ class FrameModel:
         """
         return datetime.now().strftime("%d/%m/%Y %H:%M:%S.%f")[:-3]
 
-    def get_px_to_mm(self, px: float) -> None:
+    def get_px_to_mm(self, px_ratio: float) -> None:
         """
         Convert a distance in pixels to millimeters.
 
@@ -315,7 +315,7 @@ class FrameModel:
         """
 
         # pixels of 20mm
-        self.px2mm = px / 20
+        self.px2mm = px_ratio
 
     def get_overflow_direction(self, degree: float) -> None:
         self.degree = degree

@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGroupBox,
     QToolButton,
+    QSpinBox
 )
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QFont, QColor
@@ -138,6 +139,7 @@ class MainGUIWindow(QMainWindow):
         left_panel.setStyleSheet("background-color: #f0f0f0;")
         left_layout = QVBoxLayout(left_panel)
         left_layout.setSpacing(15)
+        left_layout.setContentsMargins(10, 10, 10, 10)
         
         # Add video source controls
         source_group = self._create_video_source_controls()
@@ -214,8 +216,11 @@ class MainGUIWindow(QMainWindow):
         calibration_layout = QVBoxLayout(calibration_group)
         calibration_layout.setSpacing(10)
 
-        roi_layout = QHBoxLayout()
-        self.calibration_button = QPushButton("Draw Ruler")
+        roi_layout = QVBoxLayout()
+        roi_layout_1 = QHBoxLayout()
+
+        #---------Ruler draw sector 1
+        self.calibration_button = QPushButton("Draw a line with \n length of")
         self.calibration_button.setStyleSheet(
             """
             QPushButton {
@@ -230,22 +235,65 @@ class MainGUIWindow(QMainWindow):
             }
             """
         )
-        self.calibration_button.setFixedWidth(100)
-        
-        self.px2mm_textbox = QLineEdit()
-        self.px2mm_textbox.setText("1.0")  # Default value
-        self.px2mm_textbox.setStyleSheet(
-            "background-color: white; font-size: 10px; padding: 8px; border-radius: 4px;"
+        self.calibration_button.setFixedWidth(120)  # Fixed width for the button
+
+        self.px2mm_spinbox = QSpinBox()
+        self.px2mm_spinbox.setRange(1, 1000)  # Adjust the range as needed
+        self.px2mm_spinbox.setValue(20)  # Default value
+        self.px2mm_spinbox.setStyleSheet(
+            "background-color: white; font-size: 12px; padding: 5px; border-radius: 4px;"
         )
-        self.px2mm_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        px2mm_label = QLabel("px/mm")
+
+        px2mm_label = QLabel("mm")
         px2mm_label.setStyleSheet(
             "color: black; font-size: 8px;"
         )
-        roi_layout.addWidget(self.calibration_button)
-        roi_layout.addWidget(self.px2mm_textbox)
-        roi_layout.addWidget(px2mm_label)
 
+        roi_layout_1.addWidget(self.calibration_button)
+        roi_layout_1.addWidget(self.px2mm_spinbox)
+        roi_layout_1.addWidget(px2mm_label)
+
+        #---------Ruler draw sector 2
+        roi_layout_2 = QHBoxLayout()
+        px2mm_label_2 = QLabel("Result ratio \n(edible):")
+        px2mm_label_2.setStyleSheet(
+                "\
+                background-color: #3c4043;\
+                color: white;\
+                font-size: 12px;\
+                padding: 8px;\
+                border-radius: 4px;\
+                "
+        )
+        px2mm_label_2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        px2mm_label_2.setFixedWidth(120)
+
+        self.px2mm_result_textbox = QLineEdit()
+        self.px2mm_result_textbox.setText("1.0")  # Default value
+        self.px2mm_result_textbox.setStyleSheet(
+            "background-color: white; font-size: 10px; padding: 8px; border-radius: 4px;"
+        )
+        self.px2mm_result_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        px2mm_label_3 = QLabel("mm/px")
+        px2mm_label_3.setStyleSheet(
+            "color: black; font-size: 8px;"
+        )
+
+        roi_layout_2.addWidget(px2mm_label_2)
+        roi_layout_2.addWidget(self.px2mm_result_textbox)
+        roi_layout_2.addWidget(px2mm_label_3)
+
+        roi_layout.addLayout(roi_layout_1)
+        roi_layout.addLayout(roi_layout_2)
+
+        # Separator line
+        separator_1 = QFrame()
+        separator_1.setFrameShape(QFrame.Shape.HLine)
+        separator_1.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_1.setStyleSheet("background-color: #3c4043;")
+
+        # Arrow Sector
         arrow_layout = QHBoxLayout()
         self.add_arrow_button = QPushButton("Draw Arrow")
         self.add_arrow_button.setStyleSheet(
@@ -262,7 +310,7 @@ class MainGUIWindow(QMainWindow):
             }
             """
         )
-        self.add_arrow_button.setFixedWidth(100)
+        self.add_arrow_button.setFixedWidth(120)
         
         self.direction_textbox = QLineEdit()
         self.direction_textbox.setText("-90.0")  # Default value
@@ -274,6 +322,12 @@ class MainGUIWindow(QMainWindow):
         degree_label.setStyleSheet(
             "color: black; font-size: 8px;"
         )
+
+        # Separator line
+        separator_2 = QFrame()
+        separator_2.setFrameShape(QFrame.Shape.HLine)
+        separator_2.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_2.setStyleSheet("background-color: #3c4043;")
 
         self.confirm_arrow_button = QPushButton("Confirm calibration")
         self.confirm_arrow_button.setStyleSheet(
@@ -295,7 +349,9 @@ class MainGUIWindow(QMainWindow):
         arrow_layout.addWidget(degree_label)
 
         calibration_layout.addLayout(roi_layout)
+        calibration_layout.addWidget(separator_1)
         calibration_layout.addLayout(arrow_layout)
+        # calibration_layout.addWidget(separator_2)
         calibration_layout.addWidget(self.confirm_arrow_button)
 
         return calibration_group
@@ -538,7 +594,7 @@ class MainGUIWindow(QMainWindow):
         
         # Add "Average 30 s" label
         avg_label = QLabel("Average over past 30s")
-        avg_label.setStyleSheet("font-size: 14px; color: #333333; text-align: center;")
+        avg_label.setStyleSheet("font-size: 10px; color: #333333; text-align: left;")
         avg_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(avg_label)
 
