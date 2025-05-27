@@ -521,15 +521,19 @@ class EventHandler:
             "Click and drag to draw a line of 2cm for pixel measurement"
         )
 
-    def handle_ruler_measurement(self, px_distance):
+    def handle_ruler_measurement(self, px):
         """Handle the ruler measurement result.
 
         Args:
             distance: The measured distance in pixels
         """
-
-        self.frame_model.get_px_to_mm(px_distance)
-        self.gui.px2mm_textbox.setText(f"{self.frame_model.px2mm:.1f}")
+        distance = self.gui.px2mm_spinbox.value()
+        print("Spin box value:", distance)
+        print("Drawed px:", px)
+        px_ratio = float(px/distance)
+        
+        self.frame_model.get_px_to_mm(px_ratio)
+        self.gui.px2mm_result_textbox.setText(f"{self.frame_model.px2mm:.1f}")
         # Display the measurement result to the user
         QMessageBox.information(
             self.gui,
@@ -650,7 +654,7 @@ class EventHandler:
 
         try:
             arrow_direction = float(self.gui.direction_textbox.text())
-            px_distance = float(self.gui.px2mm_textbox.text())
+            px_distance = float(self.gui.px2mm_result_textbox.text())
             self.frame_model.get_px_to_mm(px_distance)
             self.frame_model.get_overflow_direction(arrow_direction)
 
