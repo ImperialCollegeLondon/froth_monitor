@@ -275,7 +275,7 @@ class MainGUIWindow(QMainWindow):
         )
         self.px2mm_result_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        px2mm_label_3 = QLabel("mm/px")
+        px2mm_label_3 = QLabel("px/mm")
         px2mm_label_3.setStyleSheet(
             "color: black; font-size: 8px;"
         )
