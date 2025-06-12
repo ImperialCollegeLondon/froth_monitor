@@ -35,6 +35,7 @@ print(f"Processing frame {frame_number}")
 
 import numpy as np
 import time
+import cv2
 from typing import cast
 from datetime import datetime
 from PySide6.QtCore import QRect
@@ -46,7 +47,7 @@ class ROI:
         self.coordinate = roi_coordinate
         self.analysis = VideoAnalysis(0, 0)
 
-        self.delta_pixels = None
+        self.delta_pixels = (cast(float, None), cast(float, None))
         self.cross_position = None
 
         self.delta_history = []
@@ -87,7 +88,7 @@ class ROI:
         self.delta_history.append(
             [self.timestamp, self.delta_pixels, self.calibrated_delta, None]
         )
-        
+
         return if_new_velo, if_new_average
 
     def calculate_real_delta(self, delta_pixels):
@@ -129,7 +130,6 @@ class ROI:
         return projection_mm
 
     def calculate_velocity(self, delta) -> bool:
-
         if self.timestamp == self.timestamp_buffer:
             self.current_velocity += delta
             return False
@@ -142,19 +142,25 @@ class ROI:
             # else:
             if len(self.delta_history) > 1:
                 self.delta_history[-1][-1] = self.current_velocity
-            
+
             self.velo_only_history.append(self.current_velocity)
             self.current_velocity = delta
             return True
 
     def calculate_average_velocity(self) -> bool:
-
-        if len(self.velo_only_history) % 30 == 0: # Average velocity every 30 seconds
+        if len(self.velo_only_history) % 30 == 0:  # Average velocity every 30 seconds
             sum_last_30 = sum(self.velo_only_history[-30:])
             self.average_velocity_past_30s = sum_last_30 / 30
             return True
         else:
             return False
+
+    def get_algorithm_n_params(self, algorithm: str, params:dict):
+        self.analysis.current_algorithm = algorithm
+        if algorithm == "Farneback":
+            self.analysis.of_params = params
+        elif algorithm == "Lucas-kanade":
+            self.analysis.lk_params = params
 
 class FrameModel:
     """
@@ -199,6 +205,44 @@ class FrameModel:
 
         self.px2mm = 1.0
         self.degree = -90.0
+
+        # Algorithm parameters
+        self.current_algorithm = "Farneback"
+        self.algorithm_list = ["Farneback", "Lucas-Kanade"]
+        self.lk_params = dict(
+            winSize=(15, 15),
+            maxLevel=2,
+            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
+        )
+
+        self.of_params = dict(
+            pyr_scale=0.5,
+            levels=int(3),
+            winsize=int(15),
+            iterations=int(3),
+            poly_n=int(7),
+            poly_sigma=1.5,
+        )
+
+    def confirm_algorithm_n_params(self, algorithm: str, params: dict) -> None:
+        """
+        Confirm the algorithm and parameters for optical flow.
+
+        Parameters
+        ----------
+        algorithm : str
+            The algorithm to use for optical flow.
+        params : dict
+            The parameters for the optical flow algorithm.
+        """
+
+        self.current_algorithm = algorithm
+        if algorithm == "Farneback":
+            self.of_params = params
+        elif algorithm == "Lucas-Kanade":
+            self.lk_params = params
+
+        self.algo_roi.get_algorithm_n_params(self.current_algorithm, params)
 
     def process_frame(self, frame: np.ndarray) -> tuple[int, list[ROI], bool, bool]:
         """
@@ -258,13 +302,22 @@ class FrameModel:
                 if _new_average == True:
                     if_new_average += 1
 
-        if if_new_velo >0 :
+        if if_new_velo > 0:
             update_velo_plot = True
         if if_new_average > 0:
             update_average_velo = True
-            
+
         print("time to process a frame: ", time.time() - time_1, "s")
         return self.frame_count, self.roi_list, update_velo_plot, update_average_velo
+
+    def initialize_algo_config(self):
+        roi = QRect(0, 0, 0, 0)
+        self.algo_roi = ROI(roi, 1, 1)
+        self.algo_roi.get_algorithm_n_params(self.current_algorithm, self.of_params)
+
+    def process_frame_for_algo_config(self, frame: np.ndarray) -> tuple[float, float]:
+        self.algo_roi.process_frame(frame)
+        return self.algo_roi.delta_pixels
 
     def get_frame_count(self) -> int:
         """
@@ -322,6 +375,7 @@ class FrameModel:
 
     def add_roi(self, roi):
         new_roi = ROI(roi, self.px2mm, self.degree)
+        new_roi.get_algorithm_n_params(self.current_algorithm, self.of_params)
         self.roi_list.append(new_roi)
 
     def delete_last_roi(self):

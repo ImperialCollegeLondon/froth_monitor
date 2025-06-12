@@ -146,7 +146,6 @@ class CameraThread(QObject):
 
             # For video files, control the frame rate
             if self.is_video_file:
-
                 # Calculate time elapsed since last frame
                 elapsed = current_time - last_frame_time
                 # If we need to wait to maintain the correct frame rate

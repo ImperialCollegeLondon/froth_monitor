@@ -34,6 +34,7 @@ export detailed analysis results, including **delta pixels between frames, veloc
 ---
 
 ## Features
+
 ### Update 26th May 2025
 
 A dynamic and interactive application designed to analyze and visualize froth
@@ -48,6 +49,7 @@ Draw, lock, and display an arrow indicating the direction of froth overflow.
 Customizable and adjustable arrow direction for flexible analysis.
 
 #### 2. Ruler drawing for calibration
+
 Draw rulers on the video canvas to calibrate the distance between two points.
 The distance between the two points is calculated and displayed on the canvas.
 
@@ -58,11 +60,13 @@ Real-time movement analysis for each ROI.
 Axis visualization (X and Y axes) within each ROI to track movement.
 
 #### 3. Velocity Analysis
+
 Real-time velocity analysis for each ROI.
 Velocity data is displayed in a Cartesian coordinate system.
 Velocity data is exported to an Excel file.
 
 #### 4. Video Recording
+
 This program is able to record the video stream directly from the camera. In case that the user want to re-analyze the video.
 
 #### 5. Data Export
