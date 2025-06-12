@@ -7,6 +7,7 @@ data processing and analysis.
 
 import cv2
 import sys
+import os
 from typing import cast
 from PySide6.QtWidgets import (
     QApplication,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QTimer, Qt, QRect
 from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import QDialogButtonBox
 from PySide6.QtGui import QIcon
 
 # Import MainGUIWindow at the beginning
@@ -34,6 +36,9 @@ from froth_monitor.overlay_widget import OverlayWidget
 from froth_monitor.camera_thread import CameraThread
 
 from froth_monitor.export import Export
+
+# Import the video recorder module
+from froth_monitor.video_recorder import VideoRecorder
 
 
 class EventHandler:
@@ -85,11 +90,16 @@ class EventHandler:
         self.current_frame_number = 0
         self.export = Export(self.gui)
 
+        # Initialize video recorder
+        self.video_recorder = VideoRecorder()
+        self.recording_active = False
+
         # Overlay related attributes
         self.overlay_widget: OverlayWidget = cast(OverlayWidget, None)
         self.overlay_active = False
         self.video_rect = QRect()
 
+        self.if_save = False
         # Connect GUI signals to handler methods
         self.connect_signals()
 
@@ -104,8 +114,8 @@ class EventHandler:
         self.gui.add_roi_button.clicked.connect(self.add_roi)
         self.gui.confirm_arrow_button.clicked.connect(self.confirm_arrow_n_ruler)
         self.gui.save_button.clicked.connect(self.save_data)
-        # self.gui.reset_button.clicked.connect(self.reset_mission)
-        # self.gui.start_record_button.clicked.connect(self.toggle_recording)
+        self.gui.record_button.clicked.connect(self.toggle_recording)
+        self.gui.simple_reset_button.clicked.connect(self.reset_mission)
         self.gui.add_arrow_button.clicked.connect(self.start_arrow_drawing)
         self.gui.calibration_button.clicked.connect(self.start_ruler_calibration)
         self.gui.delete_roi_button.clicked.connect(self.delete_last_roi)
@@ -179,6 +189,10 @@ class EventHandler:
         # Camera selection dropdown
         camera_combo = QComboBox(dialog)
         camera_combo.addItems(available_cameras)
+        camera_combo.setStyleSheet(
+            "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
+            border-radius: 4px;"
+        )
         layout.addWidget(camera_combo)
 
         # Confirm button
@@ -227,6 +241,11 @@ class EventHandler:
         """
         Toggle between playing and pausing the video.
         """
+        def resource_path(relative_path):
+            if hasattr(sys, '_MEIPASS'):
+                return os.path.join(sys._MEIPASS, relative_path) # type: ignore
+            return relative_path
+
         if not self.camera_thread.is_running() and not self.playing:
             QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
             return
@@ -238,7 +257,7 @@ class EventHandler:
             self.playing = False
             self.gui.statusBar().showMessage("Video paused")
             # Change icon to play icon when paused
-            self.gui.play_pause_button.setIcon(QIcon("froth_monitor/resources/play_icon.svg"))
+            self.gui.play_pause_button.setIcon(QIcon(resource_path("froth_monitor/resources/play_icon.ico")))
         else:
             # If the thread is running but paused, just resume it
             if self.camera_thread.is_running() and self.camera_thread.is_paused():
@@ -246,7 +265,8 @@ class EventHandler:
                 self.playing = True
                 self.gui.statusBar().showMessage("Video resumed")
                 # Change icon to pause icon when playing
-                self.gui.play_pause_button.setIcon(QIcon("froth_monitor/resources/pause_icon.svg"))
+                self.gui.play_pause_button.setIcon(QIcon(resource_path("froth_monitor/resources/pause_icon.ico")))
+
             # If the thread is not running, we need to restart it
             elif hasattr(self, "last_video_source"):
                 self.camera_thread.start_capture(self.last_video_source)
@@ -292,8 +312,35 @@ class EventHandler:
         # Bring the overlay to the front
         self.overlay_widget.raise_()
 
-    def delete_last_roi(self):
-        self.frame_model.delete_last_roi()
+    def reset_mission(self):
+        """Reset the application for a new mission."""
+        # Check if data has been saved
+        if not self.if_save:
+            # Show confirmation dialog
+            reply = QMessageBox.question(
+                self.gui,
+                "Confirmation",
+                "Are you sure you want to reset the application for a new mission? \
+                    \nAll unsaved data will be lost.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,  # Set default button to No
+            )
+            
+            # Only proceed if user explicitly clicked Yes
+            # The X button will return QMessageBox.StandardButton.No by default
+            if reply != QMessageBox.StandardButton.Yes:
+                return  # Exit the function without resetting
+        
+        # If we get here, either data was saved or user confirmed reset
+        QMessageBox.information(self.gui, "Info", "Application reset for new mission.")
+
+        self.if_save = False
+        self.confirm_calibration = False
+        self.camera_thread.reset()
+        self.gui.video_canvas_label.clear()
+        self.gui.plot_widget.clear()
+        self.frame_model.reset()
+        self.overlay_widget.reset()
 
     # -----------------------------------Frame Processing-----------------------------------------------
     def process_new_frame(self, frame):
@@ -322,13 +369,22 @@ class EventHandler:
         )
 
         # Process the frame with the frame model
+
+        # Only allow to let frame pass in when the previous frame has been processed
+        # This is to prevent the overstacking of frames
+        self.camera_thread.if_release = False
         self._process_frame_with_model(resized_frame)
+        self.camera_thread.if_release = True
 
         # Display the frame on the canvas
         pixmap = self._display_frame_on_canvas(scaled_image)
 
         # Update the overlay position
         self._update_overlay_position(pixmap)
+
+        # Record frame if recording is active
+        if self.recording_active and self.video_recorder.is_active():
+            self.video_recorder.record_frame(frame)
 
         # Update status bar
         self._update_status_bar()
@@ -386,13 +442,19 @@ class EventHandler:
         Args:
             resized_frame: The resized frame to process
         """
-        self.current_frame_number, roi_list = self.frame_model.process_frame(
+        self.current_frame_number, roi_list, update_velo_plot, update_average_velo\
+             = self.frame_model.process_frame(
             resized_frame
         )
         self.display_roi(roi_list)
 
         # Update the velocity plot with the latest data
-        self.update_velocity_plot()
+        if update_velo_plot:
+            self.update_velocity_plot()
+
+        # Update the average velocity label
+        if update_average_velo:
+            self.update_ave_velo_table()
 
     def _display_frame_on_canvas(self, scaled_image):
         """
@@ -459,15 +521,19 @@ class EventHandler:
             "Click and drag to draw a line of 2cm for pixel measurement"
         )
 
-    def handle_ruler_measurement(self, px_distance):
+    def handle_ruler_measurement(self, px):
         """Handle the ruler measurement result.
 
         Args:
             distance: The measured distance in pixels
         """
-
-        self.frame_model.get_px_to_mm(px_distance)
-        self.gui.px2mm_textbox.setText(f"{self.frame_model.px2mm:.1f}")
+        distance = self.gui.px2mm_spinbox.value()
+        print("Spin box value:", distance)
+        print("Drawed px:", px)
+        px_ratio = float(px/distance)
+        
+        self.frame_model.get_px_to_mm(px_ratio)
+        self.gui.px2mm_result_textbox.setText(f"{self.frame_model.px2mm:.1f}")
         # Display the measurement result to the user
         QMessageBox.information(
             self.gui,
@@ -495,11 +561,21 @@ class EventHandler:
             )
             return
 
+        # Check if calibration is confirmed
+        if not self.confirm_calibration:
+            QMessageBox.warning(
+                self.gui,
+                "Warning",
+                "Please confirm the arrow and ruler before adding ROIs.",
+            )
+            return
+
         # Create overlay widget if it doesn't exist
         if not self.overlay_widget:
             self.overlay_widget = OverlayWidget(self.gui.video_container)
             # Connect the ROI created signal to our handler
             self.overlay_widget.roi_created.connect(self.handle_roi_created)
+        
         # Connect the ruler measurement signal to our handler
         self.overlay_widget.ruler_measured.connect(self.handle_ruler_measurement)
 
@@ -558,6 +634,11 @@ class EventHandler:
             return
         self.overlay_widget.display_roi(roi_list)
 
+    def delete_last_roi(self):
+        self.frame_model.delete_last_roi()
+        self.overlay_widget.update()
+        self.gui.statusBar().showMessage("Last ROI deleted")
+        
     # ------------------------------------Arrow Drawing------------------------------------------------
     def confirm_arrow_n_ruler(self):
         """Confirm the current arrow direction."""
@@ -573,7 +654,7 @@ class EventHandler:
 
         try:
             arrow_direction = float(self.gui.direction_textbox.text())
-            px_distance = float(self.gui.px2mm_textbox.text())
+            px_distance = float(self.gui.px2mm_result_textbox.text())
             self.frame_model.get_px_to_mm(px_distance)
             self.frame_model.get_overflow_direction(arrow_direction)
 
@@ -646,17 +727,94 @@ class EventHandler:
         # Update the status bar
         self.gui.statusBar().showMessage(f"arrow angle: {degree:.1f} degrees")
 
-    def reset_mission(self):
-        """Reset the application for a new mission."""
-        # Placeholder for reset functionality
-        QMessageBox.information(self.gui, "Info", "Application reset for new mission.")
-
     def toggle_recording(self):
         """Start or stop video recording."""
-        # Placeholder for recording functionality
-        QMessageBox.information(
-            self.gui, "Info", "Recording functionality will be implemented."
-        )
+        # Check if video is loaded
+        if not self.camera_thread.is_running():
+            QMessageBox.warning(
+                self.gui,
+                "Warning",
+                "No video source loaded! Please load a video first."
+            )
+            return
+
+        if not self.export.finish_save_setting:
+            QMessageBox.warning(
+                self.gui,
+                "Export Error",
+                "Please configure export settings before recording.",
+            )
+            return
+
+        if not self.recording_active:
+            # Start recording
+            # Get video directory and filename from export settings
+            video_directory = self.export.video_directory
+            video_filename = self.export.video_filename
+
+            # If no directory is set, use a default directory
+            if not video_directory:
+                video_directory = os.path.join(os.path.expanduser("~"), "Videos", "FrothMonitor")
+                self.export.video_directory = video_directory
+
+            # Get frame dimensions and FPS
+            fps = 120.0
+            frame_width, frame_height = self.camera_thread.get_frame_dimensions()
+            if self.camera_thread.is_video_file:
+                fps = self.camera_thread.get_fps()
+            
+            # Start recording
+            success = self.video_recorder.start_recording(
+                video_directory, video_filename, frame_width, frame_height, 
+                fps, self.camera_thread.is_video_file
+            )
+
+            if success:
+                self.recording_active = True
+                self.gui.record_button.setText("  Stop Recording")
+                self.gui.record_button.setStyleSheet(
+                    "QPushButton {\
+                        background-color: red; color: white; font-size: 15px; \
+                        padding: 5px; border-radius: 4px;\
+                    }\
+                    QPushButton:hover {\
+                        background-color: #3367d6;\
+                    }"
+                )
+                self.gui.statusBar().showMessage(f"Recording started: {self.video_recorder.output_path}")
+            else:
+                QMessageBox.critical(
+                    self.gui, "Error", "Could not start recording! Check if the directory is accessible."
+                )
+        else:
+            # Stop recording
+            success, output_path, frame_count = self.video_recorder.stop_recording()
+            
+            if success:
+                self.recording_active = False
+                self.gui.record_button.setText("  Start Recording")
+                self.gui.record_button.setStyleSheet(
+                    "QPushButton {\
+                        background-color: red; color: white; font-size: 15px; \
+                        padding: 5px; border-radius: 4px;\
+                    }\
+                    QPushButton:hover {\
+                        background-color: #3367d6;\
+                    }"
+                )
+                
+                # Show success message with recording statistics
+                QMessageBox.information(
+                    self.gui,
+                    "Recording Completed",
+                    f"Video saved to: {output_path}\nFrames recorded: {frame_count}"
+                )
+                
+                self.gui.statusBar().showMessage(f"Recording stopped: {output_path}")
+            else:
+                QMessageBox.warning(
+                    self.gui, "Warning", "No active recording to stop."
+                )
 
     def export_settings(self):
         """Open export settings dialog."""
@@ -680,9 +838,10 @@ class EventHandler:
 
     def save_data(self):
         """Save the current analysis data."""
-        self.export.excel_results(
+        self.if_save = self.export.excel_results(
             self.frame_model.roi_list, self.frame_model.degree, self.frame_model.px2mm
         )
+
 
     # ------------------------------------Plotting Functions------------------------------------------
     def update_velocity_plot(self):
@@ -780,8 +939,31 @@ class EventHandler:
 
         # Update the plot
         self.gui.plot_widget.update()
-        self.gui.plot_widget.update()
 
+    def update_ave_velo_table(self):
+        """Update the average velocity table with data from all ROIs."""
+        # Clear the table
+        self.gui.table_widget.clear()
+        self.gui.table_widget.setRowCount(len(self.frame_model.roi_list))
+
+        list_data = []
+        # Add data to the table
+        for i, roi in enumerate(self.frame_model.roi_list):
+            # Skip if no velocity history
+            if roi.average_velocity_past_30s is None:
+                list_data.append("N/A")
+                continue
+                
+            print(list_data)
+            # Add average velocity to the table
+            list_data.append(roi.average_velocity_past_30s)
+        
+        self.gui.table_widget.setData(list_data)
+        self.gui.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
+        self.gui.table_widget.setFormat("%.2f")
+        self.gui.table_widget.setColumnWidth(0, 120)
+        # self.table_widget.setColumnWidth(1, 100)
+        self.gui.table_widget.setFixedHeight(200)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -549,3 +549,10 @@ class OverlayWidget(QWidget):
                 painter.drawLine(cross_x, y1, cross_x, y1 + y2)
 
                 roi.cross_position = cross_x, cross_y
+
+    def reset(self) -> None:
+        """
+        Reset the overlay to its initial state.
+        """
+        self.roi_list = []
+        self.current_roi_rect = QRect()

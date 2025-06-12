@@ -21,12 +21,14 @@ from PySide6.QtWidgets import (
     QFrame,
     QGroupBox,
     QToolButton,
+    QSpinBox
 )
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QFont, QColor
 import pyqtgraph as pg
 import sys
 import numpy as np
+import os
 
 
 class MainGUIWindow(QMainWindow):
@@ -137,6 +139,7 @@ class MainGUIWindow(QMainWindow):
         left_panel.setStyleSheet("background-color: #f0f0f0;")
         left_layout = QVBoxLayout(left_panel)
         left_layout.setSpacing(15)
+        left_layout.setContentsMargins(10, 10, 10, 10)
         
         # Add video source controls
         source_group = self._create_video_source_controls()
@@ -181,9 +184,19 @@ class MainGUIWindow(QMainWindow):
         self.webcam_radio.setChecked(True)
         self.import_button = QPushButton("Import")
         self.import_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 14px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
-        
         source_layout.addWidget(self.webcam_radio)
         source_layout.addWidget(self.prerecorded_radio)
         source_layout.addWidget(self.import_button)
@@ -203,47 +216,142 @@ class MainGUIWindow(QMainWindow):
         calibration_layout = QVBoxLayout(calibration_group)
         calibration_layout.setSpacing(10)
 
-        roi_layout = QHBoxLayout()
-        self.calibration_button = QPushButton("Draw Ruler")
-        self.calibration_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
-        )
-        self.calibration_button.setFixedWidth(100)
-        
-        self.px2mm_textbox = QLineEdit()
-        self.px2mm_textbox.setText("1.0")  # Default value
-        self.px2mm_textbox.setStyleSheet(
-            "background-color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
-        )
-        self.px2mm_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        roi_layout.addWidget(self.calibration_button)
-        roi_layout.addWidget(self.px2mm_textbox)
+        roi_layout = QVBoxLayout()
+        roi_layout_1 = QHBoxLayout()
 
+        #---------Ruler draw sector 1
+        self.calibration_button = QPushButton("Draw a line with \n length of")
+        self.calibration_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
+        )
+        self.calibration_button.setFixedWidth(120)  # Fixed width for the button
+
+        self.px2mm_spinbox = QSpinBox()
+        self.px2mm_spinbox.setRange(1, 1000)  # Adjust the range as needed
+        self.px2mm_spinbox.setValue(20)  # Default value
+        self.px2mm_spinbox.setStyleSheet(
+            "background-color: white; font-size: 12px; padding: 5px; border-radius: 4px;"
+        )
+
+        px2mm_label = QLabel("mm")
+        px2mm_label.setStyleSheet(
+            "color: black; font-size: 8px;"
+        )
+
+        roi_layout_1.addWidget(self.calibration_button)
+        roi_layout_1.addWidget(self.px2mm_spinbox)
+        roi_layout_1.addWidget(px2mm_label)
+
+        #---------Ruler draw sector 2
+        roi_layout_2 = QHBoxLayout()
+        px2mm_label_2 = QLabel("Result ratio \n(edible):")
+        px2mm_label_2.setStyleSheet(
+                "\
+                background-color: #3c4043;\
+                color: white;\
+                font-size: 12px;\
+                padding: 8px;\
+                border-radius: 4px;\
+                "
+        )
+        px2mm_label_2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        px2mm_label_2.setFixedWidth(120)
+
+        self.px2mm_result_textbox = QLineEdit()
+        self.px2mm_result_textbox.setText("1.0")  # Default value
+        self.px2mm_result_textbox.setStyleSheet(
+            "background-color: white; font-size: 10px; padding: 8px; border-radius: 4px;"
+        )
+        self.px2mm_result_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        px2mm_label_3 = QLabel("px/mm")
+        px2mm_label_3.setStyleSheet(
+            "color: black; font-size: 8px;"
+        )
+
+        roi_layout_2.addWidget(px2mm_label_2)
+        roi_layout_2.addWidget(self.px2mm_result_textbox)
+        roi_layout_2.addWidget(px2mm_label_3)
+
+        roi_layout.addLayout(roi_layout_1)
+        roi_layout.addLayout(roi_layout_2)
+
+        # Separator line
+        separator_1 = QFrame()
+        separator_1.setFrameShape(QFrame.Shape.HLine)
+        separator_1.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_1.setStyleSheet("background-color: #3c4043;")
+
+        # Arrow Sector
         arrow_layout = QHBoxLayout()
         self.add_arrow_button = QPushButton("Draw Arrow")
         self.add_arrow_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px;\
-             border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
-        self.add_arrow_button.setFixedWidth(100)
+        self.add_arrow_button.setFixedWidth(120)
         
         self.direction_textbox = QLineEdit()
         self.direction_textbox.setText("-90.0")  # Default value
         self.direction_textbox.setStyleSheet(
-            "background-color: white; font-size: 14px; padding: 8px; border-radius: 4px;"
+            "background-color: white; font-size: 10px; padding: 8px; border-radius: 4px;"
         )
         self.direction_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        degree_label = QLabel("degree")
+        degree_label.setStyleSheet(
+            "color: black; font-size: 8px;"
+        )
+
+        # Separator line
+        separator_2 = QFrame()
+        separator_2.setFrameShape(QFrame.Shape.HLine)
+        separator_2.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_2.setStyleSheet("background-color: #3c4043;")
 
         self.confirm_arrow_button = QPushButton("Confirm calibration")
         self.confirm_arrow_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px;\
-             border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 14px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         arrow_layout.addWidget(self.add_arrow_button)
         arrow_layout.addWidget(self.direction_textbox)
+        arrow_layout.addWidget(degree_label)
 
         calibration_layout.addLayout(roi_layout)
+        calibration_layout.addWidget(separator_1)
         calibration_layout.addLayout(arrow_layout)
+        # calibration_layout.addWidget(separator_2)
         calibration_layout.addWidget(self.confirm_arrow_button)
 
         return calibration_group
@@ -270,15 +378,29 @@ class MainGUIWindow(QMainWindow):
         # Add + and - buttons for ROI
         self.add_roi_button = QPushButton("+")
         self.add_roi_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 18px; \
-            font-weight: bold; padding: 5px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 18px; \
+            font-weight: bold; padding: 5px; border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         self.add_roi_button.setFixedSize(40, 40)
         
         self.delete_roi_button = QPushButton("-")
         self.delete_roi_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 18px; \
-            font-weight: bold; padding: 5px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 18px; \
+            font-weight: bold; padding: 5px; border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         self.delete_roi_button.setFixedSize(40, 40)
         
@@ -288,6 +410,13 @@ class MainGUIWindow(QMainWindow):
         
         return roi_group
 
+        # Helper to get resource path
+    
+    def resource_path(self,relative_path):
+        if hasattr(sys, '_MEIPASS'):
+            return os.path.join(sys._MEIPASS, relative_path) # type: ignore
+        return relative_path
+        
     def _add_reset_buttons(self, layout: QVBoxLayout) -> None:
         """
         Add reset buttons to the given layout.
@@ -295,20 +424,34 @@ class MainGUIWindow(QMainWindow):
         Args:
             layout: The layout to add the reset buttons to.
         """
+
+
         # Reset button with camera icon
-        self.reset_button = QPushButton("  Start Recording")
-        self.reset_button.setIcon(QIcon("froth_monitor/resources/camera_icon.svg"))
-        self.reset_button.setIconSize(QSize(24, 24))
-        self.reset_button.setStyleSheet(
-            "background-color: red; color: white; font-size: 14px; padding: 10px; border-radius: 4px; text-align: left;"
+        self.record_button = QPushButton("  Start Recording")
+        self.record_button.setIcon(QIcon(self.resource_path("froth_monitor/resources/camera_icon.ico")))
+        self.record_button.setIconSize(QSize(24, 24))
+        self.record_button.setStyleSheet(
+            "QPushButton {\
+                background-color: red; color: white; font-size: 15px; \
+                padding: 5px; border-radius: 4px;\
+            }\
+            QPushButton:hover {\
+                background-color: #3367d6;\
+            }"
         )
-        self.reset_button.setFixedHeight(50)
-        layout.addWidget(self.reset_button)
+        self.record_button.setFixedHeight(50)
+        layout.addWidget(self.record_button)
         
         # Simple Reset button (as shown in the image)
         self.simple_reset_button = QPushButton("Reset")
         self.simple_reset_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 14px; padding: 10px; border-radius: 4px;"
+            "QPushButton {\
+                background-color: #4285f4; color: white; font-size: 14px; \
+                padding: 5px; border-radius: 4px;\
+            }\
+            QPushButton:hover {\
+                background-color: #3367d6;\
+            }"
         )
         layout.addWidget(self.simple_reset_button)
 
@@ -371,13 +514,35 @@ class MainGUIWindow(QMainWindow):
         # roi_layout = QHBoxLayout()
         self.export_button = QPushButton("Export/Recording Settings")
         self.export_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         # self.calibration_button.setFixedWidth(100)
         
         self.save_button = QPushButton("Save")
         self.save_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         export_layout.addWidget(self.export_button)
         export_layout.addWidget(self.save_button)
@@ -397,6 +562,21 @@ class MainGUIWindow(QMainWindow):
             color: black")
         layout.addWidget(velocity_label)
         
+        horizontal_layout = QHBoxLayout()
+
+
+        example_1d_data = ["N/A"]
+        # ROI Movements Table
+        self.table_widget = pg.TableWidget()
+        self.table_widget.setData(example_1d_data)
+        # self.table_widget.setColumnCount(2)
+        self.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
+        self.table_widget.setFormat("%.2f")
+        self.table_widget.setColumnWidth(0, 120)
+        # self.table_widget.setColumnWidth(1, 100)
+        self.table_widget.setFixedHeight(200)
+
+
         # ROI Movements Canvas (graph)
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setBackground("white")
@@ -404,22 +584,19 @@ class MainGUIWindow(QMainWindow):
         self.plot_widget.showAxis("left")
         self.plot_widget.showAxis("bottom")
         self.plot_widget.setLabel("left", "Velocity", units="mm/s")
-        self.plot_widget.setLabel("bottom", "Time", units="frames")
+        self.plot_widget.setLabel("bottom", "Time", units="secs")
         self.plot_widget.addLegend()
-        
-        # Add a sample blue curve for visualization
-        x = np.linspace(0, 10, 100)
-        y = np.sin(x) + np.random.normal(0, 0.1, 100)
-        pen = pg.mkPen(color='#4285f4', width=2)
-        self.plot_widget.plot(x, y, pen=pen)
-        
-        layout.addWidget(self.plot_widget)
+        horizontal_layout.addWidget(self.table_widget)
+        horizontal_layout.addWidget(self.plot_widget)
+        layout.addLayout(horizontal_layout)
+
+        # layout.addWidget(self.plot_widget)
         
         # Add "Average 30 s" label
-        # avg_label = QLabel("Average 30 s")
-        # avg_label.setStyleSheet("font-size: 14px; color: #333333; text-align: center;")
-        # avg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # layout.addWidget(avg_label)
+        avg_label = QLabel("Average over past 30s")
+        avg_label.setStyleSheet("font-size: 10px; color: #333333; text-align: left;")
+        avg_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(avg_label)
 
     def _create_media_controls(self, layout: QVBoxLayout) -> None:
         """
@@ -435,11 +612,19 @@ class MainGUIWindow(QMainWindow):
         
         # Create play/pause button
         self.play_pause_button = QPushButton()
-        self.play_pause_button.setIcon(QIcon("froth_monitor/resources/pause_icon.svg"))
+        self.play_pause_button.setIcon(QIcon(self.resource_path("froth_monitor/resources/pause_icon.ico")))
+
         self.play_pause_button.setIconSize(QSize(24, 24))
         self.play_pause_button.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
-            border-radius: 4px;"
+            """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
+            border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         self.play_pause_button.setFixedSize(40, 40)
         self.play_pause_button.setToolTip("Play/Pause Video")
@@ -460,6 +645,16 @@ if __name__ == "__main__":
     app.setStyleSheet("""
         QLabel, QLineEdit, QRadioButton, QPushButton, QGroupBox, QMenuBar, QMenu, QMessageBox {
             color: black;
+        }
+        QPushButton {
+            background-color: #4285f4;
+            color: white;
+            font-size: 14px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        QPushButton:hover {
+            background-color: #3367d6;
         }
         QMessageBox QLabel {
             color: black;
