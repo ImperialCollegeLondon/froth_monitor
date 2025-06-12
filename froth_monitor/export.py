@@ -35,7 +35,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QDialog,
     QLineEdit,
-    QCheckBox,
     QHBoxLayout,
     QFileDialog,
     QRadioButton,
@@ -298,7 +297,9 @@ class Export(QFileDialog):
         yes_radio.toggled.connect(on_radio_selection)
         no_radio.toggled.connect(on_radio_selection)
 
-        self.recording_video_directory_button = QPushButton("Set Export Location for Recording")
+        self.recording_video_directory_button = QPushButton(
+            "Set Export Location for Recording"
+        )
         self.recording_video_directory_button.setStyleSheet(
             "\
             QPushButton {\

@@ -21,7 +21,7 @@ if __name__ == "__main__":
             {
             color: black;
         }
-        
+
         QMessageBox QLabel {
             color: black;
         }

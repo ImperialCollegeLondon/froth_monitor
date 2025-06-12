@@ -55,7 +55,10 @@ class OverlayWidget(QWidget):
 
         # Store video position within the canvas
         self.video_rect = QRect()
-
+        
+        self.if_algo_config = False
+        self.algo_delta_pixels = (0.0, 0.0)
+        self.algo_delta_cross_pos = (cast(int, None), cast(int, None))
         # Rectangle drawing attributes
         self.drawing_roi = False
         self.roi_start_point = QPoint()
@@ -77,7 +80,7 @@ class OverlayWidget(QWidget):
 
         # List of ROIs to display
         self.roi_list = []
-
+    
         # Enable mouse tracking for drawing
         self.setMouseTracking(True)
 
@@ -201,6 +204,10 @@ class OverlayWidget(QWidget):
                             )
                     painter.setPen(QColor(255, 255, 255))
                     painter.drawText(text_x, text_y, f"{self.arrow_angle:.1f}°")
+
+        elif self.if_algo_config:
+            print("algo config draw")
+            self.drawROI_algo(painter)
 
         else:
             if self.roi_list:
@@ -550,9 +557,89 @@ class OverlayWidget(QWidget):
 
                 roi.cross_position = cross_x, cross_y
 
+    def drawROI_algo(self, painter):
+        """
+        Helper method to draw ROIs on the overlay.
+
+        Args:
+            painter: QPainter object to use for drawing
+        """
+
+        x1 = 0
+        y1 = 0
+        x2 = self.video_width
+        y2 = self.video_height
+
+        # Calculate width and height of the ROI
+        width = x2
+        height = y2
+
+        # Create a rectangle from the coordinates
+        roi_rect = QRect(x1, y1, x2, y2)
+
+        # Draw the rectangle with a semi-transparent fill
+        # painter.fillRect(roi_rect, QColor(0, 200, 255, 40))  # Light blue with 16% opacity
+
+        # Draw the rectangle border
+        painter.setPen(
+            QPen(QColor(0, 200, 255, 200), 2)
+        )  # Light blue with 80% opacity, 2px width
+
+        # Draw horizontal line of the cross (spanning the full width of ROI)
+        painter.drawRect(roi_rect)
+
+        painter.setPen(QPen(QColor(255, 255, 255, 230)))  # White with 90% opacity
+
+        # Draw the moving cross based on delta_pixels if available
+        if self.algo_delta_pixels is not None:
+            delta_x, delta_y = self.algo_delta_pixels
+
+            if self.algo_delta_cross_pos == (None, None):
+                self.algo_delta_cross_pos = int(x1 + x2 // 2), int(y1 + y2 // 2)
+
+            # Calculate the new position for the cross
+            cross_x, cross_y = self.algo_delta_cross_pos
+            cross_x += int(delta_x)
+            cross_y += int(delta_y)
+
+            # Ensure the cross is within the ROI boundaries
+            if cross_x < x1:
+                cross_x += width
+            if cross_y < y1:
+                cross_y += height
+            if cross_x >= x1 + x2:
+                cross_x -= width
+            if cross_y >= y1 + y2:
+                cross_y -= height
+
+            # Draw the cross with a bright color
+            painter.setPen(
+                QPen(QColor(255, 50, 50, 230), 2)
+            )  # Red with 90% opacity, 2px width
+
+            # Draw horizontal line of the cross (spanning the full width of ROI)
+            painter.drawLine(x1, cross_y, x1 + x2, cross_y)
+
+            # # Draw vertical line of the cross (spanning the full height of ROI)
+            painter.drawLine(cross_x, y1, cross_x, y1 + y2)
+
+            self.algo_delta_cross_pos = cross_x, cross_y
+            print(self.algo_delta_cross_pos)
+            print(x1, y1, x2, y2)
+
     def reset(self) -> None:
         """
         Reset the overlay to its initial state.
         """
         self.roi_list = []
         self.current_roi_rect = QRect()
+
+    def display_roi_for_algo_config(self, delta):
+        """
+        Display the ROI for algorithm configuration.
+
+        Args:
+            delta: Delta coordinates for the ROI
+        """
+        self.algo_delta_pixels = delta
+        self.update()  # Trigger a repaint to display the ROI

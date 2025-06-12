@@ -90,55 +90,90 @@ class VideoAnalysis:
         self.current_velocity = 0
         self.arrow_dir_x = arrow_dir_x
         self.arrow_dir_y = arrow_dir_y
+        self.current_algorithm = "Farneback"  # or "lucas-kanade"
+
+        self.lk_params = dict(
+            winSize=(15, 15),
+            maxLevel=2,
+            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
+        )
+
+        self.of_params = dict(
+            pyr_scale=0.5,
+            levels=int(3),
+            winsize=int(15),
+            iterations=int(3),
+            poly_n=int(7),
+            poly_sigma=1.5,
+        )
 
     def analyze(self, current_frame: np.ndarray) -> tuple[float, float]:
-        """
-        Analyze the given frame for changes in x and y directions by calculating dense optical flow using the Farneback method.
-
-        Parameters
-        ----------
-        current_frame : np.ndarray
-            The frame to analyze.
-
-        Returns
-        -------
-        tuple[float, float]
-            The delta pixel values in x and y directions between the current and previous frames.
-        """
-
-        # Analyze the given frame for changes in x and y directions
         if self.previous_frame is None:
-            # If there's no previous frame, store the current frame and return
             self.previous_frame = current_frame
+            self.prev_pts = None
             return cast(float, None), cast(float, None)
 
-        # Convert both current and previous frames to grayscale
         gray_current: MatLike = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
         gray_previous: MatLike = cv2.cvtColor(self.previous_frame, cv2.COLOR_BGR2GRAY)
 
-        # Calculate dense optical flow using Farneback method
-        flow = cv2.calcOpticalFlowFarneback(
-            prev=gray_previous,
-            next=gray_current,
-            flow=cast(MatLike, None),
-            pyr_scale=0.5,
-            levels=3,
-            winsize=25,
-            iterations=3,
-            poly_n=7,
-            poly_sigma=1.5,
-            flags=0,
-        )
+        if self.current_algorithm == "Farneback":
+            flow = cv2.calcOpticalFlowFarneback(
+                prev=gray_previous,
+                next=gray_current,
+                flow=cast(MatLike, None),
+                **self.of_params,  # type: ignore
+                flags=0,
+            )  # type: ignore
 
-        # Extract flow components in x and y directions
-        flow_x = flow[..., 0]
-        flow_y = flow[..., 1]
+            flow_x = flow[..., 0]
+            flow_y = flow[..., 1]
+            avg_flow_x = cast(float, np.mean(flow_x))  # type: ignore
+            avg_flow_y = cast(float, np.mean(flow_y))  # type: ignore
 
-        avg_flow_x = cast(float, np.mean(flow_x))
-        avg_flow_y = cast(float, np.mean(flow_y))
+        elif self.current_algorithm == "Lucas-Kanade":
+            if getattr(self, "prev_pts", None) is None:
+                # Detect good features to track in the previous frame
+                self.prev_pts = cv2.goodFeaturesToTrack(
+                    gray_previous,
+                    maxCorners=100,
+                    qualityLevel=0.3,
+                    minDistance=7,
+                    blockSize=7,
+                )
 
-        # Update the previous frame to the current frame for the next analysis
+            if self.prev_pts is not None:
+                next_pts, status, err = cv2.calcOpticalFlowPyrLK(
+                    gray_previous,
+                    gray_current,
+                    self.prev_pts,
+                    None, # type: ignore
+                    **self.lk_params,  # type: ignore
+                )  # type: ignore
+                good_new = (
+                    next_pts[status == 1] if next_pts is not None else np.array([])
+                )
+                good_old = (
+                    self.prev_pts[status == 1]
+                    if self.prev_pts is not None
+                    else np.array([])
+                )
+
+                if len(good_new) > 0 and len(good_old) > 0:
+                    flow_vectors = good_new - good_old
+                    avg_flow_x = float(np.mean(flow_vectors[:, 0]))  # type: ignore
+                    avg_flow_y = float(np.mean(flow_vectors[:, 1]))  # type: ignore
+
+                else:
+                    avg_flow_x, avg_flow_y = 0.0, 0.0
+                self.prev_pts = (
+                    good_new.reshape(-1, 1, 2) if len(good_new) > 0 else None
+                )
+
+            else:
+                avg_flow_x, avg_flow_y = 0.0, 0.0
+        else:
+            raise ValueError(f"Unknown algorithm: {self.current_algorithm}")
+
         self.previous_frame = current_frame
 
-        # Return delta pixel values for the current frame
         return avg_flow_x, avg_flow_y

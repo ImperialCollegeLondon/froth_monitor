@@ -9,10 +9,8 @@ import cv2
 import os
 import time
 import numpy as np
-from datetime import datetime
-from typing import Optional, Tuple, cast
+from typing import Tuple, cast
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QMessageBox
 
 
 class VideoRecorder(QObject):
@@ -38,7 +36,9 @@ class VideoRecorder(QObject):
 
     # Signals for recording state changes
     recording_started = Signal(str)  # Emits the output path when recording starts
-    recording_stopped = Signal(str, int)  # Emits the output path and frame count when recording stops
+    recording_stopped = Signal(
+        str, int
+    )  # Emits the output path and frame count when recording stops
 
     def __init__(self):
         """
@@ -54,12 +54,22 @@ class VideoRecorder(QObject):
         self.frame_height = 0
         self.fps = 30.0  # Default FPS
         self.frame_interval = 0.0  # Time interval between frames
-        self.is_video_file = False  # Flag to indicate if recording from a video file or camera
-        self.previous_frame = cast(np.ndarray, None)  # Store the previous frame for comparison
+        self.is_video_file = (
+            False  # Flag to indicate if recording from a video file or camera
+        )
+        self.previous_frame = cast(
+            np.ndarray, None
+        )  # Store the previous frame for comparison
 
-    def start_recording(self, directory: str, filename: str, 
-    frame_width: int, frame_height: int, fps: float = 30.0,
-    is_video_file: bool = False) -> bool:
+    def start_recording(
+        self,
+        directory: str,
+        filename: str,
+        frame_width: int,
+        frame_height: int,
+        fps: float = 30.0,
+        is_video_file: bool = False,
+    ) -> bool:
         """
         Start recording video frames to a file.
 
@@ -97,8 +107,10 @@ class VideoRecorder(QObject):
 
         # Initialize video writer
         # Use H.264 codec (XVID is more widely supported than mp4v)
-        fourcc = cv2.VideoWriter.fourcc(*'XVID')
-        self.video_writer = cv2.VideoWriter(self.output_path, fourcc, fps, (frame_width, frame_height))
+        fourcc = cv2.VideoWriter.fourcc(*"XVID")
+        self.video_writer = cv2.VideoWriter(
+            self.output_path, fourcc, fps, (frame_width, frame_height)
+        )
 
         if not self.video_writer.isOpened():
             print("Failed to open video writer")
@@ -125,7 +137,7 @@ class VideoRecorder(QObject):
         """
         if not self.is_recording or self.video_writer is None:
             return False
-        
+
         # Insert previous frames to keep the same pace of the live video feed
         # As the fps of a realtime camera might not be constant
         if self.frame_count > 0:
@@ -134,7 +146,9 @@ class VideoRecorder(QObject):
                 current_time = time.time()
                 print("Live recording")
                 if current_time - self.previous_frame_time > self.frame_interval:
-                    num_interval = int((current_time - self.previous_frame_time) / self.frame_interval)
+                    num_interval = int(
+                        (current_time - self.previous_frame_time) / self.frame_interval
+                    )
                     for _ in range(num_interval):
                         self.video_writer.write(self.previous_frame)
                         self.frame_count += 1
@@ -199,7 +213,7 @@ class VideoRecorder(QObject):
         """
         duration = time.time() - self.start_time if self.is_recording else 0.0
         return self.output_path, self.frame_count, duration
-    
+
     def reset(self) -> None:
         """
         Reset the video recorder to its initial state.

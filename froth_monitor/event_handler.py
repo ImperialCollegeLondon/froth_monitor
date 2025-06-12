@@ -8,19 +8,23 @@ data processing and analysis.
 import cv2
 import sys
 import os
+import time
 from typing import cast
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
-    QMessageBox,
     QDialog,
     QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QDoubleSpinBox,
+    QMessageBox,
+    QTableWidget,
     QPushButton,
     QVBoxLayout,
 )
 from PySide6.QtCore import QTimer, Qt, QRect
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QDialogButtonBox
 from PySide6.QtGui import QIcon
 
 # Import MainGUIWindow at the beginning
@@ -39,6 +43,441 @@ from froth_monitor.export import Export
 
 # Import the video recorder module
 from froth_monitor.video_recorder import VideoRecorder
+
+
+class AlgorithmConfigurationHandler:
+    """
+    A class to handle the configuration of the velocity calculation algorithm.
+
+    This class provides a dialog window for configuring thevelocity calculation
+    algorithm. It allows the user to select an algorithm (Farneback or Lucas-Kanade) and
+    adjust the parameters for the selected algorithm. The class also provides a
+    method to retrieve the selected algorithm and its parameters.
+    """
+
+    def __init__(self, gui: MainGUIWindow, 
+                        camera_thread: CameraThread,
+                        frame_model: FrameModel):
+        self.camera_thread = camera_thread
+        self.overlay_widget = cast(OverlayWidget, None)
+
+        self.frame_model = frame_model
+        self.frame_model.initialize_algo_config()
+
+        self.lk_params = dict(
+            winSize=(15, 15),
+            maxLevel=2,
+            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
+        )
+        self.lk_valid_values = {
+            "winSize": [
+                (5, 5),
+                (7, 7),
+                (9, 9),
+                (11, 11),
+                (13, 13),
+                (15, 15),
+                (17, 17),
+                (19, 19),
+                (21, 21),
+            ],  # Must be between 0 and 1 (exclusive)
+            "maxLevel": [0, 1, 2, 3, 4, 5],  # Positive integers
+            "criteria": [
+                (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, "EPS|COUNT"),
+                (cv2.TERM_CRITERIA_EPS, "EPS"),
+                (cv2.TERM_CRITERIA_COUNT, "COUNT"),
+            ],
+        }
+        self.of_params = dict(
+            pyr_scale=0.5,
+            levels=int(3),
+            winsize=int(15),
+            iterations=int(3),
+            poly_n=int(7),
+            poly_sigma=1.5,
+        )
+        self.of_valid_values = {
+            "pyr_scale": [0.3, 0.5, 0.7, 0.9],  # Must be between 0 and 1 (exclusive)
+            "levels": [1, 2, 3, 4, 5],  # Positive integers
+            "winsize": [5, 7, 9, 11, 13, 15, 17, 19, 21],  # Positive odd integers
+            "iterations": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],  # Positive integers
+            "poly_n": [5, 7],  # Only 5 or 7
+        }
+
+        self.gui = gui
+
+        self.previous_process_time = 0.0
+        self.accumulated_process_time: list[float] = []
+        self.frame_count = 0
+        self.process_time_avg_30 = 0.0
+
+        self.initUI()
+        self.initialize_tool_window()
+        self.camera_thread.frame_available.connect(self.process_new_frame)
+
+    def initUI(self):
+        self.dialog = QDialog(self.gui)
+        self.dialog.closeEvent = lambda arg__1: self.closeEvent(arg__1)
+        self.dialog.setWindowTitle("Algorithm Configuration")
+        main_layout = QHBoxLayout(self.dialog)
+
+        # Left side: Algorithm selection and parameter table
+        left_layout = QVBoxLayout()
+        self.algorithm_selector = QComboBox()
+        left_layout.addWidget(self.algorithm_selector)
+        self.param_table = QTableWidget()  # Placeholder for parameter table
+        self.param_table.setStyleSheet(
+            """
+            background-color: white;
+            color: blue; font-size: 12px; font-weight: bold; border: 1px solid #ccc;
+            """
+        )
+        left_layout.addWidget(self.param_table)
+        left_layout.addStretch()
+
+        self.confirm_algo_button = QPushButton("Apply change")
+        self.confirm_algo_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
+        )
+        self.confirm_algo_button.clicked.connect(self._confirm_algo)
+        
+        self.exit_button = QPushButton("Confirm and Exit")
+        self.exit_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
+        )
+        self.exit_button.clicked.connect(self.dialog.close)
+        left_layout.addWidget(self.confirm_algo_button)
+        left_layout.addWidget(self.exit_button)
+        self._add_algorithm_combo()  # Add this line
+
+        # Right side: Video canvas and info bar
+        right_layout = QVBoxLayout()
+        self.video_canvas = QLabel("[Video Canvas]")  # Placeholder for video display
+        self.canvas_width = 320  # Example width
+        self.canvas_height = 240  # Example height
+        self.video_canvas.setFixedSize(self.canvas_width, self.canvas_height)
+        self.video_canvas.setStyleSheet(
+            "border: 1px solid #ccc; background-color: #f0f0f0;"
+        )  # Example style
+        right_layout.addWidget(self.video_canvas)
+        
+        # Info bar
+        self.info_bar = QLabel("Frame time: -- ms | Avg (15): -- ms")
+        right_layout.addWidget(self.info_bar)
+
+        main_layout.addLayout(left_layout)
+        main_layout.addLayout(right_layout)
+        self.dialog.setLayout(main_layout)
+
+    def _add_algorithm_combo(self):
+        self.algorithm_selector.addItems(["Farneback", "Lucas-Kanade"])
+        self.algorithm_selector.setStyleSheet(
+            "background-color: #4285f4; color: white; font-size: 12px; padding: 8px; \
+            border-radius: 4px;"
+        )
+        self._update_parameter_table()
+        self.algorithm_selector.currentIndexChanged.connect(
+            self._update_parameter_table
+        )
+
+    def _update_parameter_table(self):
+        selected_algorithm = self.algorithm_selector.currentText()
+
+        if selected_algorithm == "Farneback":
+            self.param_table.setRowCount(5)
+            self.param_table.setColumnCount(1)
+            self.param_table.setHorizontalHeaderLabels(["Value"])
+            self.param_table.setVerticalHeaderLabels(
+                ["pyr_scale", "levels", "winsize", "iterations", "poly_n"]
+            )
+            param_keys = list(self.of_params.keys())
+
+            for row in range(5):
+                key = param_keys[row]
+                value = self.of_params[key]
+                if key in self.of_valid_values:
+                    combo = QComboBox()
+                    for v in self.of_valid_values[key]:
+                        combo.addItem(str(v))
+                    combo.setCurrentText(str(value))
+                    self.param_table.setCellWidget(row, 0, combo)
+                else:
+                    # For poly_sigma, which is not in the table but is in of_params, use QDoubleSpinBox
+                    spinbox = QDoubleSpinBox()
+                    spinbox.setDecimals(2)
+                    spinbox.setRange(0.1, 10.0)
+                    spinbox.setValue(value)
+                    self.param_table.setCellWidget(row, 0, spinbox)
+
+        if selected_algorithm == "Lucas-Kanade":
+            self.param_table.setRowCount(3)
+            self.param_table.setColumnCount(1)
+            self.param_table.setHorizontalHeaderLabels(["Value"])
+            self.param_table.setVerticalHeaderLabels(
+                ["winSize", "maxLevel", "criteria"]
+            )
+
+            # winSize
+            combo_win = QComboBox()
+            for ws in self.lk_valid_values["winSize"]:
+                combo_win.addItem(str(ws))
+            combo_win.setCurrentText(str(self.lk_params["winSize"]))
+            self.param_table.setCellWidget(0, 0, combo_win)
+
+            # maxLevel
+            combo_level = QComboBox()
+            for lvl in self.lk_valid_values["maxLevel"]:
+                combo_level.addItem(str(lvl))
+            combo_level.setCurrentText(str(self.lk_params["maxLevel"]))
+            self.param_table.setCellWidget(1, 0, combo_level)
+
+            # criteria
+            combo_criteria = QComboBox()
+            for val, label in self.lk_valid_values["criteria"]:
+                combo_criteria.addItem(label, val)
+            combo_criteria.setCurrentIndex(0)  # Default to EPS|COUNT
+            self.param_table.setCellWidget(2, 0, combo_criteria)
+
+    def _confirm_algo(self):
+        """
+        Confirm the selected algorithm and update the GUI accordingly.
+        """
+        selected_algorithm = self.algorithm_selector.currentText()
+        if selected_algorithm == "Farneback":
+            self.of_params["pyr_scale"] = float(
+                cast(QComboBox, self.param_table.cellWidget(0, 0)).currentText()
+            )
+            self.of_params["levels"] = int(cast(QComboBox, self.param_table.cellWidget(1, 0)).currentText())
+            self.of_params["winsize"] = int(cast(QComboBox, self.param_table.cellWidget(2, 0)).currentText())
+            self.of_params["iterations"] = int(cast(QComboBox, self.param_table.cellWidget(3, 0)).currentText())
+            self.of_params["poly_n"] = int(cast(QComboBox, self.param_table.cellWidget(4, 0)).currentText())
+
+            self.frame_model.confirm_algorithm_n_params(selected_algorithm, 
+            self.of_params)
+        if selected_algorithm == "Lucas-Kanade":
+            winsize_str = cast(QComboBox, self.param_table.cellWidget(0, 0)).currentText()
+            winsize_tuple = eval(winsize_str)  # Safely convert string "(15, 15)" to tuple
+            self.lk_params["winSize"] = winsize_tuple
+            self.lk_params["maxLevel"] = int(cast(QComboBox, self.param_table.cellWidget(1, 0)).currentText())
+            criteria_val = cast(QComboBox, self.param_table.cellWidget(2, 0)).currentData()
+            self.lk_params["criteria"] = (criteria_val, 10, 0.03)
+
+            self.frame_model.confirm_algorithm_n_params(selected_algorithm, self.lk_params)
+        
+    def initialize_tool_window(self):
+
+        # Initialize the video rectangle to the full canvas size
+        # This will be updated when the first frame arrives
+        self.video_rect = QRect(0, 0, self.canvas_width, self.canvas_height)
+
+        # Create and set up the overlay widget
+        self.overlay_widget = OverlayWidget(self.video_canvas)
+        self.overlay_widget.setGeometry(self.video_rect)
+        self.overlay_widget.if_algo_config = True
+        self.overlay_widget.video_height = self.canvas_height
+        self.overlay_widget.video_width = self.canvas_width
+
+        # Show the overlay
+        self.overlay_widget.show()
+        self.overlay_active = True
+
+        # Bring the overlay to the front
+        self.overlay_widget.raise_()
+
+    def process_new_frame(self, frame):
+        """
+        Process and display a new frame received from the camera thread.
+
+        This method is called whenever a new frame is available from the camera thread.
+        It processes the frame, updates the UI, and handles ROI display.
+
+        Args:
+            frame: The new frame from the camera thread
+        """
+
+        time_start = time.time()
+
+        # Store the current frame for potential further processing
+        self.current_frame = frame
+
+        # Convert frame to QImage and scale it
+        cropped_frame = self._crop_image(frame)
+        qt_image = self._convert_frame_to_qimage(cropped_frame)
+        scaled_image = self._scale_image_to_canvas(qt_image)
+
+        # Create a resized frame for processing
+        resized_frame = self._create_resized_frame(
+            frame, scaled_image.width(), scaled_image.height()
+        )
+
+        # Only allow to let frame pass in when the previous frame has been processed
+        # This is to prevent the overstacking of frames
+        self.camera_thread.if_release = False
+        self._process_frame_with_model(resized_frame)
+        self.camera_thread.if_release = True
+
+        # Display the frame on the canvas
+        pixmap = self._display_frame_on_canvas(scaled_image)
+
+        self.previous_process_time = time.time() - time_start
+        self._update_info_bar()
+    
+    def _update_info_bar(self):
+        """
+        Update the information bar with the current frame time and average time.
+        """
+        self.frame_count += 1
+        self.accumulated_process_time.append(self.previous_process_time)
+
+        # Calculate the average time over the last 30 frames
+        if len(self.accumulated_process_time) == 30:
+            self.process_time_avg_30 = sum(self.accumulated_process_time) / 30
+            self.accumulated_process_time = self.accumulated_process_time[1:]
+            
+        self.info_bar.setText(
+            f"Frame time: {self.previous_process_time * 1000:.2f} ms |\
+                 Avg (30): {self.process_time_avg_30 * 1000:.2f} ms"
+        )
+        self.info_bar.setStyleSheet(
+            "color: black; font-size: 12px; padding: 8px; \
+            border-radius: 4px;"
+        )
+
+    def _crop_image(self, frame):
+        """
+        Crop the frame based on the canvas size.
+
+        Args:
+            frame: The frame to be cropped
+
+        Returns:
+            The cropped frame
+        """
+        # Calculate the cropping coordinates
+        x = (frame.shape[1] - self.canvas_width) // 2
+        y = (frame.shape[0] - self.canvas_height) // 2
+
+        # Crop the frame
+        cropped_frame = frame[y : y + self.canvas_height, x : x + self.canvas_width]
+
+        return cropped_frame
+        
+    def _convert_frame_to_qimage(self, frame):
+        """
+        Convert an OpenCV frame (BGR) to a Qt QImage (RGB).
+
+        Args:
+            frame: OpenCV frame in BGR format
+
+        Returns:
+            QImage: The converted Qt image
+        """
+        # Convert the frame from BGR to RGB format (OpenCV uses BGR, Qt uses RGB)
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Create a QImage from the frame data
+        h, w, ch = rgb_frame.shape
+        bytes_per_line = ch * w
+        return QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+
+    def _scale_image_to_canvas(self, qt_image):
+        """
+        Scale the QImage to fit the canvas while maintaining aspect ratio.
+
+        Args:
+            qt_image: The QImage to scale
+
+        Returns:
+            QImage: The scaled image
+        """
+        return qt_image.scaled(
+            self.canvas_width, self.canvas_height, Qt.AspectRatioMode.KeepAspectRatio
+        )
+
+    def _create_resized_frame(self, frame, width, height):
+        """
+        Create a resized NumPy array with the specified dimensions.
+
+        Args:
+            frame: The original frame
+            width: Target width
+            height: Target height
+
+        Returns:
+            ndarray: Resized frame
+        """
+        return cv2.resize(frame, (width, height))
+
+    def _process_frame_with_model(self, resized_frame):
+        self.delta_pixels = self.frame_model.process_frame_for_algo_config(resized_frame)
+        print(self.delta_pixels)
+        self.overlay_widget.display_roi_for_algo_config(self.delta_pixels)
+
+    def _display_frame_on_canvas(self, scaled_image):
+        """
+        Convert the QImage to a QPixmap and display it on the video canvas.
+
+        Args:
+            scaled_image: The scaled QImage to display
+
+        Returns:
+            QPixmap: The pixmap that was set on the canvas
+        """
+        pixmap = QPixmap.fromImage(scaled_image)
+        self.video_canvas.setPixmap(pixmap)
+        return pixmap
+
+    def closeEvent(self, event):
+        """
+        Handle the window close event.
+
+        This method is called when the window is closed. It releases the
+        video capture and stops the timer.
+
+        Args:
+            event: The close event.
+        """
+        selected_algorithm = self.algorithm_selector.currentText()
+
+        if selected_algorithm == "Farneback":
+            params = self.of_params
+
+        else:
+            params = self.lk_params
+
+        param_str = "\n".join(f"{k}: {v}" for k, v in params.items())
+
+        QMessageBox.information(
+            self.dialog,
+            "Algorithm Configuration",
+            f"Algorithm: {selected_algorithm}\n Parameters:\n{param_str}"
+        )
+
+        self.dialog.close()
 
 
 class EventHandler:
@@ -80,6 +519,7 @@ class EventHandler:
 
         # Parameters of the event handling logic
         self.playing = False
+        self.confirm_algo = False
         self.confirm_calibration = False
         self.current_frame = None
         self.frame_width = 0
@@ -112,6 +552,9 @@ class EventHandler:
         # # Connect buttons directly using the gui reference
         self.gui.play_pause_button.clicked.connect(self.pause_play)
         self.gui.add_roi_button.clicked.connect(self.add_roi)
+        self.gui.algorithm_configuration.clicked.connect(
+            self.open_algorithm_configuration
+        )
         self.gui.confirm_arrow_button.clicked.connect(self.confirm_arrow_n_ruler)
         self.gui.save_button.clicked.connect(self.save_data)
         self.gui.record_button.clicked.connect(self.toggle_recording)
@@ -135,7 +578,6 @@ class EventHandler:
 
         self.initialze_tool_window()
         self.timer.start(self.time_interval)
-        print(f"FPS rate: {self.fps_rate}")
 
     def import_local_video(self):
         """
@@ -237,13 +679,28 @@ class EventHandler:
             )
             return
 
+    def open_algorithm_configuration(self):
+        """
+        Open a dialog to configure the velocity calculation algorithm.
+        """
+        if not self.camera_thread.is_running():
+            QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
+            return
+
+        dialog = AlgorithmConfigurationHandler(self.gui, 
+                                                self.camera_thread, 
+                                                self.frame_model)
+        dialog.dialog.exec()
+        pass
+
     def pause_play(self):
         """
         Toggle between playing and pausing the video.
         """
+
         def resource_path(relative_path):
-            if hasattr(sys, '_MEIPASS'):
-                return os.path.join(sys._MEIPASS, relative_path) # type: ignore
+            if hasattr(sys, "_MEIPASS"):
+                return os.path.join(sys._MEIPASS, relative_path)  # type: ignore
             return relative_path
 
         if not self.camera_thread.is_running() and not self.playing:
@@ -257,7 +714,9 @@ class EventHandler:
             self.playing = False
             self.gui.statusBar().showMessage("Video paused")
             # Change icon to play icon when paused
-            self.gui.play_pause_button.setIcon(QIcon(resource_path("froth_monitor/resources/play_icon.ico")))
+            self.gui.play_pause_button.setIcon(
+                QIcon(resource_path("froth_monitor/resources/play_icon.ico"))
+            )
         else:
             # If the thread is running but paused, just resume it
             if self.camera_thread.is_running() and self.camera_thread.is_paused():
@@ -265,7 +724,9 @@ class EventHandler:
                 self.playing = True
                 self.gui.statusBar().showMessage("Video resumed")
                 # Change icon to pause icon when playing
-                self.gui.play_pause_button.setIcon(QIcon(resource_path("froth_monitor/resources/pause_icon.ico")))
+                self.gui.play_pause_button.setIcon(
+                    QIcon(resource_path("froth_monitor/resources/pause_icon.ico"))
+                )
 
             # If the thread is not running, we need to restart it
             elif hasattr(self, "last_video_source"):
@@ -325,17 +786,19 @@ class EventHandler:
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,  # Set default button to No
             )
-            
+
             # Only proceed if user explicitly clicked Yes
             # The X button will return QMessageBox.StandardButton.No by default
             if reply != QMessageBox.StandardButton.Yes:
                 return  # Exit the function without resetting
-        
+
         # If we get here, either data was saved or user confirmed reset
         QMessageBox.information(self.gui, "Info", "Application reset for new mission.")
 
         self.if_save = False
         self.confirm_calibration = False
+        self.confirm_algo = False
+        self.current_frame_number = 0
         self.camera_thread.reset()
         self.gui.video_canvas_label.clear()
         self.gui.plot_widget.clear()
@@ -442,9 +905,8 @@ class EventHandler:
         Args:
             resized_frame: The resized frame to process
         """
-        self.current_frame_number, roi_list, update_velo_plot, update_average_velo\
-             = self.frame_model.process_frame(
-            resized_frame
+        self.current_frame_number, roi_list, update_velo_plot, update_average_velo = (
+            self.frame_model.process_frame(resized_frame)
         )
         self.display_roi(roi_list)
 
@@ -530,8 +992,8 @@ class EventHandler:
         distance = self.gui.px2mm_spinbox.value()
         print("Spin box value:", distance)
         print("Drawed px:", px)
-        px_ratio = float(px/distance)
-        
+        px_ratio = float(px / distance)
+
         self.frame_model.get_px_to_mm(px_ratio)
         self.gui.px2mm_result_textbox.setText(f"{self.frame_model.px2mm:.1f}")
         # Display the measurement result to the user
@@ -575,7 +1037,7 @@ class EventHandler:
             self.overlay_widget = OverlayWidget(self.gui.video_container)
             # Connect the ROI created signal to our handler
             self.overlay_widget.roi_created.connect(self.handle_roi_created)
-        
+
         # Connect the ruler measurement signal to our handler
         self.overlay_widget.ruler_measured.connect(self.handle_ruler_measurement)
 
@@ -638,7 +1100,7 @@ class EventHandler:
         self.frame_model.delete_last_roi()
         self.overlay_widget.update()
         self.gui.statusBar().showMessage("Last ROI deleted")
-        
+
     # ------------------------------------Arrow Drawing------------------------------------------------
     def confirm_arrow_n_ruler(self):
         """Confirm the current arrow direction."""
@@ -734,7 +1196,7 @@ class EventHandler:
             QMessageBox.warning(
                 self.gui,
                 "Warning",
-                "No video source loaded! Please load a video first."
+                "No video source loaded! Please load a video first.",
             )
             return
 
@@ -754,7 +1216,9 @@ class EventHandler:
 
             # If no directory is set, use a default directory
             if not video_directory:
-                video_directory = os.path.join(os.path.expanduser("~"), "Videos", "FrothMonitor")
+                video_directory = os.path.join(
+                    os.path.expanduser("~"), "Videos", "FrothMonitor"
+                )
                 self.export.video_directory = video_directory
 
             # Get frame dimensions and FPS
@@ -762,11 +1226,15 @@ class EventHandler:
             frame_width, frame_height = self.camera_thread.get_frame_dimensions()
             if self.camera_thread.is_video_file:
                 fps = self.camera_thread.get_fps()
-            
+
             # Start recording
             success = self.video_recorder.start_recording(
-                video_directory, video_filename, frame_width, frame_height, 
-                fps, self.camera_thread.is_video_file
+                video_directory,
+                video_filename,
+                frame_width,
+                frame_height,
+                fps,
+                self.camera_thread.is_video_file,
             )
 
             if success:
@@ -781,15 +1249,19 @@ class EventHandler:
                         background-color: #3367d6;\
                     }"
                 )
-                self.gui.statusBar().showMessage(f"Recording started: {self.video_recorder.output_path}")
+                self.gui.statusBar().showMessage(
+                    f"Recording started: {self.video_recorder.output_path}"
+                )
             else:
                 QMessageBox.critical(
-                    self.gui, "Error", "Could not start recording! Check if the directory is accessible."
+                    self.gui,
+                    "Error",
+                    "Could not start recording! Check if the directory is accessible.",
                 )
         else:
             # Stop recording
             success, output_path, frame_count = self.video_recorder.stop_recording()
-            
+
             if success:
                 self.recording_active = False
                 self.gui.record_button.setText("  Start Recording")
@@ -802,19 +1274,17 @@ class EventHandler:
                         background-color: #3367d6;\
                     }"
                 )
-                
+
                 # Show success message with recording statistics
                 QMessageBox.information(
                     self.gui,
                     "Recording Completed",
-                    f"Video saved to: {output_path}\nFrames recorded: {frame_count}"
+                    f"Video saved to: {output_path}\nFrames recorded: {frame_count}",
                 )
-                
+
                 self.gui.statusBar().showMessage(f"Recording stopped: {output_path}")
             else:
-                QMessageBox.warning(
-                    self.gui, "Warning", "No active recording to stop."
-                )
+                QMessageBox.warning(self.gui, "Warning", "No active recording to stop.")
 
     def export_settings(self):
         """Open export settings dialog."""
@@ -841,7 +1311,6 @@ class EventHandler:
         self.if_save = self.export.excel_results(
             self.frame_model.roi_list, self.frame_model.degree, self.frame_model.px2mm
         )
-
 
     # ------------------------------------Plotting Functions------------------------------------------
     def update_velocity_plot(self):
@@ -953,17 +1422,18 @@ class EventHandler:
             if roi.average_velocity_past_30s is None:
                 list_data.append("N/A")
                 continue
-                
+
             print(list_data)
             # Add average velocity to the table
             list_data.append(roi.average_velocity_past_30s)
-        
+
         self.gui.table_widget.setData(list_data)
         self.gui.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
         self.gui.table_widget.setFormat("%.2f")
         self.gui.table_widget.setColumnWidth(0, 120)
         # self.table_widget.setColumnWidth(1, 100)
         self.gui.table_widget.setFixedHeight(200)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
