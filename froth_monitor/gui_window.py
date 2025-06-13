@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGroupBox,
     QSpinBox,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon
@@ -47,11 +48,16 @@ class MainGUIWindow(QMainWindow):
         """
         super(MainGUIWindow, self).__init__()
         self.setWindowTitle("Froth Monitor")
-        self.setGeometry(100, 100, 1000, 600)
+        self.setMinimumSize(800, 600)
+        self.resize(1200, 800)  # Default size, but resizable
         self.setStyleSheet("background-color: #f0f0f0;")
+
+        # self.setGeometry(100, 100, 1000, 600)
+        # self.setStyleSheet("background-color: #f0f0f0;")
 
         # Initialize default arrow angle (90 degrees)
         self.arrow_angle = -np.pi / 2
+
         # Initialize default px2mm value (1.0)
         self.px2mm = 1.0
 
@@ -63,14 +69,7 @@ class MainGUIWindow(QMainWindow):
         self.initUI()
 
     def initUI(self) -> None:
-        """
-        Initialize the UI elements of the main window.
-
-        This function sets up the main window's layout by calling specialized methods
-        for creating different parts of the UI, including the header bar, left panel controls,
-        and right panel with video canvas and graph display.
-        """
-        # Main widget and layout
+        """Initialize responsive UI elements."""
         main_widget = QWidget(self)
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout()
@@ -78,30 +77,31 @@ class MainGUIWindow(QMainWindow):
         main_layout.setSpacing(0)
         main_widget.setLayout(main_layout)
 
-        # Create header bar
+        # Create responsive header bar
         header_bar = self._create_header_bar()
         main_layout.addWidget(header_bar)
 
-        # Main content area
+        # Main content area with flexible layout
         content_widget = QWidget()
         content_widget.setStyleSheet(
-            "background-color: #f0f0f0; font-weight: bold; font-size: 16px; \
-            color: black"
+            "background-color: #f0f0f0; font-weight: bold; font-size: 16px; color: black"
         )
         content_layout = QHBoxLayout(content_widget)
         content_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.addWidget(content_widget)
 
-        # Create left panel with controls
+        # Create panels with flexible sizing
         left_panel = self._create_left_panel()
-
-        # Create right panel with video canvas and graph
         right_panel = self._create_right_panel()
 
-        # Add panels to content layout
-        content_layout.addWidget(left_panel)
-        content_layout.addWidget(right_panel)
+        # Set size policies for responsive behavior
+        left_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        right_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
+        # Add panels with stretch factors
+        content_layout.addWidget(left_panel, 0)  # Fixed proportion
+        content_layout.addWidget(right_panel, 1)  # 
+        
     def _create_header_bar(self) -> QFrame:
         """
         Create the header bar with title.
@@ -109,18 +109,19 @@ class MainGUIWindow(QMainWindow):
         Returns:
             QFrame: The header bar widget.
         """
+        """Create responsive header bar."""
         header_bar = QFrame()
         header_bar.setStyleSheet("background-color: #3c4043; color: white;")
-        header_bar.setFixedHeight(50)
+        # Use minimum height instead of fixed height
+        header_bar.setMinimumHeight(40)
+        header_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        
         header_layout = QHBoxLayout(header_bar)
-        header_layout.setContentsMargins(20, 0, 20, 0)
+        header_layout.setContentsMargins(20, 10, 20, 10)
 
-        # Add title to header
         title_label = QLabel("Froth Monitor")
         title_label.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
         header_layout.addWidget(title_label)
-
-        # Add spacer to push window controls to the right
         header_layout.addStretch()
 
         return header_bar
@@ -132,32 +133,30 @@ class MainGUIWindow(QMainWindow):
         Returns:
             QFrame: The left panel widget with all controls.
         """
+        """Create responsive left panel."""
         left_panel = QFrame()
-        left_panel.setFixedWidth(250)
+        # Remove fixed width, use minimum and maximum width instead
+        left_panel.setMinimumWidth(200)
+        left_panel.setMaximumWidth(300)
+        left_panel.setMinimumHeight(300)
         left_panel.setStyleSheet("background-color: #f0f0f0;")
+        
         left_layout = QVBoxLayout(left_panel)
         left_layout.setSpacing(15)
         left_layout.setContentsMargins(10, 10, 10, 10)
 
-        # Add video source controls
+        # Add all control groups
         source_group = self._create_video_source_controls()
-        left_layout.addWidget(source_group)
-
-        # Add calibration controls
         calibration_group = self._create_calibration_controls()
-        left_layout.addWidget(calibration_group)
-
-        # Add ROI controls
         roi_group = self._create_roi_controls()
-        left_layout.addWidget(roi_group)
-
-        # Add export settings
         export_group = self._create_export_settings()
+        
+        left_layout.addWidget(source_group)
+        left_layout.addWidget(calibration_group)
+        left_layout.addWidget(roi_group)
         left_layout.addWidget(export_group)
-        # Add reset buttons
+        
         self._add_reset_buttons(left_layout)
-
-        # Add spacer at the bottom
         left_layout.addStretch()
 
         return left_panel
@@ -225,44 +224,51 @@ class MainGUIWindow(QMainWindow):
         return source_group
 
     def _create_calibration_controls(self) -> QGroupBox:
-        """
-        Create the calibration controls.
-
-        Returns:
-            QGroupBox: The calibration group box with button and text input.
-        """
+        """Create responsive calibration controls."""
         calibration_group = QGroupBox("Calibration/ROI")
-        calibration_group.setStyleSheet(
-            "font-weight: bold; font-size: 16px; \
-            color: black"
-        )
-        calibration_layout = QVBoxLayout(calibration_group)
-        calibration_layout.setSpacing(10)
-
-        roi_layout = QVBoxLayout()
-        roi_layout_1 = QHBoxLayout()
-
-        # ---------Ruler draw sector 1
-        self.calibration_button = QPushButton("Draw a line with \n length of")
-        self.calibration_button.setStyleSheet(
+        calibration_group.setStyleSheet(            
             """
             QPushButton {
                 background-color: #4285f4;
                 color: white;
                 font-size: 12px;
-                padding: 8px;
+                padding: 4px;
                 border-radius: 4px;
+                min-width: 80px;
+                min-height: 10px;
             }
             QPushButton:hover {
                 background-color: #3367d6;
             }
-            """
-        )
-        self.calibration_button.setFixedWidth(120)  # Fixed width for the button
+            """)
+        calibration_layout = QVBoxLayout(calibration_group)
+        calibration_layout.setSpacing(10)
+
+        # Ruler draw sector 1 - responsive layout
+        roi_layout_1 = QHBoxLayout()
+        
+        self.calibration_button = QPushButton("Draw a line with \n length of")
+        # self.calibration_button.setStyleSheet(
+        #     """
+        #     QPushButton {
+        #         background-color: #4285f4;
+        #         color: white;
+        #         font-size: 12px;
+        #         padding: 8px;
+        #         border-radius: 4px;
+        #         min-width: 80px;
+        #     }
+        #     QPushButton:hover {
+        #         background-color: #3367d6;
+        #     }
+        #     """
+        # )
+        # Remove fixed width, use size policy instead
+        self.calibration_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         self.px2mm_spinbox = QSpinBox()
-        self.px2mm_spinbox.setRange(1, 1000)  # Adjust the range as needed
-        self.px2mm_spinbox.setValue(20)  # Default value
+        self.px2mm_spinbox.setRange(1, 1000)
+        self.px2mm_spinbox.setValue(20)
         self.px2mm_spinbox.setStyleSheet(
             "background-color: white; font-size: 12px; padding: 5px; border-radius: 4px;"
         )
@@ -270,27 +276,24 @@ class MainGUIWindow(QMainWindow):
         px2mm_label = QLabel("mm")
         px2mm_label.setStyleSheet("color: black; font-size: 8px;")
 
-        roi_layout_1.addWidget(self.calibration_button)
-        roi_layout_1.addWidget(self.px2mm_spinbox)
-        roi_layout_1.addWidget(px2mm_label)
+        roi_layout_1.addWidget(self.calibration_button, 1)
+        roi_layout_1.addWidget(self.px2mm_spinbox, 0)
+        roi_layout_1.addWidget(px2mm_label, 0)
 
-        # ---------Ruler draw sector 2
+        # Ruler draw sector 2 - responsive layout
         roi_layout_2 = QHBoxLayout()
+        
         px2mm_label_2 = QLabel("Result ratio \n(edible):")
         px2mm_label_2.setStyleSheet(
-            "\
-                background-color: #3c4043;\
-                color: white;\
-                font-size: 12px;\
-                padding: 8px;\
-                border-radius: 4px;\
-                "
+            "background-color: #3c4043; color: white; font-size: 12px; "
+            "padding: 8px; border-radius: 4px;"
         )
         px2mm_label_2.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        px2mm_label_2.setFixedWidth(120)
+        # Remove fixed width
+        px2mm_label_2.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         self.px2mm_result_textbox = QLineEdit()
-        self.px2mm_result_textbox.setText("1.0")  # Default value
+        self.px2mm_result_textbox.setText("1.0")
         self.px2mm_result_textbox.setStyleSheet(
             "background-color: white; font-size: 10px; padding: 8px; border-radius: 4px;"
         )
@@ -299,21 +302,13 @@ class MainGUIWindow(QMainWindow):
         px2mm_label_3 = QLabel("mm/px")
         px2mm_label_3.setStyleSheet("color: black; font-size: 8px;")
 
-        roi_layout_2.addWidget(px2mm_label_2)
-        roi_layout_2.addWidget(self.px2mm_result_textbox)
-        roi_layout_2.addWidget(px2mm_label_3)
+        roi_layout_2.addWidget(px2mm_label_2, 1)
+        roi_layout_2.addWidget(self.px2mm_result_textbox, 0)
+        roi_layout_2.addWidget(px2mm_label_3, 0)
 
-        roi_layout.addLayout(roi_layout_1)
-        roi_layout.addLayout(roi_layout_2)
-
-        # Separator line
-        separator_1 = QFrame()
-        separator_1.setFrameShape(QFrame.Shape.HLine)
-        separator_1.setFrameShadow(QFrame.Shadow.Sunken)
-        separator_1.setStyleSheet("background-color: #3c4043;")
-
-        # Arrow Sector
+        # Arrow sector - responsive layout
         arrow_layout = QHBoxLayout()
+        
         self.add_arrow_button = QPushButton("Draw Arrow")
         self.add_arrow_button.setStyleSheet(
             """
@@ -323,28 +318,35 @@ class MainGUIWindow(QMainWindow):
                 font-size: 12px;
                 padding: 8px;
                 border-radius: 4px;
+                min-width: 80px;
             }
             QPushButton:hover {
                 background-color: #3367d6;
             }
             """
         )
-        self.add_arrow_button.setFixedWidth(120)
+        # Remove fixed width
+        self.add_arrow_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         self.direction_textbox = QLineEdit()
-        self.direction_textbox.setText("-90.0")  # Default value
+        self.direction_textbox.setText("-90.0")
         self.direction_textbox.setStyleSheet(
             "background-color: white; font-size: 10px; padding: 8px; border-radius: 4px;"
         )
         self.direction_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
         degree_label = QLabel("degree")
         degree_label.setStyleSheet("color: black; font-size: 8px;")
 
-        # Separator line
-        separator_2 = QFrame()
-        separator_2.setFrameShape(QFrame.Shape.HLine)
-        separator_2.setFrameShadow(QFrame.Shadow.Sunken)
-        separator_2.setStyleSheet("background-color: #3c4043;")
+        arrow_layout.addWidget(self.add_arrow_button, 1)
+        arrow_layout.addWidget(self.direction_textbox, 0)
+        arrow_layout.addWidget(degree_label, 0)
+
+        # Add separators
+        separator_1 = QFrame()
+        separator_1.setFrameShape(QFrame.Shape.HLine)
+        separator_1.setFrameShadow(QFrame.Shadow.Sunken)
+        separator_1.setStyleSheet("background-color: #3c4043;")
 
         self.confirm_arrow_button = QPushButton("Confirm calibration")
         self.confirm_arrow_button.setStyleSheet(
@@ -361,69 +363,48 @@ class MainGUIWindow(QMainWindow):
             }
             """
         )
-        arrow_layout.addWidget(self.add_arrow_button)
-        arrow_layout.addWidget(self.direction_textbox)
-        arrow_layout.addWidget(degree_label)
 
-        calibration_layout.addLayout(roi_layout)
+        calibration_layout.addLayout(roi_layout_1)
+        calibration_layout.addLayout(roi_layout_2)
         calibration_layout.addWidget(separator_1)
         calibration_layout.addLayout(arrow_layout)
-        # calibration_layout.addWidget(separator_2)
         calibration_layout.addWidget(self.confirm_arrow_button)
 
         return calibration_group
 
     def _create_roi_controls(self) -> QGroupBox:
-        """
-        Create the ROI (Region of Interest) controls.
-
-        Returns:
-            QGroupBox: The ROI group box with add and delete buttons.
-        """
+        """Create responsive ROI controls."""
         roi_group = QGroupBox()
-        roi_group.setStyleSheet("font-weight: bold; font-size: 16px; color: black")
+        roi_group.setStyleSheet(            
+            """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 18px;
+                font-weight: bold; padding: 5px; border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            QLabel{
+                background-color: #3c4043; color: white; font-size: 14px; 
+                font-weight: bold; padding: 8px; border-radius: 4px;
+            }
+            """)
         roi_layout = QHBoxLayout(roi_group)
 
-        # Add spacer to push buttons to the right
-        # roi_layout.addStretch()
         self.roi_text = QLabel("ROI")
-        self.roi_text.setStyleSheet(
-            "background-color: #3c4043; color: white; font-size: 14px; \
-            font-weight: bold; padding: 8px; border-radius: 4px;"
-        )
 
-        # Add + and - buttons for ROI
+        # Make buttons responsive with minimum size instead of fixed size
         self.add_roi_button = QPushButton("+")
-        self.add_roi_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4; color: white; font-size: 18px; \
-            font-weight: bold; padding: 5px; border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """
-        )
-        self.add_roi_button.setFixedSize(40, 40)
+        self.add_roi_button.setMinimumSize(35, 35)
+        self.add_roi_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
         self.delete_roi_button = QPushButton("-")
-        self.delete_roi_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4; color: white; font-size: 18px; \
-            font-weight: bold; padding: 5px; border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """
-        )
-        self.delete_roi_button.setFixedSize(40, 40)
+        self.delete_roi_button.setMinimumSize(35, 35)
+        self.delete_roi_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
-        roi_layout.addWidget(self.roi_text)
-        roi_layout.addWidget(self.add_roi_button)
-        roi_layout.addWidget(self.delete_roi_button)
+        roi_layout.addWidget(self.roi_text, 1)
+        roi_layout.addWidget(self.add_roi_button, 0)
+        roi_layout.addWidget(self.delete_roi_button, 0)
 
         return roi_group
 
@@ -435,60 +416,49 @@ class MainGUIWindow(QMainWindow):
         return relative_path
 
     def _add_reset_buttons(self, layout: QVBoxLayout) -> None:
-        """
-        Add reset buttons to the given layout.
-
-        Args:
-            layout: The layout to add the reset buttons to.
-        """
-
-        # Reset button with camera icon
+        """Add responsive reset buttons."""
         self.record_button = QPushButton("  Start Recording")
         self.record_button.setIcon(
             QIcon(self.resource_path("froth_monitor/resources/camera_icon.ico"))
         )
         self.record_button.setIconSize(QSize(24, 24))
         self.record_button.setStyleSheet(
-            "QPushButton {\
-                background-color: red; color: white; font-size: 15px; \
-                padding: 5px; border-radius: 4px;\
-            }\
-            QPushButton:hover {\
-                background-color: #3367d6;\
-            }"
+            """
+            QPushButton {
+                background-color: red; color: white; font-size: 15px;
+                padding: 8px; border-radius: 4px; min-height: 40px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
-        self.record_button.setFixedHeight(50)
+        # Remove fixed height, use minimum height instead
+        self.record_button.setMinimumHeight(40)
         layout.addWidget(self.record_button)
 
-        # Simple Reset button (as shown in the image)
         self.simple_reset_button = QPushButton("Reset")
         self.simple_reset_button.setStyleSheet(
-            "QPushButton {\
-                background-color: #4285f4; color: white; font-size: 14px; \
-                padding: 5px; border-radius: 4px;\
-            }\
-            QPushButton:hover {\
-                background-color: #3367d6;\
-            }"
+            """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 14px;
+                padding: 8px; border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
         )
         layout.addWidget(self.simple_reset_button)
 
     def _create_right_panel(self) -> QFrame:
-        """
-        Create the right panel with video canvas and graph display.
-
-        Returns:
-            QFrame: The right panel widget with video and graph components.
-        """
+        """Create responsive right panel."""
         right_panel = QFrame()
         right_panel.setStyleSheet("background-color: #f0f0f0;")
         right_layout = QVBoxLayout(right_panel)
         right_layout.setSpacing(10)
 
-        # Add video canvas
         self._create_video_canvas(right_layout)
-
-        # Add graph display
         self._create_graph_display(right_layout)
 
         return right_panel
@@ -570,93 +540,74 @@ class MainGUIWindow(QMainWindow):
         return export_group
 
     def _create_graph_display(self, layout: QVBoxLayout) -> None:
-        """
-        Create the graph display for velocity vs time and add it to the given layout.
-
-        Args:
-            layout: The layout to add the graph display to.
-        """
-        # Velocity vs Time label
+        """Create responsive graph display."""
         velocity_label = QLabel("Velocity vs Time")
-        velocity_label.setStyleSheet(
-            "font-weight: bold; font-size: 16px; \
-            color: black"
-        )
+        velocity_label.setStyleSheet("font-weight: bold; font-size: 16px; color: black")
         layout.addWidget(velocity_label)
 
         horizontal_layout = QHBoxLayout()
 
+        # Responsive table
         example_1d_data = ["N/A"]
-        # ROI Movements Table
         self.table_widget = pg.TableWidget()
         self.table_widget.setData(example_1d_data)
-        # self.table_widget.setColumnCount(2)
         self.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
         self.table_widget.setFormat("%.2f")
-        self.table_widget.setColumnWidth(0, 120)
-        # self.table_widget.setColumnWidth(1, 100)
-        self.table_widget.setFixedHeight(200)
+        # Remove fixed column width and height
+        self.table_widget.setMinimumHeight(150)
+        self.table_widget.setMinimumWidth(150)
+        self.table_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
 
-        # ROI Movements Canvas (graph)
+        # Responsive plot widget
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setBackground("white")
-        self.plot_widget.setFixedHeight(200)
+        # Remove fixed height, use minimum height instead
+        self.plot_widget.setMinimumHeight(150)
+        self.plot_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.plot_widget.showAxis("left")
         self.plot_widget.showAxis("bottom")
         self.plot_widget.setLabel("left", "Velocity", units="mm/s")
         self.plot_widget.setLabel("bottom", "Time", units="secs")
         self.plot_widget.addLegend()
-        horizontal_layout.addWidget(self.table_widget)
-        horizontal_layout.addWidget(self.plot_widget)
+        
+        horizontal_layout.addWidget(self.table_widget, 0)
+        horizontal_layout.addWidget(self.plot_widget, 1)
         layout.addLayout(horizontal_layout)
 
-        # layout.addWidget(self.plot_widget)
-
-        # Add "Average 30 s" label
         avg_label = QLabel("Average over past 30s")
         avg_label.setStyleSheet("font-size: 10px; color: #333333; text-align: left;")
         avg_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(avg_label)
 
     def _create_media_controls(self, layout: QVBoxLayout) -> None:
-        """
-        Create media control buttons (play/pause) below the video canvas.
-
-        Args:
-            layout: The layout to add the media controls to.
-        """
-        # Create a container for media controls
+        """Create responsive media controls."""
         media_controls_container = QWidget()
         media_controls_layout = QHBoxLayout(media_controls_container)
         media_controls_layout.setContentsMargins(0, 5, 0, 5)
 
-        # Create play/pause button
         self.play_pause_button = QPushButton()
         self.play_pause_button.setIcon(
             QIcon(self.resource_path("froth_monitor/resources/pause_icon.ico"))
         )
-
         self.play_pause_button.setIconSize(QSize(24, 24))
         self.play_pause_button.setStyleSheet(
             """
             QPushButton {
-                background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
-            border-radius: 4px;
+                background-color: #4285f4; color: white; font-size: 14px;
+                padding: 8px; border-radius: 4px;
             }
             QPushButton:hover {
                 background-color: #3367d6;
             }
             """
         )
-        self.play_pause_button.setFixedSize(40, 40)
+        # Use minimum size instead of fixed size
+        self.play_pause_button.setMinimumSize(35, 35)
+        self.play_pause_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.play_pause_button.setToolTip("Play/Pause Video")
 
-        # Add the button to the layout
         media_controls_layout.addWidget(self.play_pause_button)
-        # Add a stretch to push the button to the right
         media_controls_layout.addStretch()
-
-        # Add the media controls container to the main layout
         layout.addWidget(media_controls_container)
 
     # The createMenuBar, add_buttons, add_canvas_placeholder, and add_ROI_movement_placeholder methods
