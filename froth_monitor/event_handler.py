@@ -828,12 +828,8 @@ class EventHandler:
         self.timer = QTimer()  # Keep for compatibility with existing code
 
         # Parameters of the event handling logic
-        # self.playing = False
         self.confirm_algo = False
-        # self.confirm_calibration = False
         self.current_frame = None
-        # self.frame_width = 0
-        # self.frame_height = 0
 
         # Initialize video recorder
         self.video_recorder = VideoRecorder()
@@ -1116,54 +1112,6 @@ class EventHandler:
             self.gui.statusBar().showMessage(
                 f"Frame: {self.current_frame_number} | Time: {self.frame_model.last_processed_time}"
             )
-
-    # ------------------------------------Ruler Drawing------------------------------------------------
-    # def start_ruler_calibration(self):
-    #     """Start the ruler calibration mode for measuring distances in pixels."""
-    #     # Check if video is loaded
-    #     if self.check_if_import() is False:
-    #         return
-
-    #     if self.confirm_calibration:
-    #         QMessageBox.warning(
-    #             self.gui,
-    #             "Warning",
-    #             "You have already confirmed the arrow and ruler. Please reset the application if you want to change them.",
-    #         )
-    #         return
-    #     # Start ruler calibration mode
-    #     self.overlay_widget.ruler_calibration()
-
-    #     # Inform the user
-    #     self.gui.statusBar().showMessage(
-    #         "Click and drag to draw a line of 2cm for pixel measurement"
-    #     )
-
-    # def handle_ruler_measurement(self, px):
-    #     """Handle the ruler measurement result.
-
-    #     Args:
-    #         distance: The measured distance in pixels
-    #     """
-    #     distance = self.gui.px2mm_spinbox.value()
-    #     px_ratio = float(px / distance)
-
-    #     self.frame_model.get_px_to_mm(px_ratio)
-    #     self.gui.px2mm_result_textbox.setText(f"{self.frame_model.px2mm:.1f}")
-    #     # Display the measurement result to the user
-    #     QMessageBox.information(
-    #         self.gui,
-    #         "Ruler Calibration",
-    #         f"Px to mm ratio: {self.frame_model.px2mm:.1f} per mm",
-    #     )
-
-    #     # Update the status bar
-    #     self.gui.statusBar().showMessage(
-    #         f"Px to mm ratio: {self.frame_model.px2mm:.1f} per mm"
-    #     )
-
-    #     # You could store this calibration value for future use if needed
-    #     # self.calibration_value = distance
 
     # ------------------------------------ROi Drawing--------------------------------------------------
     def add_roi(self):
