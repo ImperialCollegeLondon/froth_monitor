@@ -262,9 +262,8 @@ class FrameModel:
             A tuple containing the frame number and the processed frame.
         """
 
-        time_1 = time.time()
         if frame is None:
-            return None, None
+            return None, None, False, False
 
         # Increment the frame counter
         self.frame_count += 1

@@ -288,6 +288,12 @@ class AlgorithmConfigurationHandler:
 
             self.frame_model.confirm_algorithm_n_params(selected_algorithm, self.lk_params)
         
+        QMessageBox.information(
+            self.dialog,
+            "Algorithm Changed",
+            "The new configuration has been applied.",
+        )
+
     def initialize_tool_window(self):
 
         # Initialize the video rectangle to the full canvas size
@@ -434,7 +440,6 @@ class AlgorithmConfigurationHandler:
 
     def _process_frame_with_model(self, resized_frame):
         self.delta_pixels = self.frame_model.process_frame_for_algo_config(resized_frame)
-        print(self.delta_pixels)
         self.overlay_widget.display_roi_for_algo_config(self.delta_pixels)
 
     def _display_frame_on_canvas(self, scaled_image):
@@ -480,6 +485,7 @@ class AlgorithmConfigurationHandler:
         self.dialog.close()
 
 class VideoHandler:
+
     def __init__(self, 
         event_handler: 'EventHandler',
         gui: MainGUIWindow, 
@@ -524,7 +530,7 @@ class VideoHandler:
 
                 # Start playing the video
                 self.playing = True
-                self.event_handler.initialze_tool_window()
+                self.event_handler.initialze_tool_window_n_handlers()
             else:
                 QMessageBox.critical(
                     self.gui, "Error", "Could not open the video file!"
@@ -594,7 +600,7 @@ class VideoHandler:
 
             # Start playing the video
             self.playing = True
-            self.event_handler.initialze_tool_window()
+            self.event_handler.initialze_tool_window_n_handlers()
             # Close the dialog
             dialog.accept()
         else:
@@ -647,6 +653,137 @@ class VideoHandler:
                 QMessageBox.warning(self.gui, "Warning", "Cannot resume video!")
                 return
 
+class CalibrationHandler:
+    """Handles ruler calibration and arrow direction setup."""
+    def __init__(self, 
+    gui, 
+    frame_model,
+    overlay_widget):
+        self.gui = gui
+        self.frame_model = frame_model
+        self.overlay_widget = overlay_widget
+
+        self.confirm_calibration = False
+
+    # ------------------------------------Ruler Drawing------------------------------------------------
+    def start_ruler_calibration(self):
+        """Start the ruler calibration mode for measuring distances in pixels."""
+
+        if self.confirm_calibration:
+            QMessageBox.warning(
+                self.gui,
+                "Warning",
+                "You have already confirmed the arrow and ruler. Please reset the application if you want to change them.",
+            )
+            return
+        # Start ruler calibration mode
+        self.overlay_widget.ruler_calibration()
+
+        # Inform the user
+        self.gui.statusBar().showMessage(
+            "Click and drag to draw a line of 2cm for pixel measurement"
+        )
+
+    def handle_ruler_measurement(self, px):
+        """Handle the ruler measurement result.
+
+        Args:
+            distance: The measured distance in pixels
+        """
+        distance = self.gui.px2mm_spinbox.value()
+        px_ratio = float(px / distance)
+
+        self.frame_model.get_px_to_mm(px_ratio)
+        self.gui.px2mm_result_textbox.setText(f"{self.frame_model.px2mm:.1f}")
+        # Display the measurement result to the user
+        QMessageBox.information(
+            self.gui,
+            "Ruler Calibration",
+            f"Px to mm ratio: {self.frame_model.px2mm:.1f} per mm",
+        )
+
+        # Update the status bar
+        self.gui.statusBar().showMessage(
+            f"Px to mm ratio: {self.frame_model.px2mm:.1f} per mm"
+        )
+
+        # You could store this calibration value for future use if needed
+        # self.calibration_value = distance
+
+
+    # ------------------------------------Arrow Drawing------------------------------------------------
+    def confirm_arrow_n_ruler(self):
+        """Confirm the current arrow direction."""
+
+        if self.frame_model.px2mm is None:
+            QMessageBox.warning(
+                self.gui, "Warning", "Please calibrate the ruler first."
+            )
+            return
+
+        try:
+            arrow_direction = float(self.gui.direction_textbox.text())
+            px_distance = float(self.gui.px2mm_result_textbox.text())
+            self.frame_model.get_px_to_mm(px_distance)
+            self.frame_model.get_overflow_direction(arrow_direction)
+
+        except ValueError:
+            print(ValueError)
+            QMessageBox.warning(
+                self.gui,
+                "Warning",
+                "Please enter valid arrow direction and px2mm values.",
+            )
+            return
+
+        self.confirm_calibration = True
+        QMessageBox.information(
+            self.gui,
+            "Info",
+            "Overflow direction (arrow) and calibration (ruler) confirmed.",
+        )
+
+    def start_arrow_drawing(self):
+        """Start the arrow drawing mode."""
+
+        if self.confirm_calibration:
+            QMessageBox.warning(
+                self.gui,
+                "Warning",
+                "You have already confirmed the arrow and ruler. Please reset the application if you want to change them.",
+            )
+            return
+
+        # Start ruler calibration mode
+        self.overlay_widget.start_arrow_drawing()
+
+        # Inform the user
+        self.gui.statusBar().showMessage(
+            "Click and drag to draw a line of 2cm for pixel measurement"
+        )
+
+    def handle_arrow_drawing(self, start_pos, end_pos, degree):
+        # Placeholder for arrow drawing result handling
+        """Handle the ruler measurement result.
+
+        Args:
+            distance: The measured distance in pixels
+        """
+
+        self.frame_model.get_overflow_direction(degree)
+        self.gui.direction_textbox.setText(f"{degree:.2f}")
+
+        # Display the measurement result to the user
+        QMessageBox.information(
+            self.gui,
+            "Arrow drawed",
+            f"angle: {degree:.1f} degrees (from the horizontal axis anticlockwisely)",
+        )
+
+        # Update the status bar
+        self.gui.statusBar().showMessage(f"arrow angle: {degree:.1f} degrees")
+
+
 class EventHandler:
     """
     Event handler class that connects GUI components with application logic.
@@ -675,6 +812,11 @@ class EventHandler:
         self.current_frame_number = 0
         self.export = Export(self.gui)
 
+        # Overlay related attributes
+        self.overlay_widget: OverlayWidget = cast(OverlayWidget, None)
+        self.overlay_active = False
+        self.video_rect = QRect()
+
         # Initialize camera thread for event-driven frame capture
         self.camera_thread = CameraThread()
         self.camera_thread.frame_available.connect(self.process_new_frame)
@@ -688,7 +830,7 @@ class EventHandler:
         # Parameters of the event handling logic
         # self.playing = False
         self.confirm_algo = False
-        self.confirm_calibration = False
+        # self.confirm_calibration = False
         self.current_frame = None
         # self.frame_width = 0
         # self.frame_height = 0
@@ -696,11 +838,6 @@ class EventHandler:
         # Initialize video recorder
         self.video_recorder = VideoRecorder()
         self.recording_active = False
-
-        # Overlay related attributes
-        self.overlay_widget: OverlayWidget = cast(OverlayWidget, None)
-        self.overlay_active = False
-        self.video_rect = QRect()
 
         self.if_save = False
         # Connect GUI signals to handler methods
@@ -718,137 +855,30 @@ class EventHandler:
         self.gui.algorithm_configuration.clicked.connect(
             self.open_algorithm_configuration
         )
-        self.gui.confirm_arrow_button.clicked.connect(self.confirm_arrow_n_ruler)
+
         self.gui.save_button.clicked.connect(self.save_data)
         self.gui.record_button.clicked.connect(self.toggle_recording)
         self.gui.simple_reset_button.clicked.connect(self.reset_mission)
-        self.gui.add_arrow_button.clicked.connect(self.start_arrow_drawing)
-        self.gui.calibration_button.clicked.connect(self.start_ruler_calibration)
+
         self.gui.delete_roi_button.clicked.connect(self.delete_last_roi)
-
-    # def handle_video_import(self):
-    #     if self.gui.webcam_radio.isChecked():
-    #         self.load_camera_dialog()
-    #     else:
-    #         self.import_local_video()
-
-    # def initialize_for_local_video(self, video_capture: cv2.VideoCapture) -> None:
-    #     """
-    #     Read the FPS of the video from the video capture object."
-    #     """
-    #     self.fps_rate = video_capture.get(cv2.CAP_PROP_FPS)
-    #     self.time_interval = int(1000 / self.fps_rate)
-
-    #     self.initialze_tool_window()
-    #     self.timer.start(self.time_interval)
-
-    # def import_local_video(self):
-    #     """
-    #     Open a file dialog to select a local video file and initialize video capture.
-    #     """
-    #     file_path, _ = QFileDialog.getOpenFileName(
-    #         self.gui, "Open Video File", "", "Video Files (*.mp4 *.avi *.mkv)"
-    #     )
-
-    #     if file_path:
-    #         # Store the video source for pause/resume functionality
-    #         self.last_video_source = file_path
-
-    #         # Start the camera thread with the selected video file
-    #         if self.camera_thread.start_capture(file_path):
-    #             # Get video properties
-    #             self.frame_width, self.frame_height = (
-    #                 self.camera_thread.get_frame_dimensions()
-    #             )
-
-    #             # Start playing the video
-    #             self.playing = True
-    #             self.initialze_tool_window()
-    #         else:
-    #             QMessageBox.critical(
-    #                 self.gui, "Error", "Could not open the video file!"
-    #             )
-    #             return
-
-    # def load_camera_dialog(self):
-    #     """
-    #     Open a dialog to select and load an available camera.
-    #     """
-    #     available_cameras = []
-    #     for index in range(10):  # Check up to 10 camera indices
-    #         cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-    #         if cap.isOpened():
-    #             available_cameras.append(f"Camera {index}")
-    #             cap.release()
-
-    #     if not available_cameras:
-    #         QMessageBox.critical(self.gui, "Error", "No cameras detected!")
-    #         return
-
-    #     dialog = QDialog(self.gui)
-    #     dialog.setWindowTitle("Select Camera")
-    #     dialog.setMinimumWidth(300)
-
-    #     layout = QVBoxLayout(dialog)
-
-    #     # Camera selection dropdown
-    #     camera_combo = QComboBox(dialog)
-    #     camera_combo.addItems(available_cameras)
-    #     camera_combo.setStyleSheet(
-    #         "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
-    #         border-radius: 4px;"
-    #     )
-    #     layout.addWidget(camera_combo)
-
-    #     # Confirm button
-    #     confirm_button = QPushButton("Load Camera", dialog)
-    #     confirm_button.clicked.connect(
-    #         lambda: self.load_selected_camera(camera_combo, dialog)
-    #     )
-    #     layout.addWidget(confirm_button)
-
-    #     # Show the dialog
-    #     dialog.exec()
-
-    # def load_selected_camera(self, camera_combo, dialog):
-        # """
-        # Load the selected camera from the camera selection dialog.
-
-        # Args:
-        #     camera_combo: QComboBox containing the camera selection.
-        #     dialog: QDialog containing the camera selection dialog.
-        # """
-        # selected_camera = camera_combo.currentText()
-        # camera_index = int(selected_camera.split(" ")[1])
-
-        # # Store the camera index for pause/resume functionality
-        # self.last_video_source = camera_index
-
-        # # Start the camera thread with the selected camera
-        # if self.camera_thread.start_capture(camera_index):
-        #     # Get video properties
-        #     self.frame_width, self.frame_height = (
-        #         self.camera_thread.get_frame_dimensions()
-        #     )
-
-        #     # Start playing the video
-        #     self.playing = True
-        #     self.initialze_tool_window()
-        #     # Close the dialog
-        #     dialog.accept()
-        # else:
-        #     QMessageBox.critical(
-        #         self.gui, "Error", "Could not open the selected camera!"
-        #     )
-        #     return
 
     def open_algorithm_configuration(self):
         """
         Open a dialog to configure the velocity calculation algorithm.
         """
+        if_paused = self.video_handler.playing
+
         if not self.camera_thread.is_running():
             QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
             return
+
+        if not if_paused:  # Access playing state from VideoHandler
+            QMessageBox.information(
+                self.gui, "Information", 
+                "Video was PAUSED by user,\
+                \nit is going to be CONTINUED now for algoritm configuration."
+            )
+            self.video_handler.pause_play()  # Use VideoHandler's pause_play metho
 
         dialog = AlgorithmConfigurationHandler(self.gui, 
                                                 self.camera_thread, 
@@ -856,51 +886,7 @@ class EventHandler:
         dialog.dialog.exec()
         pass
 
-    # def pause_play(self):
-    #     """
-    #     Toggle between playing and pausing the video.
-    #     """
-
-    #     def resource_path(relative_path):
-    #         if hasattr(sys, "_MEIPASS"):
-    #             return os.path.join(sys._MEIPASS, relative_path)  # type: ignore
-    #         return relative_path
-
-    #     if not self.camera_thread.is_running() and not self.playing:
-    #         QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
-    #         return
-
-    #     if self.playing:
-    #         # Pause the video using the camera thread's pause method
-    #         # This keeps the video source open but stops emitting frames
-    #         self.camera_thread.pause()
-    #         self.playing = False
-    #         self.gui.statusBar().showMessage("Video paused")
-    #         # Change icon to play icon when paused
-    #         self.gui.play_pause_button.setIcon(
-    #             QIcon(resource_path("froth_monitor/resources/play_icon.ico"))
-    #         )
-    #     else:
-    #         # If the thread is running but paused, just resume it
-    #         if self.camera_thread.is_running() and self.camera_thread.is_paused():
-    #             self.camera_thread.resume()
-    #             self.playing = True
-    #             self.gui.statusBar().showMessage("Video resumed")
-    #             # Change icon to pause icon when playing
-    #             self.gui.play_pause_button.setIcon(
-    #                 QIcon(resource_path("froth_monitor/resources/pause_icon.ico"))
-    #             )
-
-    #         # If the thread is not running, we need to restart it
-    #         elif hasattr(self, "last_video_source"):
-    #             self.camera_thread.start_capture(self.last_video_source)
-    #             self.playing = True
-    #             self.gui.statusBar().showMessage("Video started")
-    #         else:
-                # QMessageBox.warning(self.gui, "Warning", "Cannot resume video!")
-                # return
-
-    def initialze_tool_window(self):
+    def initialze_tool_window_n_handlers(self):
         if not self.video_handler.playing:  # Access playing state from VideoHandler
             return
 
@@ -917,24 +903,31 @@ class EventHandler:
 
         # Connect the ROI created signal to our handler
         self.overlay_widget.roi_created.connect(self.handle_roi_created)
-        # Connect the ruler measurement signal to our handler
-        self.overlay_widget.ruler_measured.connect(self.handle_ruler_measurement)
-        self.overlay_widget.arrow_drawn.connect(self.handle_arrow_drawing)
 
         self.overlay_widget.setGeometry(self.video_rect)
-        print("Geometry of the overlay widget:", self.overlay_widget.geometry())
-        print("Geometry of the video container:", self.gui.video_container.geometry())
-        print(
-            "Geometry of the video canvas label:",
-            self.gui.video_canvas_label.geometry(),
-        )
+        # print("Geometry of the overlay widget:", self.overlay_widget.geometry())
+        # print("Geometry of the video container:", self.gui.video_container.geometry())
+        # print("Geometry of the video canvas label:",self.gui.video_canvas_label.geometry())
 
         # Show the overlay
         self.overlay_widget.show()
         self.overlay_active = True
-
         # Bring the overlay to the front
         self.overlay_widget.raise_()
+
+        self.handlers_intial_after_overlay_creation()    
+
+    def handlers_intial_after_overlay_creation(self):
+        """
+        Initialize the event handlers after the overlay widget is created.
+        """
+        self.calibration_handler = CalibrationHandler(self.gui, self.frame_model, self.overlay_widget)
+
+        self.gui.confirm_arrow_button.clicked.connect(self.calibration_handler.confirm_arrow_n_ruler)
+        self.gui.add_arrow_button.clicked.connect(self.calibration_handler.start_arrow_drawing)
+        self.gui.calibration_button.clicked.connect(self.calibration_handler.start_ruler_calibration)
+        self.overlay_widget.ruler_measured.connect(self.calibration_handler.handle_ruler_measurement)
+        self.overlay_widget.arrow_drawn.connect(self.calibration_handler.handle_arrow_drawing)
 
     def reset_mission(self):
         """Reset the application for a new mission."""
@@ -1125,54 +1118,52 @@ class EventHandler:
             )
 
     # ------------------------------------Ruler Drawing------------------------------------------------
-    def start_ruler_calibration(self):
-        """Start the ruler calibration mode for measuring distances in pixels."""
-        # Check if video is loaded
-        if self.check_if_import() is False:
-            return
+    # def start_ruler_calibration(self):
+    #     """Start the ruler calibration mode for measuring distances in pixels."""
+    #     # Check if video is loaded
+    #     if self.check_if_import() is False:
+    #         return
 
-        if self.confirm_calibration:
-            QMessageBox.warning(
-                self.gui,
-                "Warning",
-                "You have already confirmed the arrow and ruler. Please reset the application if you want to change them.",
-            )
-            return
-        # Start ruler calibration mode
-        self.overlay_widget.ruler_calibration()
+    #     if self.confirm_calibration:
+    #         QMessageBox.warning(
+    #             self.gui,
+    #             "Warning",
+    #             "You have already confirmed the arrow and ruler. Please reset the application if you want to change them.",
+    #         )
+    #         return
+    #     # Start ruler calibration mode
+    #     self.overlay_widget.ruler_calibration()
 
-        # Inform the user
-        self.gui.statusBar().showMessage(
-            "Click and drag to draw a line of 2cm for pixel measurement"
-        )
+    #     # Inform the user
+    #     self.gui.statusBar().showMessage(
+    #         "Click and drag to draw a line of 2cm for pixel measurement"
+    #     )
 
-    def handle_ruler_measurement(self, px):
-        """Handle the ruler measurement result.
+    # def handle_ruler_measurement(self, px):
+    #     """Handle the ruler measurement result.
 
-        Args:
-            distance: The measured distance in pixels
-        """
-        distance = self.gui.px2mm_spinbox.value()
-        print("Spin box value:", distance)
-        print("Drawed px:", px)
-        px_ratio = float(px / distance)
+    #     Args:
+    #         distance: The measured distance in pixels
+    #     """
+    #     distance = self.gui.px2mm_spinbox.value()
+    #     px_ratio = float(px / distance)
 
-        self.frame_model.get_px_to_mm(px_ratio)
-        self.gui.px2mm_result_textbox.setText(f"{self.frame_model.px2mm:.1f}")
-        # Display the measurement result to the user
-        QMessageBox.information(
-            self.gui,
-            "Ruler Calibration",
-            f"Px to mm ratio: {self.frame_model.px2mm:.1f} per mm",
-        )
+    #     self.frame_model.get_px_to_mm(px_ratio)
+    #     self.gui.px2mm_result_textbox.setText(f"{self.frame_model.px2mm:.1f}")
+    #     # Display the measurement result to the user
+    #     QMessageBox.information(
+    #         self.gui,
+    #         "Ruler Calibration",
+    #         f"Px to mm ratio: {self.frame_model.px2mm:.1f} per mm",
+    #     )
 
-        # Update the status bar
-        self.gui.statusBar().showMessage(
-            f"Px to mm ratio: {self.frame_model.px2mm:.1f} per mm"
-        )
+    #     # Update the status bar
+    #     self.gui.statusBar().showMessage(
+    #         f"Px to mm ratio: {self.frame_model.px2mm:.1f} per mm"
+    #     )
 
-        # You could store this calibration value for future use if needed
-        # self.calibration_value = distance
+    #     # You could store this calibration value for future use if needed
+    #     # self.calibration_value = distance
 
     # ------------------------------------ROi Drawing--------------------------------------------------
     def add_roi(self):
@@ -1202,7 +1193,7 @@ class EventHandler:
             self.overlay_widget.roi_created.connect(self.handle_roi_created)
 
         # Connect the ruler measurement signal to our handler
-        self.overlay_widget.ruler_measured.connect(self.handle_ruler_measurement)
+        self.overlay_widget.ruler_measured.connect(self.calibration_handler.handle_ruler_measurement)
 
         # Start ROI drawing mode
         self.overlay_widget.start_roi_drawing()
@@ -1310,7 +1301,7 @@ class EventHandler:
             self.overlay_widget = OverlayWidget(self.gui.video_container)
             # Connect the signals to our handlers
             self.overlay_widget.roi_created.connect(self.handle_roi_created)
-            self.overlay_widget.ruler_measured.connect(self.handle_ruler_measurement)
+            self.overlay_widget.ruler_measured.connect(self.calibration_handler.handle_ruler_measurement)
             self.overlay_widget.setGeometry(self.video_rect)
             self.overlay_widget.show()
             self.overlay_active = True
