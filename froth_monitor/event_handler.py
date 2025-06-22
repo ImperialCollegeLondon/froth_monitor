@@ -479,105 +479,29 @@ class AlgorithmConfigurationHandler:
 
         self.dialog.close()
 
+class VideoHandler:
+    def __init__(self, 
+        event_handler: 'EventHandler',
+        gui: MainGUIWindow, 
+        frame_model: FrameModel,
+        camera_thread: CameraThread):
 
-class EventHandler:
-    """
-    Event handler class that connects GUI components with application logic.
-
-    This class handles events triggered by user interactions with the GUI,
-    such as button clicks, menu selections, and mouse events. It manages
-    the underlying video processing, ROI analysis, and data export.
-
-    Attributes:
-        gui: The MainGUIWindow instance to connect with.
-        video_capture: OpenCV VideoCapture object for video input.
-        timer: QTimer for controlling frame updates.
-        playing: Boolean flag indicating if video is currently playing.
-        current_frame: The current video frame being displayed.
-        frame_width: Width of the video frame.
-        frame_height: Height of the video frame.
-    """
-
-    def __init__(self, gui: MainGUIWindow):
-        """
-        Initialize the EventHandler with a reference to the GUI.
-
-        Args:
-            gui: The MainGUIWindow instance to connect with.
-        """
         self.gui = gui
-        self.canvas_width = self.gui.video_canvas_label.width()
-        self.canvas_height = self.gui.video_canvas_label.height()
+        self.event_handler = event_handler
+        self.frame_model = frame_model
+        self.camera_thread = camera_thread
 
-        # Initialize camera thread for event-driven frame capture
-        self.camera_thread = CameraThread()
-        self.camera_thread.frame_available.connect(self.process_new_frame)
-
-        # Initialize video capture for compatibility with existing code
-        self.video_capture = None  # Keep for compatibility with existing code
-        self.timer = QTimer()  # Keep for compatibility with existing code
-
-        # Parameters of the event handling logic
+        # Add missing state variables
         self.playing = False
-        self.confirm_algo = False
-        self.confirm_calibration = False
-        self.current_frame = None
         self.frame_width = 0
         self.frame_height = 0
-
-        # Initialize the frame model for processing video frames
-        self.frame_model = FrameModel()
-        self.current_frame_number = 0
-        self.export = Export(self.gui)
-
-        # Initialize video recorder
-        self.video_recorder = VideoRecorder()
-        self.recording_active = False
-
-        # Overlay related attributes
-        self.overlay_widget: OverlayWidget = cast(OverlayWidget, None)
-        self.overlay_active = False
-        self.video_rect = QRect()
-
-        self.if_save = False
-        # Connect GUI signals to handler methods
-        self.connect_signals()
-
-    def connect_signals(self):
-        """Connect GUI signals to their respective handler methods."""
-        # Connect menu actions directly
-        self.gui.import_button.clicked.connect(self.handle_video_import)
-        self.gui.export_button.clicked.connect(self.export_settings)
-
-        # # Connect buttons directly using the gui reference
-        self.gui.play_pause_button.clicked.connect(self.pause_play)
-        self.gui.add_roi_button.clicked.connect(self.add_roi)
-        self.gui.algorithm_configuration.clicked.connect(
-            self.open_algorithm_configuration
-        )
-        self.gui.confirm_arrow_button.clicked.connect(self.confirm_arrow_n_ruler)
-        self.gui.save_button.clicked.connect(self.save_data)
-        self.gui.record_button.clicked.connect(self.toggle_recording)
-        self.gui.simple_reset_button.clicked.connect(self.reset_mission)
-        self.gui.add_arrow_button.clicked.connect(self.start_arrow_drawing)
-        self.gui.calibration_button.clicked.connect(self.start_ruler_calibration)
-        self.gui.delete_roi_button.clicked.connect(self.delete_last_roi)
+        self.last_video_source = None
 
     def handle_video_import(self):
         if self.gui.webcam_radio.isChecked():
             self.load_camera_dialog()
         else:
             self.import_local_video()
-
-    def initialize_for_local_video(self, video_capture: cv2.VideoCapture) -> None:
-        """
-        Read the FPS of the video from the video capture object."
-        """
-        self.fps_rate = video_capture.get(cv2.CAP_PROP_FPS)
-        self.time_interval = int(1000 / self.fps_rate)
-
-        self.initialze_tool_window()
-        self.timer.start(self.time_interval)
 
     def import_local_video(self):
         """
@@ -600,7 +524,7 @@ class EventHandler:
 
                 # Start playing the video
                 self.playing = True
-                self.initialze_tool_window()
+                self.event_handler.initialze_tool_window()
             else:
                 QMessageBox.critical(
                     self.gui, "Error", "Could not open the video file!"
@@ -670,7 +594,7 @@ class EventHandler:
 
             # Start playing the video
             self.playing = True
-            self.initialze_tool_window()
+            self.event_handler.initialze_tool_window()
             # Close the dialog
             dialog.accept()
         else:
@@ -678,20 +602,6 @@ class EventHandler:
                 self.gui, "Error", "Could not open the selected camera!"
             )
             return
-
-    def open_algorithm_configuration(self):
-        """
-        Open a dialog to configure the velocity calculation algorithm.
-        """
-        if not self.camera_thread.is_running():
-            QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
-            return
-
-        dialog = AlgorithmConfigurationHandler(self.gui, 
-                                                self.camera_thread, 
-                                                self.frame_model)
-        dialog.dialog.exec()
-        pass
 
     def pause_play(self):
         """
@@ -737,8 +647,261 @@ class EventHandler:
                 QMessageBox.warning(self.gui, "Warning", "Cannot resume video!")
                 return
 
+class EventHandler:
+    """
+    Event handler class that connects GUI components with application logic.
+
+    This class handles events triggered by user interactions with the GUI,
+    such as button clicks, menu selections, and mouse events. It manages
+    the underlying video processing, ROI analysis, and data export.
+
+    Attributes:
+        gui: The MainGUIWindow instance to connect with.
+        video_capture: OpenCV VideoCapture object for video input.
+        timer: QTimer for controlling frame updates.
+        playing: Boolean flag indicating if video is currently playing.
+        current_frame: The current video frame being displayed.
+        frame_width: Width of the video frame.
+        frame_height: Height of the video frame.
+    """
+
+    def __init__(self, gui: MainGUIWindow):
+        self.gui = gui
+        self.canvas_width = self.gui.video_canvas_label.width()
+        self.canvas_height = self.gui.video_canvas_label.height()
+
+        # Initialize the frame model for processing video frames
+        self.frame_model = FrameModel()
+        self.current_frame_number = 0
+        self.export = Export(self.gui)
+
+        # Initialize camera thread for event-driven frame capture
+        self.camera_thread = CameraThread()
+        self.camera_thread.frame_available.connect(self.process_new_frame)
+
+        self.video_handler = VideoHandler(self, self.gui, self.frame_model, self.camera_thread)
+
+        # Initialize video capture for compatibility with existing code
+        self.video_capture = None  # Keep for compatibility with existing code
+        self.timer = QTimer()  # Keep for compatibility with existing code
+
+        # Parameters of the event handling logic
+        # self.playing = False
+        self.confirm_algo = False
+        self.confirm_calibration = False
+        self.current_frame = None
+        # self.frame_width = 0
+        # self.frame_height = 0
+
+        # Initialize video recorder
+        self.video_recorder = VideoRecorder()
+        self.recording_active = False
+
+        # Overlay related attributes
+        self.overlay_widget: OverlayWidget = cast(OverlayWidget, None)
+        self.overlay_active = False
+        self.video_rect = QRect()
+
+        self.if_save = False
+        # Connect GUI signals to handler methods
+        self.connect_signals()
+
+    def connect_signals(self):
+        """Connect GUI signals to their respective handler methods."""
+        # Connect menu actions directly
+        self.gui.import_button.clicked.connect(self.video_handler.handle_video_import)
+        self.gui.export_button.clicked.connect(self.export_settings)
+
+        # # Connect buttons directly using the gui reference
+        self.gui.play_pause_button.clicked.connect(self.video_handler.pause_play)
+        self.gui.add_roi_button.clicked.connect(self.add_roi)
+        self.gui.algorithm_configuration.clicked.connect(
+            self.open_algorithm_configuration
+        )
+        self.gui.confirm_arrow_button.clicked.connect(self.confirm_arrow_n_ruler)
+        self.gui.save_button.clicked.connect(self.save_data)
+        self.gui.record_button.clicked.connect(self.toggle_recording)
+        self.gui.simple_reset_button.clicked.connect(self.reset_mission)
+        self.gui.add_arrow_button.clicked.connect(self.start_arrow_drawing)
+        self.gui.calibration_button.clicked.connect(self.start_ruler_calibration)
+        self.gui.delete_roi_button.clicked.connect(self.delete_last_roi)
+
+    # def handle_video_import(self):
+    #     if self.gui.webcam_radio.isChecked():
+    #         self.load_camera_dialog()
+    #     else:
+    #         self.import_local_video()
+
+    # def initialize_for_local_video(self, video_capture: cv2.VideoCapture) -> None:
+    #     """
+    #     Read the FPS of the video from the video capture object."
+    #     """
+    #     self.fps_rate = video_capture.get(cv2.CAP_PROP_FPS)
+    #     self.time_interval = int(1000 / self.fps_rate)
+
+    #     self.initialze_tool_window()
+    #     self.timer.start(self.time_interval)
+
+    # def import_local_video(self):
+    #     """
+    #     Open a file dialog to select a local video file and initialize video capture.
+    #     """
+    #     file_path, _ = QFileDialog.getOpenFileName(
+    #         self.gui, "Open Video File", "", "Video Files (*.mp4 *.avi *.mkv)"
+    #     )
+
+    #     if file_path:
+    #         # Store the video source for pause/resume functionality
+    #         self.last_video_source = file_path
+
+    #         # Start the camera thread with the selected video file
+    #         if self.camera_thread.start_capture(file_path):
+    #             # Get video properties
+    #             self.frame_width, self.frame_height = (
+    #                 self.camera_thread.get_frame_dimensions()
+    #             )
+
+    #             # Start playing the video
+    #             self.playing = True
+    #             self.initialze_tool_window()
+    #         else:
+    #             QMessageBox.critical(
+    #                 self.gui, "Error", "Could not open the video file!"
+    #             )
+    #             return
+
+    # def load_camera_dialog(self):
+    #     """
+    #     Open a dialog to select and load an available camera.
+    #     """
+    #     available_cameras = []
+    #     for index in range(10):  # Check up to 10 camera indices
+    #         cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+    #         if cap.isOpened():
+    #             available_cameras.append(f"Camera {index}")
+    #             cap.release()
+
+    #     if not available_cameras:
+    #         QMessageBox.critical(self.gui, "Error", "No cameras detected!")
+    #         return
+
+    #     dialog = QDialog(self.gui)
+    #     dialog.setWindowTitle("Select Camera")
+    #     dialog.setMinimumWidth(300)
+
+    #     layout = QVBoxLayout(dialog)
+
+    #     # Camera selection dropdown
+    #     camera_combo = QComboBox(dialog)
+    #     camera_combo.addItems(available_cameras)
+    #     camera_combo.setStyleSheet(
+    #         "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
+    #         border-radius: 4px;"
+    #     )
+    #     layout.addWidget(camera_combo)
+
+    #     # Confirm button
+    #     confirm_button = QPushButton("Load Camera", dialog)
+    #     confirm_button.clicked.connect(
+    #         lambda: self.load_selected_camera(camera_combo, dialog)
+    #     )
+    #     layout.addWidget(confirm_button)
+
+    #     # Show the dialog
+    #     dialog.exec()
+
+    # def load_selected_camera(self, camera_combo, dialog):
+        # """
+        # Load the selected camera from the camera selection dialog.
+
+        # Args:
+        #     camera_combo: QComboBox containing the camera selection.
+        #     dialog: QDialog containing the camera selection dialog.
+        # """
+        # selected_camera = camera_combo.currentText()
+        # camera_index = int(selected_camera.split(" ")[1])
+
+        # # Store the camera index for pause/resume functionality
+        # self.last_video_source = camera_index
+
+        # # Start the camera thread with the selected camera
+        # if self.camera_thread.start_capture(camera_index):
+        #     # Get video properties
+        #     self.frame_width, self.frame_height = (
+        #         self.camera_thread.get_frame_dimensions()
+        #     )
+
+        #     # Start playing the video
+        #     self.playing = True
+        #     self.initialze_tool_window()
+        #     # Close the dialog
+        #     dialog.accept()
+        # else:
+        #     QMessageBox.critical(
+        #         self.gui, "Error", "Could not open the selected camera!"
+        #     )
+        #     return
+
+    def open_algorithm_configuration(self):
+        """
+        Open a dialog to configure the velocity calculation algorithm.
+        """
+        if not self.camera_thread.is_running():
+            QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
+            return
+
+        dialog = AlgorithmConfigurationHandler(self.gui, 
+                                                self.camera_thread, 
+                                                self.frame_model)
+        dialog.dialog.exec()
+        pass
+
+    # def pause_play(self):
+    #     """
+    #     Toggle between playing and pausing the video.
+    #     """
+
+    #     def resource_path(relative_path):
+    #         if hasattr(sys, "_MEIPASS"):
+    #             return os.path.join(sys._MEIPASS, relative_path)  # type: ignore
+    #         return relative_path
+
+    #     if not self.camera_thread.is_running() and not self.playing:
+    #         QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
+    #         return
+
+    #     if self.playing:
+    #         # Pause the video using the camera thread's pause method
+    #         # This keeps the video source open but stops emitting frames
+    #         self.camera_thread.pause()
+    #         self.playing = False
+    #         self.gui.statusBar().showMessage("Video paused")
+    #         # Change icon to play icon when paused
+    #         self.gui.play_pause_button.setIcon(
+    #             QIcon(resource_path("froth_monitor/resources/play_icon.ico"))
+    #         )
+    #     else:
+    #         # If the thread is running but paused, just resume it
+    #         if self.camera_thread.is_running() and self.camera_thread.is_paused():
+    #             self.camera_thread.resume()
+    #             self.playing = True
+    #             self.gui.statusBar().showMessage("Video resumed")
+    #             # Change icon to pause icon when playing
+    #             self.gui.play_pause_button.setIcon(
+    #                 QIcon(resource_path("froth_monitor/resources/pause_icon.ico"))
+    #             )
+
+    #         # If the thread is not running, we need to restart it
+    #         elif hasattr(self, "last_video_source"):
+    #             self.camera_thread.start_capture(self.last_video_source)
+    #             self.playing = True
+    #             self.gui.statusBar().showMessage("Video started")
+    #         else:
+                # QMessageBox.warning(self.gui, "Warning", "Cannot resume video!")
+                # return
+
     def initialze_tool_window(self):
-        if not self.playing:
+        if not self.video_handler.playing:  # Access playing state from VideoHandler
             return
 
         # Get the dimensions of the video canvas
@@ -816,7 +979,7 @@ class EventHandler:
         Args:
             frame: The new frame from the camera thread
         """
-        if not self.playing:
+        if not self.video_handler.playing:  # Access playing state from VideoHandler
             return
 
         # Store the current frame for potential further processing

@@ -472,6 +472,9 @@ class MainGUIWindow(QMainWindow):
         """
         self.video_container = QWidget()
         self.video_container.setFixedSize(700, 400)
+        # self.video_container.setFixedHeight(400)
+        # self.video_container.setFixedWidth(700)
+        self.video_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.video_container.setStyleSheet(
             "background-color: #333333; border-radius: 4px;"
         )
@@ -485,6 +488,7 @@ class MainGUIWindow(QMainWindow):
         video_container_layout.addWidget(self.video_canvas_label)
 
         layout.addWidget(self.video_container)
+        # layout.addWidget(self.video_canvas_label)
 
         # Add media controls below the video canvas
         self._create_media_controls(layout)

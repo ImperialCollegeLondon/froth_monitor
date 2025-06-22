@@ -44,9 +44,6 @@ class OverlayWidget(QWidget):
         # Initialize timestamp
         self.timestamp = time.strftime("%H:%M:%S", time.localtime())
 
-        # # Set font for timestamp
-        # self.font = QFont("Arial", 24, QFont.Weight.Bold)
-
         # Store video dimensions
         self.video_width = 0
         self.video_height = 0
@@ -59,6 +56,7 @@ class OverlayWidget(QWidget):
         self.if_algo_config = False
         self.algo_delta_pixels = (0.0, 0.0)
         self.algo_delta_cross_pos = (cast(int, None), cast(int, None))
+
         # Rectangle drawing attributes
         self.drawing_roi = False
         self.roi_start_point = QPoint()
@@ -387,6 +385,7 @@ class OverlayWidget(QWidget):
         self.drawing_ruler = False
         self.arrow_start_point = QPoint()
         self.arrow_end_point = QPoint()
+        print(self.arrow_start_point, self.arrow_end_point)
         self.arrow_angle = 0.0
 
     def reset_arrow_mode(self):

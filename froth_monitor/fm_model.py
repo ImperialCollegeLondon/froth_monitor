@@ -307,7 +307,7 @@ class FrameModel:
         if if_new_average > 0:
             update_average_velo = True
 
-        print("time to process a frame: ", time.time() - time_1, "s")
+        # print("time to process a frame: ", time.time() - time_1, "s")
         return self.frame_count, self.roi_list, update_velo_plot, update_average_velo
 
     def initialize_algo_config(self):
