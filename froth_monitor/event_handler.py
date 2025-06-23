@@ -893,7 +893,316 @@ class ROIHander:
         self.overlay_widget.update()
         self.gui.statusBar().showMessage("Last ROI deleted")
 
+class VelocityPlotter:
+    def __init__(self,
+        gui: MainGUIWindow,
+        frame_model: FrameModel):
+        self.gui = gui
+        self.frame_model = frame_model
+        self.plot_widget = self.gui.plot_widget
 
+    # ------------------------------------Plotting Functions------------------------------------------
+    def update_velocity_plot(self):
+        """Update the velocity plot with data from all ROIs.
+
+        This method extracts velocity history data from each ROI in the frame_model's roi_list
+        and plots it on the plot_widget. Each ROI's velocity history is plotted as a separate
+        line with a different color and labeled in the legend.
+
+        The plot displays a fixed window of 30 elements (3 seconds) with new data appearing
+        from the right edge and older data scrolling to the left. When the history exceeds
+        30 elements, the oldest elements are removed to maintain the fixed window size.
+        """
+        # Clear the plot widget
+        self.gui.plot_widget.clear()
+
+        # Check if there are any ROIs to plot
+        if not self.frame_model.roi_list:
+            return
+
+        # Define a list of colors for different ROIs
+        colors = [
+            "r",
+            "g",
+            "b",
+            "c",
+            "m",
+            "y",
+            "w",
+        ]  # Red, green, blue, cyan, magenta, yellow, white
+
+        # Fixed window size (3 seconds)
+        WINDOW_SIZE = 30
+
+        # Find the maximum velocity across all ROIs for y-axis scaling
+        max_velocity = 0
+        if self.frame_model.roi_list and any(
+            roi.velo_only_history for roi in self.frame_model.roi_list
+        ):
+            max_velocity = max(
+                max(roi.velo_only_history) if roi.velo_only_history else 0
+                for roi in self.frame_model.roi_list
+            )
+
+        # Plot velocity history for each ROI
+        for i, roi in enumerate(self.frame_model.roi_list):
+            # Skip if no velocity history
+            if not roi.velo_only_history:
+                continue
+
+            # Get color for this ROI (cycle through colors if more ROIs than colors)
+            color = colors[i % len(colors)]
+
+            # Get the velocity history data
+            history = roi.velo_only_history
+
+            # Limit history to the most recent WINDOW_SIZE elements
+            if len(history) > WINDOW_SIZE:
+                history = history[-WINDOW_SIZE:]
+
+            # Create a fixed-size array for display (30 elements)
+            display_data = [None] * WINDOW_SIZE
+
+            # Position the data at the right side of the display
+            # For example, if we have 5 elements, they go in positions 25-29 (0-indexed)
+            start_pos = WINDOW_SIZE - len(history)
+            for j, value in enumerate(history):
+                display_data[start_pos + j] = value
+
+            # Create x-axis data (fixed range from 0 to WINDOW_SIZE-1)
+            x_data = list(range(WINDOW_SIZE))
+
+            # Create y-axis data with None values filtered out for plotting
+            # (pyqtgraph will skip None values when plotting)
+            plot_x = []
+            plot_y = []
+            for x, y in zip(x_data, display_data):
+                if y is not None:
+                    plot_x.append(x)
+                    plot_y.append(y)
+
+            # Add the plot with a label for the legend
+            if plot_x and plot_y:  # Only plot if we have data
+                self.gui.plot_widget.plot(
+                    plot_x, plot_y, pen=color, name=f"ROI {i + 1}"
+                )
+
+        # Set fixed x-axis range (0 to WINDOW_SIZE-1)
+        self.gui.plot_widget.setXRange(0, WINDOW_SIZE - 1)
+
+        # Set appropriate y-axis range if there's data
+        if max_velocity > 0:
+            # Add some padding to the top of the y-axis
+            self.gui.plot_widget.setYRange(0, max_velocity * 1.1)
+
+        # Update the plot
+        self.gui.plot_widget.update()
+
+    def update_ave_velo_table(self):
+        """Update the average velocity table with data from all ROIs."""
+        # Clear the table
+        self.gui.table_widget.clear()
+        self.gui.table_widget.setRowCount(len(self.frame_model.roi_list))
+
+        list_data = []
+        # Add data to the table
+        for i, roi in enumerate(self.frame_model.roi_list):
+            # Skip if no velocity history
+            if roi.average_velocity_past_30s is None:
+                list_data.append("N/A")
+                continue
+
+            print(list_data)
+            # Add average velocity to the table
+            list_data.append(roi.average_velocity_past_30s)
+
+        self.gui.table_widget.setData(list_data)
+        self.gui.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
+        self.gui.table_widget.setFormat("%.2f")
+        self.gui.table_widget.setColumnWidth(0, 120)
+        # self.table_widget.setColumnWidth(1, 100)
+        self.gui.table_widget.setFixedHeight(200)
+
+
+class FrameProcessor:
+    def __init__(self,
+        event_handler: 'EventHandler',
+        gui: MainGUIWindow,
+        frame_model: FrameModel,
+        camera_thread: CameraThread,
+        overlay_widget: OverlayWidget,
+        video_recorder: VideoRecorder,
+        roi_handler: ROIHander,
+        velocity_plotter: VelocityPlotter):
+
+        self.gui = gui
+        self.event_handler = event_handler
+        self.frame_model = frame_model
+        self.camera_thread = camera_thread
+        self.overlay_widget = overlay_widget
+        self.video_recorder = video_recorder
+        self.roi_handler = roi_handler
+        self.velocity_plotter = velocity_plotter
+
+        self.canvas_width = self.gui.video_canvas_label.width()
+        self.canvas_height = self.gui.video_canvas_label.height()
+
+
+    # -----------------------------------Frame Processing-----------------------------------------------
+    def process_new_frame(self, frame):
+        """
+        Process and display a new frame received from the camera thread.
+
+        This method is called whenever a new frame is available from the camera thread.
+        It processes the frame, updates the UI, and handles ROI display.
+
+        Args:
+            frame: The new frame from the camera thread
+        """
+        if not self.event_handler.video_handler.playing:  # Access playing state from VideoHandler
+            return
+
+        # Store the current frame for potential further processing
+        self.current_frame = frame
+
+        # Convert frame to QImage and scale it
+        qt_image = self._convert_frame_to_qimage(frame)
+        scaled_image = self._scale_image_to_canvas(qt_image)
+
+        # Create a resized frame for processing
+        resized_frame = self._create_resized_frame(
+            frame, scaled_image.width(), scaled_image.height()
+        )
+
+        # Process the frame with the frame model
+
+        # Only allow to let frame pass in when the previous frame has been processed
+        # This is to prevent the overstacking of frames
+        self.camera_thread.if_release = False
+        self._process_frame_with_model(resized_frame)
+        self.camera_thread.if_release = True
+
+        # Display the frame on the canvas
+        pixmap = self._display_frame_on_canvas(scaled_image)
+
+        # Update the overlay position
+        self._update_overlay_position(pixmap)
+
+        # Record frame if recording is active
+        if self.event_handler.recording_active and self.video_recorder.is_active():
+            self.video_recorder.record_frame(frame)
+
+        # Update status bar
+        self._update_status_bar()
+
+    def _convert_frame_to_qimage(self, frame):
+        """
+        Convert an OpenCV frame (BGR) to a Qt QImage (RGB).
+
+        Args:
+            frame: OpenCV frame in BGR format
+
+        Returns:
+            QImage: The converted Qt image
+        """
+        # Convert the frame from BGR to RGB format (OpenCV uses BGR, Qt uses RGB)
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Create a QImage from the frame data
+        h, w, ch = rgb_frame.shape
+        bytes_per_line = ch * w
+        return QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+
+    def _scale_image_to_canvas(self, qt_image):
+        """
+        Scale the QImage to fit the canvas while maintaining aspect ratio.
+
+        Args:
+            qt_image: The QImage to scale
+
+        Returns:
+            QImage: The scaled image
+        """
+        return qt_image.scaled(
+            self.canvas_width, self.canvas_height, Qt.AspectRatioMode.KeepAspectRatio
+        )
+
+    def _create_resized_frame(self, frame, width, height):
+        """
+        Create a resized NumPy array with the specified dimensions.
+
+        Args:
+            frame: The original frame
+            width: Target width
+            height: Target height
+
+        Returns:
+            ndarray: Resized frame
+        """
+        return cv2.resize(frame, (width, height))
+
+    def _process_frame_with_model(self, resized_frame):
+        """
+        Process the frame with the frame model and display ROIs.
+
+        Args:
+            resized_frame: The resized frame to process
+        """
+        self.current_frame_number, roi_list, update_velo_plot, update_average_velo = (
+            self.frame_model.process_frame(resized_frame)
+        )
+        self.roi_handler.display_roi(roi_list)
+
+        # Update the velocity plot with the latest data
+        if update_velo_plot:
+            self.velocity_plotter.update_velocity_plot()
+
+        # Update the average velocity label
+        if update_average_velo:
+            self.velocity_plotter.update_ave_velo_table()
+
+    def _display_frame_on_canvas(self, scaled_image):
+        """
+        Convert the QImage to a QPixmap and display it on the video canvas.
+
+        Args:
+            scaled_image: The scaled QImage to display
+
+        Returns:
+            QPixmap: The pixmap that was set on the canvas
+        """
+        pixmap = QPixmap.fromImage(scaled_image)
+        self.gui.video_canvas_label.setPixmap(pixmap)
+        return pixmap
+
+    def _update_overlay_position(self, pixmap):
+        """
+        Update the position and size of the overlay widget based on the video dimensions.
+
+        Args:
+            pixmap: The pixmap displayed on the canvas
+        """
+        if pixmap.width() < self.canvas_width or pixmap.height() < self.canvas_height:
+            # Calculate the position of the video within the canvas (centered)
+            x_offset = (self.canvas_width - pixmap.width()) // 2
+            y_offset = (self.canvas_height - pixmap.height()) // 2
+            self.video_rect = QRect(x_offset, y_offset, pixmap.width(), pixmap.height())
+
+            # Update overlay widget geometry if it exists
+            if self.overlay_widget:
+                self.overlay_widget.setGeometry(self.video_rect)
+        else:
+            # Video fills the canvas
+            self.video_rect = QRect(0, 0, self.canvas_width, self.canvas_height)
+
+    def _update_status_bar(self):
+        """
+        Update status bar with frame information.
+        """
+        if hasattr(self.gui, "statusBar"):
+            self.gui.statusBar().showMessage(
+                f"Frame: {self.current_frame_number} | Time: {self.frame_model.last_processed_time}"
+            )
 
 class EventHandler:
     """
@@ -941,6 +1250,19 @@ class EventHandler:
         """
         self.calibration_handler = CalibrationHandler(self.gui, self.frame_model, self.overlay_widget)
         self.roi_handler = ROIHander(self, self.gui, self.frame_model, self.camera_thread, self.overlay_widget)
+        self.frame_processor = FrameProcessor(
+            self,
+            self.gui,
+            self.frame_model,
+            self.camera_thread,
+            self.overlay_widget,
+            self.video_recorder,
+            self.roi_handler,
+            self.velocity_plotter,
+        )
+
+        # Connect camera thread signals to frame processor
+        self.camera_thread.frame_available.connect(self.frame_processor.process_new_frame)
 
         self.gui.confirm_arrow_button.clicked.connect(self.calibration_handler.confirm_arrow_n_ruler)
         self.gui.add_arrow_button.clicked.connect(self.calibration_handler.start_arrow_drawing)
@@ -968,14 +1290,15 @@ class EventHandler:
 
         # Initialize camera thread for event-driven frame capture
         self.camera_thread = CameraThread()
-        self.camera_thread.frame_available.connect(self.process_new_frame)
-
-        self.overlay_handler = OverlayHandler(self.gui, self)
-        self.video_handler = VideoHandler(self, self.gui, self.frame_model, self.camera_thread)
-
         # Initialize video recorder
         self.video_recorder = VideoRecorder()
         self.recording_active = False
+
+        # Initialize handlers
+        self.overlay_handler = OverlayHandler(self.gui, self)
+        self.video_handler = VideoHandler(self, self.gui, self.frame_model, self.camera_thread)
+        self.velocity_plotter = VelocityPlotter(self.gui, self.frame_model)
+
 
     def connect_signals(self):
         """Connect GUI signals to their respective handler methods."""
@@ -994,7 +1317,6 @@ class EventHandler:
         self.gui.save_button.clicked.connect(self.save_data)
         self.gui.record_button.clicked.connect(self.toggle_recording)
         self.gui.simple_reset_button.clicked.connect(self.reset_mission)
-
 
     def open_algorithm_configuration(self):
         """
@@ -1207,7 +1529,6 @@ class EventHandler:
             self.gui.statusBar().showMessage(
                 f"Frame: {self.current_frame_number} | Time: {self.frame_model.last_processed_time}"
             )
-
 
     def toggle_recording(self):
         """Start or stop video recording."""
