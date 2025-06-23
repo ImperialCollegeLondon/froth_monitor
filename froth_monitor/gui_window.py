@@ -4,7 +4,6 @@ This module contains the GUI layout and components for the Froth Tracker applica
 without any connected functionality. It serves as a template for the application's
 user interface structure.
 """
-
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -29,17 +28,6 @@ import os
 
 
 class MainGUIWindow(QMainWindow):
-    """
-    The main graphical user interface (GUI) window class for the Froth Tracker application.
-
-    This class provides the primary interface layout for the application, including:
-    - Menu bar with import and export options
-    - Video canvas for displaying frames
-    - Arrow direction canvas and controls
-    - ROI movement visualization area
-    - Control buttons for various operations
-    """
-
     def __init__(self) -> None:
         """
         Constructor for the MainGUIWindow class.
@@ -50,10 +38,8 @@ class MainGUIWindow(QMainWindow):
         self.setWindowTitle("Froth Monitor")
         self.setMinimumSize(800, 600)
         self.resize(1200, 800)  # Default size, but resizable
+        # self.showMaximized()
         self.setStyleSheet("background-color: #f0f0f0;")
-
-        # self.setGeometry(100, 100, 1000, 600)
-        # self.setStyleSheet("background-color: #f0f0f0;")
 
         # Initialize default arrow angle (90 degrees)
         self.arrow_angle = -np.pi / 2
@@ -64,9 +50,16 @@ class MainGUIWindow(QMainWindow):
         # Initialize overlay related attributes
         self.overlay_widget = None
         self.video_rect = None
+        
+        # Initialize notification overlay
+        self.notification_overlay = None
+        self.window_size_locked = False
 
         # Define UI elements
         self.initUI()
+        
+        # Show the window size notification after UI is initialized
+        self._show_window_size_notification()
 
     def initUI(self) -> None:
         """Initialize responsive UI elements."""
@@ -102,6 +95,133 @@ class MainGUIWindow(QMainWindow):
         content_layout.addWidget(left_panel, 0)  # Fixed proportion
         content_layout.addWidget(right_panel, 1)  # 
         
+    def _show_window_size_notification(self) -> None:
+        """Show the window size adjustment notification overlay."""
+
+        # Create overlay widget that covers only the minimum size area
+        self.notification_overlay = QWidget(self)
+        self.notification_overlay.setStyleSheet(
+            "background-color: rgba(0, 0, 0, 150);"  # Semi-transparent dark overlay
+        )
+        self.notification_overlay.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        
+        self.notification_overlay.setGeometry(0, 0, 1200, 800)
+        
+        # Create the notification content
+        overlay_layout = QVBoxLayout(self.notification_overlay)
+        overlay_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Create notification card
+        notification_card = QFrame()
+        notification_card.setStyleSheet(
+            """
+            QFrame {
+                background-color: white;
+                border-radius: 10px;
+                padding: 10px;
+                border: 2px solid #4285f4;
+            }
+            """
+        )
+        notification_card.setFixedSize(500, 200)
+        
+        card_layout = QVBoxLayout(notification_card)
+        card_layout.setSpacing(15)
+        
+        # Title - Fixed styling to ensure visibility
+        title_label = QLabel("Window Size Adjustment")
+        title_label.setStyleSheet(
+            """
+            QLabel {
+                font-size: 18px; 
+                font-weight: bold; 
+                color: #333333;
+                background-color: transparent;
+                border: none;
+                margin: 0px;
+                padding: 5px;
+            }
+            """
+        )
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Message - Fixed styling to ensure visibility
+        message_label = QLabel(
+            "Please adjust the window size to fit your screen preferences now.\n"
+            "Window resizing will be disabled once you confirm and start using the application."
+        )
+        message_label.setStyleSheet(
+            """
+            QLabel {
+                font-size: 12px; 
+                color: #555555;
+                background-color: transparent;
+                border: none;
+                margin: 0px;
+                padding: 5px;
+                line-height: 1.4;
+            }
+            """
+        )
+        message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        message_label.setWordWrap(True)
+        
+        # Confirm button
+        confirm_button = QPushButton("I'm Ready - Lock Window Size")
+        confirm_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 10px 20px;
+                border-radius: 5px;
+                border: none;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            QPushButton:pressed {
+                background-color: #2851a3;
+            }
+            """
+        )
+        confirm_button.clicked.connect(self._confirm_window_size)
+        
+        # Add widgets to card layout
+        card_layout.addWidget(title_label)
+        card_layout.addWidget(message_label)
+        card_layout.addWidget(confirm_button)
+        
+        # Add card to overlay layout
+        overlay_layout.addWidget(notification_card)
+        
+        # Show the overlay
+        self.notification_overlay.show()
+        self.notification_overlay.raise_()
+
+
+    def _confirm_window_size(self) -> None:
+        """Handle window size confirmation and hide the notification."""
+        # Lock window size
+        self.window_size_locked = True
+        self.setFixedSize(self.size())  # Lock the current size
+        
+        # Hide and delete the notification overlay
+        if self.notification_overlay:
+            self.notification_overlay.hide()
+            self.notification_overlay.deleteLater()
+            self.notification_overlay = None
+            
+    def resizeEvent(self, event):
+        """Handle window resize events to maintain overlay position."""
+        super().resizeEvent(event)
+        # Keep notification overlay covering only the minimum size area
+        if self.notification_overlay and self.notification_overlay.isVisible():
+            self.notification_overlay.setGeometry(0, 0, self.width(), self.height())
+            
     def _create_header_bar(self) -> QFrame:
         """
         Create the header bar with title.
