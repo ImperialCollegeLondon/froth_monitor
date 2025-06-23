@@ -801,7 +801,7 @@ class OverlayHandler:
         self.video_rect = QRect(0, 0, canvas_width, canvas_height)
 
         # Create and set up the overlay widget
-        self.overlay_widget = OverlayWidget(self.gui.video_container)
+        self.overlay_widget = OverlayWidget(self.gui.video_canvas_label)
 
         self.overlay_widget.setGeometry(self.video_rect)
         # print("Geometry of the overlay widget:", self.overlay_widget.geometry())
@@ -1017,11 +1017,9 @@ class VelocityPlotter:
             list_data.append(roi.average_velocity_past_30s)
 
         self.gui.table_widget.setData(list_data)
-        self.gui.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
+        self.gui.table_widget.setHorizontalHeaderLabels(["ROI vs. mean_velocity (mm/s)"])
         self.gui.table_widget.setFormat("%.2f")
-        self.gui.table_widget.setColumnWidth(0, 120)
-        # self.table_widget.setColumnWidth(1, 100)
-        self.gui.table_widget.setFixedHeight(200)
+
 
 class FrameProcessor:
     def __init__(self,

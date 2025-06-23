@@ -202,7 +202,6 @@ class MainGUIWindow(QMainWindow):
         self.notification_overlay.show()
         self.notification_overlay.raise_()
 
-
     def _confirm_window_size(self) -> None:
         """Handle window size confirmation and hide the notification."""
         # Lock window size
@@ -584,33 +583,55 @@ class MainGUIWindow(QMainWindow):
         return right_panel
 
     def _create_video_canvas(self, layout: QVBoxLayout) -> None:
-        """
-        Create the video canvas and add it to the given layout.
+        """Create the video canvas with table on the right."""
 
-        Args:
-            layout: The layout to add the video canvas to.
-        """
+        # Create horizontal container for video + table
+        video_table_container = QWidget()
+        video_table_layout = QHBoxLayout(video_table_container)
+        
+        # Video container (left side)
         self.video_container = QWidget()
-        self.video_container.setFixedSize(700, 400)
-        # self.video_container.setFixedHeight(400)
-        # self.video_container.setFixedWidth(700)
+        self.video_container.setMinimumSize(700, 400)
         self.video_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.video_container.setStyleSheet(
-            "background-color: #333333; border-radius: 4px;"
-        )
+        self.video_container.setStyleSheet("background-color: #333333; border-radius: 4px;")
         video_container_layout = QVBoxLayout(self.video_container)
-
-        # Create the video canvas label
+        
         self.video_canvas_label = QLabel("")
         self.video_canvas_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_canvas_label.setStyleSheet("background-color: #333333;")
-        self.video_canvas_label.setGeometry(0, 0, 700, 400)
         video_container_layout.addWidget(self.video_canvas_label)
+        
+        table_container = QWidget()
+        table_container.setStyleSheet("background-color: #f0f0f0;")
+        table_layout = QVBoxLayout(table_container)
+        table_label = QLabel("Average Velocity over the past 30s")
+        table_label.setStyleSheet("color: black; font-size: 14px; font-weight: bold;")
+        table_layout.addWidget(table_label)
 
-        layout.addWidget(self.video_container)
-        # layout.addWidget(self.video_canvas_label)
+        # Table widget (right side)
+        example_1d_data = ["N/A"]
+        self.table_widget = pg.TableWidget()
+        self.table_widget.setData(example_1d_data)
+        self.table_widget.setHorizontalHeaderLabels(["ROI vs. mean_velocity (mm/s)"])
+        self.table_widget.setFormat("%.2f")
+        self.table_widget.setMinimumHeight(150)
+        self.table_widget.setMinimumWidth(250)  # Fixed width
 
-        # Add media controls below the video canvas
+        # Set minimum column width
+        self.table_widget.setColumnWidth(0, 200)  # Set column 0 to 200px width
+        # OR set minimum column width
+        self.table_widget.horizontalHeader().setMinimumSectionSize(150)  # Minimum for all columns
+        # OR set specific column minimum width
+        self.table_widget.horizontalHeader().resizeSection(0, 200)
+
+        self.table_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        table_layout.addWidget(self.table_widget)
+
+        # Add to horizontal layout
+        video_table_layout.addWidget(self.video_container, 1)
+        video_table_layout.addWidget(table_container, 0)
+        
+        layout.addWidget(video_table_container)
         self._create_media_controls(layout)
 
     def _create_export_settings(self) -> QGroupBox:
@@ -671,16 +692,16 @@ class MainGUIWindow(QMainWindow):
 
         horizontal_layout = QHBoxLayout()
 
-        # Responsive table
-        example_1d_data = ["N/A"]
-        self.table_widget = pg.TableWidget()
-        self.table_widget.setData(example_1d_data)
-        self.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
-        self.table_widget.setFormat("%.2f")
-        # Remove fixed column width and height
-        self.table_widget.setMinimumHeight(150)
-        self.table_widget.setMinimumWidth(150)
-        self.table_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        # # Responsive table
+        # example_1d_data = ["N/A"]
+        # self.table_widget = pg.TableWidget()
+        # self.table_widget.setData(example_1d_data)
+        # self.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
+        # self.table_widget.setFormat("%.2f")
+        # # Remove fixed column width and height
+        # self.table_widget.setMinimumHeight(150)
+        # self.table_widget.setMinimumWidth(150)
+        # self.table_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
 
         # Responsive plot widget
         self.plot_widget = pg.PlotWidget()
@@ -694,7 +715,7 @@ class MainGUIWindow(QMainWindow):
         self.plot_widget.setLabel("bottom", "Time", units="secs")
         self.plot_widget.addLegend()
         
-        horizontal_layout.addWidget(self.table_widget, 0)
+        # horizontal_layout.addWidget(self.table_widget, 0)
         horizontal_layout.addWidget(self.plot_widget, 1)
         layout.addLayout(horizontal_layout)
 
