@@ -600,9 +600,13 @@ class VideoHandler:
 
             # Start playing the video
             self.playing = True
+
+            # Initialize the tool window and handlers
             self.event_handler.initialze_tool_window_n_handlers()
+
             # Close the dialog
             dialog.accept()
+
         else:
             QMessageBox.critical(
                 self.gui, "Error", "Could not open the selected camera!"
@@ -799,9 +803,6 @@ class OverlayHandler:
         # Create and set up the overlay widget
         self.overlay_widget = OverlayWidget(self.gui.video_container)
 
-        # Connect the ROI created signal to our handler
-        self.overlay_widget.roi_created.connect(self.event_handler.handle_roi_created)
-
         self.overlay_widget.setGeometry(self.video_rect)
         # print("Geometry of the overlay widget:", self.overlay_widget.geometry())
         # print("Geometry of the video container:", self.gui.video_container.geometry())
@@ -812,6 +813,87 @@ class OverlayHandler:
         self.overlay_active = True
         # Bring the overlay to the front
         self.overlay_widget.raise_()
+
+class ROIHander:
+
+    def __init__(self,
+        event_handler: 'EventHandler',
+        gui: MainGUIWindow,
+        frame_model: FrameModel,
+        camera_thread: CameraThread,
+        overlay_widget: OverlayWidget):
+
+        self.gui = gui
+        self.camera_thread = camera_thread
+        self.frame_model = frame_model
+        self.overlay_widget = overlay_widget
+
+    # ------------------------------------ROi Drawing--------------------------------------------------
+    def add_roi(self):
+        """Add a new Region of Interest to the video."""
+        # Check if video is loaded
+        if not self.camera_thread.is_running():
+            QMessageBox.warning(
+                self.gui,
+                "Warning",
+                "No video source loaded! Please load a video first.",
+            )
+            return
+
+        # Start ROI drawing mode
+        self.overlay_widget.start_roi_drawing()
+
+        # Inform the user
+        self.gui.statusBar().showMessage(
+            "Click and drag to draw a Region of Interest rectangle"
+        )
+
+    def handle_roi_created(self, rect):
+        """Handle the creation of a new ROI rectangle.
+
+        Args:
+            rect: QRect representing the ROI rectangle drawn by the user
+        """
+        # Convert the rectangle coordinates to be relative to the video dimensions
+        # This is important for when the video is scaled to fit the canvas
+        video_x = rect.x()
+        video_y = rect.y()
+        video_width = rect.width()
+        video_height = rect.height()
+
+        # Store the ROI coordinates
+        roi_coords = video_x, video_y, video_width, video_height
+
+        # You would typically create an ROI object here and add it to your application's data model
+        self.frame_model.add_roi(roi_coords)
+
+        # Inform the user
+        self.gui.statusBar().showMessage(
+            f"ROI created at ({video_x}, {video_y}) with size {video_width}x{video_height}"
+        )
+
+    def display_roi(self, roi_list):
+        """Display the Region of Interests on the video.
+
+        Args:
+            roi_list: List of ROI objects to be displayed
+        """
+        # Check if video is loaded
+        if not self.camera_thread.is_running():
+            QMessageBox.warning(
+                self.gui,
+                "Warning",
+                "No video source loaded! Please load a video first.",
+            )
+            return
+        self.overlay_widget.display_roi(roi_list)
+
+    def delete_last_roi(self):
+        self.frame_model.delete_last_roi()
+        self.overlay_widget.update()
+        self.gui.statusBar().showMessage("Last ROI deleted")
+
+
 
 class EventHandler:
     """
@@ -833,6 +915,44 @@ class EventHandler:
 
     def __init__(self, gui: MainGUIWindow):
         self.gui = gui
+
+        self.handlers_initial_before_overlay_creation()
+
+        # Parameters of the event handling logic
+        self.confirm_algo = False
+        self.current_frame = None
+        self.if_save = False
+
+        # Connect GUI signals to handler methods
+        self.connect_signals()
+
+    def initialze_tool_window_n_handlers(self):
+        if not self.video_handler.playing:  # Access playing state from VideoHandler
+            return
+
+        self.overlay_handler.initialize_tool_window()
+        self.overlay_widget = self.overlay_handler.overlay_widget
+
+        self.handlers_initial_after_overlay_creation()    
+
+    def handlers_initial_after_overlay_creation(self):
+        """
+        Initialize the event handlers after the overlay widget is created.
+        """
+        self.calibration_handler = CalibrationHandler(self.gui, self.frame_model, self.overlay_widget)
+        self.roi_handler = ROIHander(self, self.gui, self.frame_model, self.camera_thread, self.overlay_widget)
+
+        self.gui.confirm_arrow_button.clicked.connect(self.calibration_handler.confirm_arrow_n_ruler)
+        self.gui.add_arrow_button.clicked.connect(self.calibration_handler.start_arrow_drawing)
+        self.gui.calibration_button.clicked.connect(self.calibration_handler.start_ruler_calibration)
+        self.overlay_widget.ruler_measured.connect(self.calibration_handler.handle_ruler_measurement)
+        self.overlay_widget.arrow_drawn.connect(self.calibration_handler.handle_arrow_drawing)
+        
+        self.gui.add_roi_button.clicked.connect(self.roi_handler.add_roi)
+        self.overlay_widget.roi_created.connect(self.roi_handler.handle_roi_created)  # Connect to the signal emitted by OverlayWidget
+        self.gui.delete_roi_button.clicked.connect(self.roi_handler.delete_last_roi)
+
+    def handlers_initial_before_overlay_creation(self):
         self.canvas_width = self.gui.video_canvas_label.width()
         self.canvas_height = self.gui.video_canvas_label.height()
 
@@ -853,31 +973,20 @@ class EventHandler:
         self.overlay_handler = OverlayHandler(self.gui, self)
         self.video_handler = VideoHandler(self, self.gui, self.frame_model, self.camera_thread)
 
-        # Initialize video capture for compatibility with existing code
-        self.video_capture = None  # Keep for compatibility with existing code
-        self.timer = QTimer()  # Keep for compatibility with existing code
-
-        # Parameters of the event handling logic
-        self.confirm_algo = False
-        self.current_frame = None
-
         # Initialize video recorder
         self.video_recorder = VideoRecorder()
         self.recording_active = False
 
-        self.if_save = False
-        # Connect GUI signals to handler methods
-        self.connect_signals()
-
     def connect_signals(self):
         """Connect GUI signals to their respective handler methods."""
+
         # Connect menu actions directly
         self.gui.import_button.clicked.connect(self.video_handler.handle_video_import)
         self.gui.export_button.clicked.connect(self.export_settings)
 
         # # Connect buttons directly using the gui reference
         self.gui.play_pause_button.clicked.connect(self.video_handler.pause_play)
-        self.gui.add_roi_button.clicked.connect(self.add_roi)
+
         self.gui.algorithm_configuration.clicked.connect(
             self.open_algorithm_configuration
         )
@@ -886,7 +995,6 @@ class EventHandler:
         self.gui.record_button.clicked.connect(self.toggle_recording)
         self.gui.simple_reset_button.clicked.connect(self.reset_mission)
 
-        self.gui.delete_roi_button.clicked.connect(self.delete_last_roi)
 
     def open_algorithm_configuration(self):
         """
@@ -911,28 +1019,6 @@ class EventHandler:
                                                 self.frame_model)
         dialog.dialog.exec()
         pass
-
-    def initialze_tool_window_n_handlers(self):
-        if not self.video_handler.playing:  # Access playing state from VideoHandler
-            return
-
-        self.overlay_handler.initialize_tool_window()
-        self.overlay_widget = self.overlay_handler.overlay_widget
-        
-        self.handlers_intial_after_overlay_creation()    
-
-
-    def handlers_intial_after_overlay_creation(self):
-        """
-        Initialize the event handlers after the overlay widget is created.
-        """
-        self.calibration_handler = CalibrationHandler(self.gui, self.frame_model, self.overlay_widget)
-
-        self.gui.confirm_arrow_button.clicked.connect(self.calibration_handler.confirm_arrow_n_ruler)
-        self.gui.add_arrow_button.clicked.connect(self.calibration_handler.start_arrow_drawing)
-        self.gui.calibration_button.clicked.connect(self.calibration_handler.start_ruler_calibration)
-        self.overlay_widget.ruler_measured.connect(self.calibration_handler.handle_ruler_measurement)
-        self.overlay_widget.arrow_drawn.connect(self.calibration_handler.handle_arrow_drawing)
 
     def reset_mission(self):
         """Reset the application for a new mission."""
@@ -1069,7 +1155,7 @@ class EventHandler:
         self.current_frame_number, roi_list, update_velo_plot, update_average_velo = (
             self.frame_model.process_frame(resized_frame)
         )
-        self.display_roi(roi_list)
+        self.roi_handler.display_roi(roi_list)
 
         # Update the velocity plot with the latest data
         if update_velo_plot:
@@ -1122,183 +1208,6 @@ class EventHandler:
                 f"Frame: {self.current_frame_number} | Time: {self.frame_model.last_processed_time}"
             )
 
-    # ------------------------------------ROi Drawing--------------------------------------------------
-    def add_roi(self):
-        """Add a new Region of Interest to the video."""
-        # Check if video is loaded
-        if not self.camera_thread.is_running():
-            QMessageBox.warning(
-                self.gui,
-                "Warning",
-                "No video source loaded! Please load a video first.",
-            )
-            return
-
-        # Check if calibration is confirmed
-        if not self.confirm_calibration:
-            QMessageBox.warning(
-                self.gui,
-                "Warning",
-                "Please confirm the arrow and ruler before adding ROIs.",
-            )
-            return
-
-        # Create overlay widget if it doesn't exist
-        if not self.overlay_widget:
-            self.overlay_widget = OverlayWidget(self.gui.video_container)
-            # Connect the ROI created signal to our handler
-            self.overlay_widget.roi_created.connect(self.handle_roi_created)
-
-        # Connect the ruler measurement signal to our handler
-        self.overlay_widget.ruler_measured.connect(self.calibration_handler.handle_ruler_measurement)
-
-        # Start ROI drawing mode
-        self.overlay_widget.start_roi_drawing()
-
-        # Inform the user
-        self.gui.statusBar().showMessage(
-            "Click and drag to draw a Region of Interest rectangle"
-        )
-
-    def handle_roi_created(self, rect):
-        """Handle the creation of a new ROI rectangle.
-
-        Args:
-            rect: QRect representing the ROI rectangle drawn by the user
-        """
-        # Convert the rectangle coordinates to be relative to the video dimensions
-        # This is important for when the video is scaled to fit the canvas
-        video_x = rect.x()
-        video_y = rect.y()
-        video_width = rect.width()
-        video_height = rect.height()
-
-        # Store the ROI coordinates
-        roi_coords = video_x, video_y, video_width, video_height
-
-        # For now, just print the coordinates for debugging
-        print(f"ROI created at: {roi_coords}")
-
-        # You would typically create an ROI object here and add it to your application's data model
-        self.frame_model.add_roi(roi_coords)
-
-        # Inform the user
-        self.gui.statusBar().showMessage(
-            f"ROI created at ({video_x}, {video_y}) with size {video_width}x{video_height}"
-        )
-
-        # You might want to hide the overlay after ROI creation
-        # self.overlay_widget.hide()
-        # self.overlay_active = False
-
-    def display_roi(self, roi_list):
-        """Display the Region of Interests on the video.
-
-        Args:
-            roi_list: List of ROI objects to be displayed
-        """
-        # Check if video is loaded
-        if not self.camera_thread.is_running():
-            QMessageBox.warning(
-                self.gui,
-                "Warning",
-                "No video source loaded! Please load a video first.",
-            )
-            return
-        self.overlay_widget.display_roi(roi_list)
-
-    def delete_last_roi(self):
-        self.frame_model.delete_last_roi()
-        self.overlay_widget.update()
-        self.gui.statusBar().showMessage("Last ROI deleted")
-
-    # ------------------------------------Arrow Drawing------------------------------------------------
-    def confirm_arrow_n_ruler(self):
-        """Confirm the current arrow direction."""
-        # Placeholder for arrow confirmation
-        if self.check_if_import() is False:
-            return
-
-        if self.frame_model.px2mm is None:
-            QMessageBox.warning(
-                self.gui, "Warning", "Please calibrate the ruler first."
-            )
-            return
-
-        try:
-            arrow_direction = float(self.gui.direction_textbox.text())
-            px_distance = float(self.gui.px2mm_result_textbox.text())
-            self.frame_model.get_px_to_mm(px_distance)
-            self.frame_model.get_overflow_direction(arrow_direction)
-
-        except ValueError:
-            print(ValueError)
-            QMessageBox.warning(
-                self.gui,
-                "Warning",
-                "Please enter valid arrow direction and px2mm values.",
-            )
-            return
-
-        self.confirm_calibration = True
-        QMessageBox.information(
-            self.gui,
-            "Info",
-            "Overflow direction (arrow) and calibration (ruler) confirmed.",
-        )
-
-    def start_arrow_drawing(self):
-        """Start the arrow drawing mode."""
-
-        if self.check_if_import() is False:
-            return
-
-        # Create overlay widget if it doesn't exist
-        if not self.overlay_widget:
-            self.overlay_widget = OverlayWidget(self.gui.video_container)
-            # Connect the signals to our handlers
-            self.overlay_widget.roi_created.connect(self.handle_roi_created)
-            self.overlay_widget.ruler_measured.connect(self.calibration_handler.handle_ruler_measurement)
-            self.overlay_widget.setGeometry(self.video_rect)
-            self.overlay_widget.show()
-            self.overlay_active = True
-
-        if self.confirm_calibration:
-            QMessageBox.warning(
-                self.gui,
-                "Warning",
-                "You have already confirmed the arrow and ruler. Please reset the application if you want to change them.",
-            )
-            return
-
-        # Start ruler calibration mode
-        self.overlay_widget.start_arrow_drawing()
-
-        # Inform the user
-        self.gui.statusBar().showMessage(
-            "Click and drag to draw a line of 2cm for pixel measurement"
-        )
-
-    def handle_arrow_drawing(self, start_pos, end_pos, degree):
-        # Placeholder for arrow drawing result handling
-        """Handle the ruler measurement result.
-
-        Args:
-            distance: The measured distance in pixels
-        """
-
-        self.frame_model.get_overflow_direction(degree)
-        self.gui.direction_textbox.setText(f"{degree:.2f}")
-
-        # Display the measurement result to the user
-        QMessageBox.information(
-            self.gui,
-            "Arrow drawed",
-            f"angle: {degree:.1f} degrees (from the horizontal axis anticlockwisely)",
-        )
-
-        # Update the status bar
-        self.gui.statusBar().showMessage(f"arrow angle: {degree:.1f} degrees")
 
     def toggle_recording(self):
         """Start or stop video recording."""
