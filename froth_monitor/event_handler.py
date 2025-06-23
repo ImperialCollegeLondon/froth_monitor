@@ -662,7 +662,6 @@ class CalibrationHandler:
         self.gui = gui
         self.frame_model = frame_model
         self.overlay_widget = overlay_widget
-
         self.confirm_calibration = False
 
     # ------------------------------------Ruler Drawing------------------------------------------------
@@ -709,7 +708,6 @@ class CalibrationHandler:
 
         # You could store this calibration value for future use if needed
         # self.calibration_value = distance
-
 
     # ------------------------------------Arrow Drawing------------------------------------------------
     def confirm_arrow_n_ruler(self):
@@ -783,6 +781,37 @@ class CalibrationHandler:
         # Update the status bar
         self.gui.statusBar().showMessage(f"arrow angle: {degree:.1f} degrees")
 
+class OverlayHandler:
+    def __init__(self, gui, event_handler: "EventHandler") -> None:
+        self.gui = gui
+        self.overlay_widget = OverlayWidget(self.gui)
+        self.event_handler = event_handler
+
+    def initialize_tool_window(self):
+        # Get the dimensions of the video canvas
+        canvas_width = self.gui.video_canvas_label.width()
+        canvas_height = self.gui.video_canvas_label.height()
+
+        # Initialize the video rectangle to the full canvas size
+        # This will be updated when the first frame arrives
+        self.video_rect = QRect(0, 0, canvas_width, canvas_height)
+
+        # Create and set up the overlay widget
+        self.overlay_widget = OverlayWidget(self.gui.video_container)
+
+        # Connect the ROI created signal to our handler
+        self.overlay_widget.roi_created.connect(self.event_handler.handle_roi_created)
+
+        self.overlay_widget.setGeometry(self.video_rect)
+        # print("Geometry of the overlay widget:", self.overlay_widget.geometry())
+        # print("Geometry of the video container:", self.gui.video_container.geometry())
+        # print("Geometry of the video canvas label:",self.gui.video_canvas_label.geometry())
+
+        # Show the overlay
+        self.overlay_widget.show()
+        self.overlay_active = True
+        # Bring the overlay to the front
+        self.overlay_widget.raise_()
 
 class EventHandler:
     """
@@ -821,6 +850,7 @@ class EventHandler:
         self.camera_thread = CameraThread()
         self.camera_thread.frame_available.connect(self.process_new_frame)
 
+        self.overlay_handler = OverlayHandler(self.gui, self)
         self.video_handler = VideoHandler(self, self.gui, self.frame_model, self.camera_thread)
 
         # Initialize video capture for compatibility with existing code
@@ -886,32 +916,11 @@ class EventHandler:
         if not self.video_handler.playing:  # Access playing state from VideoHandler
             return
 
-        # Get the dimensions of the video canvas
-        canvas_width = self.gui.video_canvas_label.width()
-        canvas_height = self.gui.video_canvas_label.height()
-
-        # Initialize the video rectangle to the full canvas size
-        # This will be updated when the first frame arrives
-        self.video_rect = QRect(0, 0, canvas_width, canvas_height)
-
-        # Create and set up the overlay widget
-        self.overlay_widget = OverlayWidget(self.gui.video_container)
-
-        # Connect the ROI created signal to our handler
-        self.overlay_widget.roi_created.connect(self.handle_roi_created)
-
-        self.overlay_widget.setGeometry(self.video_rect)
-        # print("Geometry of the overlay widget:", self.overlay_widget.geometry())
-        # print("Geometry of the video container:", self.gui.video_container.geometry())
-        # print("Geometry of the video canvas label:",self.gui.video_canvas_label.geometry())
-
-        # Show the overlay
-        self.overlay_widget.show()
-        self.overlay_active = True
-        # Bring the overlay to the front
-        self.overlay_widget.raise_()
-
+        self.overlay_handler.initialize_tool_window()
+        self.overlay_widget = self.overlay_handler.overlay_widget
+        
         self.handlers_intial_after_overlay_creation()    
+
 
     def handlers_intial_after_overlay_creation(self):
         """
