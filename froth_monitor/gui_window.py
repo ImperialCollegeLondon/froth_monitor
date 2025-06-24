@@ -4,6 +4,7 @@ This module contains the GUI layout and components for the Froth Tracker applica
 without any connected functionality. It serves as a template for the application's
 user interface structure.
 """
+
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -50,14 +51,14 @@ class MainGUIWindow(QMainWindow):
         # Initialize overlay related attributes
         self.overlay_widget = None
         self.video_rect = None
-        
+
         # Initialize notification overlay
         self.notification_overlay = None
         self.window_size_locked = False
 
         # Define UI elements
         self.initUI()
-        
+
         # Show the window size notification after UI is initialized
         self._show_window_size_notification()
 
@@ -88,13 +89,17 @@ class MainGUIWindow(QMainWindow):
         right_panel = self._create_right_panel()
 
         # Set size policies for responsive behavior
-        left_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        right_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        left_panel.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
+        right_panel.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
 
         # Add panels with stretch factors
         content_layout.addWidget(left_panel, 0)  # Fixed proportion
-        content_layout.addWidget(right_panel, 1)  # 
-        
+        content_layout.addWidget(right_panel, 1)  #
+
     def _show_window_size_notification(self) -> None:
         """Show the window size adjustment notification overlay."""
 
@@ -103,14 +108,16 @@ class MainGUIWindow(QMainWindow):
         self.notification_overlay.setStyleSheet(
             "background-color: rgba(0, 0, 0, 150);"  # Semi-transparent dark overlay
         )
-        self.notification_overlay.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        
+        self.notification_overlay.setAttribute(
+            Qt.WidgetAttribute.WA_StyledBackground, True
+        )
+
         self.notification_overlay.setGeometry(0, 0, 1200, 800)
-        
+
         # Create the notification content
         overlay_layout = QVBoxLayout(self.notification_overlay)
         overlay_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         # Create notification card
         notification_card = QFrame()
         notification_card.setStyleSheet(
@@ -124,17 +131,17 @@ class MainGUIWindow(QMainWindow):
             """
         )
         notification_card.setFixedSize(500, 200)
-        
+
         card_layout = QVBoxLayout(notification_card)
         card_layout.setSpacing(15)
-        
+
         # Title - Fixed styling to ensure visibility
         title_label = QLabel("Window Size Adjustment")
         title_label.setStyleSheet(
             """
             QLabel {
-                font-size: 18px; 
-                font-weight: bold; 
+                font-size: 18px;
+                font-weight: bold;
                 color: #333333;
                 background-color: transparent;
                 border: none;
@@ -144,7 +151,7 @@ class MainGUIWindow(QMainWindow):
             """
         )
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         # Message - Fixed styling to ensure visibility
         message_label = QLabel(
             "Please adjust the window size to fit your screen preferences now.\n"
@@ -153,7 +160,7 @@ class MainGUIWindow(QMainWindow):
         message_label.setStyleSheet(
             """
             QLabel {
-                font-size: 12px; 
+                font-size: 12px;
                 color: #555555;
                 background-color: transparent;
                 border: none;
@@ -165,7 +172,7 @@ class MainGUIWindow(QMainWindow):
         )
         message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         message_label.setWordWrap(True)
-        
+
         # Confirm button
         confirm_button = QPushButton("I'm Ready - Lock Window Size")
         confirm_button.setStyleSheet(
@@ -189,15 +196,15 @@ class MainGUIWindow(QMainWindow):
             """
         )
         confirm_button.clicked.connect(self._confirm_window_size)
-        
+
         # Add widgets to card layout
         card_layout.addWidget(title_label)
         card_layout.addWidget(message_label)
         card_layout.addWidget(confirm_button)
-        
+
         # Add card to overlay layout
         overlay_layout.addWidget(notification_card)
-        
+
         # Show the overlay
         self.notification_overlay.show()
         self.notification_overlay.raise_()
@@ -207,20 +214,20 @@ class MainGUIWindow(QMainWindow):
         # Lock window size
         self.window_size_locked = True
         self.setFixedSize(self.size())  # Lock the current size
-        
+
         # Hide and delete the notification overlay
         if self.notification_overlay:
             self.notification_overlay.hide()
             self.notification_overlay.deleteLater()
             self.notification_overlay = None
-            
+
     def resizeEvent(self, event):
         """Handle window resize events to maintain overlay position."""
         super().resizeEvent(event)
         # Keep notification overlay covering only the minimum size area
         if self.notification_overlay and self.notification_overlay.isVisible():
             self.notification_overlay.setGeometry(0, 0, self.width(), self.height())
-            
+
     def _create_header_bar(self) -> QFrame:
         """
         Create the header bar with title.
@@ -233,8 +240,10 @@ class MainGUIWindow(QMainWindow):
         header_bar.setStyleSheet("background-color: #3c4043; color: white;")
         # Use minimum height instead of fixed height
         header_bar.setMinimumHeight(40)
-        header_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        
+        header_bar.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+        )
+
         header_layout = QHBoxLayout(header_bar)
         header_layout.setContentsMargins(20, 10, 20, 10)
 
@@ -255,11 +264,11 @@ class MainGUIWindow(QMainWindow):
         """Create responsive left panel."""
         left_panel = QFrame()
         # Remove fixed width, use minimum and maximum width instead
-        left_panel.setMinimumWidth(200)
-        left_panel.setMaximumWidth(300)
+        left_panel.setMinimumWidth(250)
+        left_panel.setMaximumWidth(350)
         left_panel.setMinimumHeight(300)
         left_panel.setStyleSheet("background-color: #f0f0f0;")
-        
+
         left_layout = QVBoxLayout(left_panel)
         left_layout.setSpacing(15)
         left_layout.setContentsMargins(10, 10, 10, 10)
@@ -269,12 +278,12 @@ class MainGUIWindow(QMainWindow):
         calibration_group = self._create_calibration_controls()
         roi_group = self._create_roi_controls()
         export_group = self._create_export_settings()
-        
+
         left_layout.addWidget(source_group)
         left_layout.addWidget(calibration_group)
         left_layout.addWidget(roi_group)
         left_layout.addWidget(export_group)
-        
+
         self._add_reset_buttons(left_layout)
         left_layout.addStretch()
 
@@ -288,18 +297,18 @@ class MainGUIWindow(QMainWindow):
             QGroupBox: The video source group box with radio buttons.
         """
         source_group = QGroupBox("Video Source")
-        source_group.setStyleSheet("font-weight: bold; font-size: 16px; color: black")
+        source_group.setStyleSheet("font-weight: bold; font-size: 15px; color: black")
         source_layout = QVBoxLayout(source_group)
         source_layout.setSpacing(10)
 
         # Radio buttons for video source
         self.webcam_radio = QRadioButton("Webcam")
         self.webcam_radio.setStyleSheet(
-            "font-weight: normal; font-size: 14px; color: black"
+            "font-weight: normal; font-size: 12px; color: black"
         )
         self.prerecorded_radio = QRadioButton("Pre-recorded")
         self.prerecorded_radio.setStyleSheet(
-            "font-weight: normal; font-size: 14px; color: black"
+            "font-weight: normal; font-size: 12px; color: black"
         )
         self.webcam_radio.setChecked(True)
         self.import_button = QPushButton("Import")
@@ -308,7 +317,7 @@ class MainGUIWindow(QMainWindow):
             QPushButton {
                 background-color: #4285f4;
                 color: white;
-                font-size: 14px;
+                font-size: 12px;
                 padding: 8px;
                 border-radius: 4px;
             }
@@ -324,7 +333,7 @@ class MainGUIWindow(QMainWindow):
             QPushButton {
                 background-color: #4285f4;
                 color: white;
-                font-size: 14px;
+                font-size: 12px;
                 font-weight: bold;
                 padding: 8px;
                 border-radius: 4px;
@@ -345,45 +354,35 @@ class MainGUIWindow(QMainWindow):
     def _create_calibration_controls(self) -> QGroupBox:
         """Create responsive calibration controls."""
         calibration_group = QGroupBox("Calibration/ROI")
-        calibration_group.setStyleSheet(            
-            """
-            QPushButton {
-                background-color: #4285f4;
-                color: white;
-                font-size: 12px;
-                padding: 4px;
-                border-radius: 4px;
-                min-width: 80px;
-                min-height: 10px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """)
+        calibration_group.setStyleSheet(
+            "font-weight: bold; font-size: 15px; color: black"
+        )
         calibration_layout = QVBoxLayout(calibration_group)
         calibration_layout.setSpacing(10)
 
         # Ruler draw sector 1 - responsive layout
         roi_layout_1 = QHBoxLayout()
-        
-        self.calibration_button = QPushButton("Draw a line with \n length of")
-        # self.calibration_button.setStyleSheet(
-        #     """
-        #     QPushButton {
-        #         background-color: #4285f4;
-        #         color: white;
-        #         font-size: 12px;
-        #         padding: 8px;
-        #         border-radius: 4px;
-        #         min-width: 80px;
-        #     }
-        #     QPushButton:hover {
-        #         background-color: #3367d6;
-        #     }
-        #     """
-        # )
+
+        self.calibration_button = QPushButton("Draw a line with length of")
+        self.calibration_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 10px;
+                padding: 8px;
+                border-radius: 4px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
+        )
         # Remove fixed width, use size policy instead
-        self.calibration_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.calibration_button.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
 
         self.px2mm_spinbox = QSpinBox()
         self.px2mm_spinbox.setRange(1, 1000)
@@ -401,15 +400,17 @@ class MainGUIWindow(QMainWindow):
 
         # Ruler draw sector 2 - responsive layout
         roi_layout_2 = QHBoxLayout()
-        
+
         px2mm_label_2 = QLabel("Result ratio \n(edible):")
         px2mm_label_2.setStyleSheet(
-            "background-color: #3c4043; color: white; font-size: 12px; "
+            "background-color: #3c4043; color: white; font-size: 10px; "
             "padding: 8px; border-radius: 4px;"
         )
         px2mm_label_2.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # Remove fixed width
-        px2mm_label_2.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        px2mm_label_2.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
 
         self.px2mm_result_textbox = QLineEdit()
         self.px2mm_result_textbox.setText("1.0")
@@ -427,14 +428,14 @@ class MainGUIWindow(QMainWindow):
 
         # Arrow sector - responsive layout
         arrow_layout = QHBoxLayout()
-        
+
         self.add_arrow_button = QPushButton("Draw Arrow")
         self.add_arrow_button.setStyleSheet(
             """
             QPushButton {
                 background-color: #4285f4;
                 color: white;
-                font-size: 12px;
+                font-size: 10px;
                 padding: 8px;
                 border-radius: 4px;
                 min-width: 80px;
@@ -445,7 +446,9 @@ class MainGUIWindow(QMainWindow):
             """
         )
         # Remove fixed width
-        self.add_arrow_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.add_arrow_button.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
 
         self.direction_textbox = QLineEdit()
         self.direction_textbox.setText("-90.0")
@@ -453,7 +456,7 @@ class MainGUIWindow(QMainWindow):
             "background-color: white; font-size: 10px; padding: 8px; border-radius: 4px;"
         )
         self.direction_textbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         degree_label = QLabel("degree")
         degree_label.setStyleSheet("color: black; font-size: 8px;")
 
@@ -473,7 +476,7 @@ class MainGUIWindow(QMainWindow):
             QPushButton {
                 background-color: #4285f4;
                 color: white;
-                font-size: 14px;
+                font-size: 12px;
                 padding: 12px;
                 border-radius: 4px;
             }
@@ -494,7 +497,7 @@ class MainGUIWindow(QMainWindow):
     def _create_roi_controls(self) -> QGroupBox:
         """Create responsive ROI controls."""
         roi_group = QGroupBox()
-        roi_group.setStyleSheet(            
+        roi_group.setStyleSheet(
             """
             QPushButton {
                 background-color: #4285f4; color: white; font-size: 18px;
@@ -504,10 +507,11 @@ class MainGUIWindow(QMainWindow):
                 background-color: #3367d6;
             }
             QLabel{
-                background-color: #3c4043; color: white; font-size: 14px; 
+                background-color: #3c4043; color: white; font-size: 14px;
                 font-weight: bold; padding: 8px; border-radius: 4px;
             }
-            """)
+            """
+        )
         roi_layout = QHBoxLayout(roi_group)
 
         self.roi_text = QLabel("ROI")
@@ -515,11 +519,15 @@ class MainGUIWindow(QMainWindow):
         # Make buttons responsive with minimum size instead of fixed size
         self.add_roi_button = QPushButton("+")
         self.add_roi_button.setMinimumSize(35, 35)
-        self.add_roi_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.add_roi_button.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
 
         self.delete_roi_button = QPushButton("-")
         self.delete_roi_button.setMinimumSize(35, 35)
-        self.delete_roi_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.delete_roi_button.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
 
         roi_layout.addWidget(self.roi_text, 1)
         roi_layout.addWidget(self.add_roi_button, 0)
@@ -588,19 +596,23 @@ class MainGUIWindow(QMainWindow):
         # Create horizontal container for video + table
         video_table_container = QWidget()
         video_table_layout = QHBoxLayout(video_table_container)
-        
+
         # Video container (left side)
         self.video_container = QWidget()
         self.video_container.setMinimumSize(700, 400)
-        self.video_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.video_container.setStyleSheet("background-color: #333333; border-radius: 4px;")
+        self.video_container.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self.video_container.setStyleSheet(
+            "background-color: #333333; border-radius: 4px;"
+        )
         video_container_layout = QVBoxLayout(self.video_container)
-        
+
         self.video_canvas_label = QLabel("")
         self.video_canvas_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_canvas_label.setStyleSheet("background-color: #333333;")
         video_container_layout.addWidget(self.video_canvas_label)
-        
+
         table_container = QWidget()
         table_container.setStyleSheet("background-color: #f0f0f0;")
         table_layout = QVBoxLayout(table_container)
@@ -620,17 +632,21 @@ class MainGUIWindow(QMainWindow):
         # Set minimum column width
         self.table_widget.setColumnWidth(0, 200)  # Set column 0 to 200px width
         # OR set minimum column width
-        self.table_widget.horizontalHeader().setMinimumSectionSize(150)  # Minimum for all columns
+        self.table_widget.horizontalHeader().setMinimumSectionSize(
+            150
+        )  # Minimum for all columns
         # OR set specific column minimum width
         self.table_widget.horizontalHeader().resizeSection(0, 200)
 
-        self.table_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.table_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         table_layout.addWidget(self.table_widget)
 
         # Add to horizontal layout
         video_table_layout.addWidget(self.video_container, 1)
         video_table_layout.addWidget(table_container, 0)
-        
+
         layout.addWidget(video_table_container)
         self._create_media_controls(layout)
 
@@ -692,37 +708,37 @@ class MainGUIWindow(QMainWindow):
 
         horizontal_layout = QHBoxLayout()
 
-        # # Responsive table
-        # example_1d_data = ["N/A"]
-        # self.table_widget = pg.TableWidget()
-        # self.table_widget.setData(example_1d_data)
-        # self.table_widget.setHorizontalHeaderLabels(["mean_velocity  "])
-        # self.table_widget.setFormat("%.2f")
-        # # Remove fixed column width and height
-        # self.table_widget.setMinimumHeight(150)
-        # self.table_widget.setMinimumWidth(150)
-        # self.table_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-
-        # Responsive plot widget
+        # Responsive plot widget for velocity
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setBackground("white")
         # Remove fixed height, use minimum height instead
         self.plot_widget.setMinimumHeight(150)
-        self.plot_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.plot_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self.plot_widget.showAxis("left")
         self.plot_widget.showAxis("bottom")
         self.plot_widget.setLabel("left", "Velocity", units="mm/s")
         self.plot_widget.setLabel("bottom", "Time", units="secs")
         self.plot_widget.addLegend()
-        
-        # horizontal_layout.addWidget(self.table_widget, 0)
-        horizontal_layout.addWidget(self.plot_widget, 1)
-        layout.addLayout(horizontal_layout)
 
-        avg_label = QLabel("Average over past 30s")
-        avg_label.setStyleSheet("font-size: 10px; color: #333333; text-align: left;")
-        avg_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(avg_label)
+        # New plot widget for froth height
+        self.froth_height_plot_widget = pg.PlotWidget()
+        self.froth_height_plot_widget.setBackground("white")
+        self.froth_height_plot_widget.setMinimumHeight(150)
+        self.froth_height_plot_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self.froth_height_plot_widget.showAxis("left")
+        self.froth_height_plot_widget.showAxis("bottom")
+        self.froth_height_plot_widget.setLabel("left", "Froth Height", units="mm")
+        self.froth_height_plot_widget.setLabel("bottom", "Time", units="secs")
+        self.froth_height_plot_widget.addLegend()
+
+        # Add both plot widgets to horizontal layout
+        horizontal_layout.addWidget(self.plot_widget, 1)
+        horizontal_layout.addWidget(self.froth_height_plot_widget, 1)
+        layout.addLayout(horizontal_layout)
 
     def _create_media_controls(self, layout: QVBoxLayout) -> None:
         """Create responsive media controls."""
@@ -748,7 +764,9 @@ class MainGUIWindow(QMainWindow):
         )
         # Use minimum size instead of fixed size
         self.play_pause_button.setMinimumSize(35, 35)
-        self.play_pause_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.play_pause_button.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
         self.play_pause_button.setToolTip("Play/Pause Video")
 
         media_controls_layout.addWidget(self.play_pause_button)

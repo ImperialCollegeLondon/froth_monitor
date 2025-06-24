@@ -36,13 +36,16 @@ from froth_monitor.fm_model import FrameModel
 # Import the custom overlay widget
 from froth_monitor.overlay_widget import OverlayWidget
 
-# Import the camera thread
+# Import the camera and network threads
 from froth_monitor.camera_thread import CameraThread
+from froth_monitor.network_thread import NetworkThread
 
 from froth_monitor.export import Export
 
 # Import the video recorder module
 from froth_monitor.video_recorder import VideoRecorder
+
+
 
 
 class AlgorithmConfigurationHandler:
@@ -1019,7 +1022,6 @@ class VelocityPlotter:
         self.gui.table_widget.setData(list_data)
         self.gui.table_widget.setHorizontalHeaderLabels(["ROI vs. mean_velocity (mm/s)"])
         self.gui.table_widget.setFormat("%.2f")
-
 
 class FrameProcessor:
     def __init__(self,

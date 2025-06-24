@@ -146,7 +146,7 @@ class VideoAnalysis:
                     gray_previous,
                     gray_current,
                     self.prev_pts,
-                    None, # type: ignore
+                    None,  # type: ignore
                     **self.lk_params,  # type: ignore
                 )  # type: ignore
                 good_new = (

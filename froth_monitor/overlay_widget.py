@@ -52,7 +52,7 @@ class OverlayWidget(QWidget):
 
         # Store video position within the canvas
         self.video_rect = QRect()
-        
+
         self.if_algo_config = False
         self.algo_delta_pixels = (0.0, 0.0)
         self.algo_delta_cross_pos = (cast(int, None), cast(int, None))
@@ -78,7 +78,7 @@ class OverlayWidget(QWidget):
 
         # List of ROIs to display
         self.roi_list = []
-    
+
         # Enable mouse tracking for drawing
         self.setMouseTracking(True)
 

@@ -155,12 +155,13 @@ class ROI:
         else:
             return False
 
-    def get_algorithm_n_params(self, algorithm: str, params:dict):
+    def get_algorithm_n_params(self, algorithm: str, params: dict):
         self.analysis.current_algorithm = algorithm
         if algorithm == "Farneback":
             self.analysis.of_params = params
         elif algorithm == "Lucas-kanade":
             self.analysis.lk_params = params
+
 
 class FrameModel:
     """
