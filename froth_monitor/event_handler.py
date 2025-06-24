@@ -46,8 +46,6 @@ from froth_monitor.export import Export
 from froth_monitor.video_recorder import VideoRecorder
 
 
-
-
 class AlgorithmConfigurationHandler:
     """
     A class to handle the configuration of the velocity calculation algorithm.
@@ -493,12 +491,14 @@ class VideoHandler:
         event_handler: 'EventHandler',
         gui: MainGUIWindow, 
         frame_model: FrameModel,
-        camera_thread: CameraThread):
+        camera_thread: CameraThread,
+        network_thread: NetworkThread):
 
         self.gui = gui
         self.event_handler = event_handler
         self.frame_model = frame_model
         self.camera_thread = camera_thread
+        self.network_thread = network_thread
 
         # Add missing state variables
         self.playing = False
@@ -509,8 +509,19 @@ class VideoHandler:
     def handle_video_import(self):
         if self.gui.webcam_radio.isChecked():
             self.load_camera_dialog()
-        else:
+        elif self.gui.prerecorded_radio.isChecked():
             self.import_local_video()
+        elif self.gui.jetson_radio.isChecked():
+            self.import_jetson_video()
+
+    def import_jetson_video(self):
+        self.event_handler.if_jetson = True
+
+        # Start network capture
+        if self.network_thread.start_network_capture("0.0.0.0", 5001):
+            print("Network capture started successfully")
+        else:
+            print("Failed to start network capture")
 
     def import_local_video(self):
         """
@@ -1061,6 +1072,7 @@ class FrameProcessor:
         if not self.event_handler.video_handler.playing:  # Access playing state from VideoHandler
             return
 
+        print("Processing new frame")
         # Store the current frame for potential further processing
         self.current_frame = frame
 
@@ -1231,6 +1243,9 @@ class EventHandler:
         self.current_frame = None
         self.if_save = False
 
+        # If using jetson import or not
+        self.if_jetson = False
+
         # Connect GUI signals to handler methods
         self.connect_signals()
 
@@ -1262,6 +1277,7 @@ class EventHandler:
 
         # Connect camera thread signals to frame processor
         self.camera_thread.frame_available.connect(self.frame_processor.process_new_frame)
+        self.network_thread.frame_available.connect(self.frame_processor.process_new_frame)
 
         self.gui.confirm_arrow_button.clicked.connect(self.calibration_handler.confirm_arrow_n_ruler)
         self.gui.add_arrow_button.clicked.connect(self.calibration_handler.start_arrow_drawing)
@@ -1289,13 +1305,15 @@ class EventHandler:
 
         # Initialize camera thread for event-driven frame capture
         self.camera_thread = CameraThread()
+        self.network_thread = NetworkThread()
         # Initialize video recorder
         self.video_recorder = VideoRecorder()
         self.recording_active = False
 
         # Initialize handlers
         self.overlay_handler = OverlayHandler(self.gui, self)
-        self.video_handler = VideoHandler(self, self.gui, self.frame_model, self.camera_thread)
+        self.video_handler = VideoHandler(self, self.gui, self.frame_model, 
+                                        self.camera_thread, self.network_thread)
         self.velocity_plotter = VelocityPlotter(self.gui, self.frame_model)
 
     def connect_signals(self):

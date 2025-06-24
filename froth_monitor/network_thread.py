@@ -108,6 +108,7 @@ class NetworkThread(QObject):
         Supports pausing without closing the network connection.
         """
         while self.running and self.video_receiver:
+            print("Receiver loop running")
             try:
                 # If paused, just sleep a bit and continue the loop without receiving
                 if self.paused:
