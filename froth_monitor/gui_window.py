@@ -377,7 +377,7 @@ class MainGUIWindow(QMainWindow):
                 background-color: #4285f4;
                 color: white;
                 font-size: 10px;
-                padding: 8px;
+                padding: 4px;
                 border-radius: 4px;
                 min-width: 80px;
             }
@@ -484,7 +484,7 @@ class MainGUIWindow(QMainWindow):
                 background-color: #4285f4;
                 color: white;
                 font-size: 12px;
-                padding: 12px;
+                padding: 4px;
                 border-radius: 4px;
             }
             QPushButton:hover {
@@ -559,7 +559,7 @@ class MainGUIWindow(QMainWindow):
         self.record_button.setStyleSheet(
             """
             QPushButton {
-                background-color: red; color: white; font-size: 15px;
+                background-color: red; color: white; font-size: 13px;
                 padding: 8px; border-radius: 4px; min-height: 40px;
             }
             QPushButton:hover {
@@ -568,7 +568,10 @@ class MainGUIWindow(QMainWindow):
             """
         )
         # Remove fixed height, use minimum height instead
-        self.record_button.setMinimumHeight(40)
+        self.record_button.setMinimumHeight(25)
+        self.record_button.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
         layout.addWidget(self.record_button)
 
         self.simple_reset_button = QPushButton("Reset")
