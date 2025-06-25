@@ -331,7 +331,6 @@ class MainGUIWindow(QMainWindow):
             """
         )
 
-        
         self.algorithm_configuration = QPushButton("Algorithm Configuration")
         self.algorithm_configuration.setStyleSheet(
             """
@@ -351,7 +350,9 @@ class MainGUIWindow(QMainWindow):
 
         source_layout.addWidget(self.webcam_radio)
         source_layout.addWidget(self.prerecorded_radio)
-        source_layout.addWidget(self.jetson_radio)  # Add this line to add the Jetson radio button to the layout
+        source_layout.addWidget(
+            self.jetson_radio
+        )  # Add this line to add the Jetson radio button to the layout
         source_layout.addWidget(self.import_button)
         source_layout.addWidget(self.algorithm_configuration)
 

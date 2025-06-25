@@ -10,8 +10,14 @@ import matplotlib.pyplot as plt
 # Minimum Y-axis window amplitude in mm
 MIN_Y_WINDOW = 10.0
 
+
 class VisualizerWindow(QtWidgets.QMainWindow):
-    def __init__(self, window_size=100, min_y_window=MIN_Y_WINDOW, title="Lidar + Video Visualizer"):
+    def __init__(
+        self,
+        window_size=100,
+        min_y_window=MIN_Y_WINDOW,
+        title="Lidar + Video Visualizer",
+    ):
         super().__init__()
         self.setWindowTitle(title)
         self.resize(1200, 650)
@@ -55,7 +61,7 @@ class VisualizerWindow(QtWidgets.QMainWindow):
         hbox.addLayout(stats_layout, stretch=2)
 
         # initialize plot line
-        self.line, = self.ax.plot([], [], marker='o', linestyle='-')
+        (self.line,) = self.ax.plot([], [], marker="o", linestyle="-")
         self.ax.set_xlabel("Time (s)")
         self.ax.set_ylabel("Distance (mm)")
         self.ax.grid(True)
@@ -99,11 +105,11 @@ class VisualizerWindow(QtWidgets.QMainWindow):
         self.res_label.setText(f"Resolution: {w}x{h}")
 
         # display frame
-        img = QtGui.QImage(frame.data, w, h, 3*w, QtGui.QImage.Format_RGB888)
+        img = QtGui.QImage(frame.data, w, h, 3 * w, QtGui.QImage.Format_RGB888)
         pix = QtGui.QPixmap.fromImage(img).scaled(
             self.video_label.size(),
             QtCore.Qt.KeepAspectRatio,
-            QtCore.Qt.FastTransformation
+            QtCore.Qt.FastTransformation,
         )
         self.video_label.setPixmap(pix)
 
@@ -126,14 +132,16 @@ class VisualizerWindow(QtWidgets.QMainWindow):
         y_range = y_max - y_min
         if y_range < self.min_y_window:
             mid = (y_max + y_min) / 2.0
-            y_min = mid - self.min_y_window/2.0
-            y_max = mid + self.min_y_window/2.0
+            y_min = mid - self.min_y_window / 2.0
+            y_max = mid + self.min_y_window / 2.0
         self.ax.set_ylim(y_min, y_max)
 
         self.canvas.draw_idle()
 
+
 if __name__ == "__main__":
-    import threading, cv2
+    import threading
+    import cv2
 
     app = QtWidgets.QApplication(sys.argv)
     win = VisualizerWindow(window_size=200)
@@ -147,7 +155,7 @@ if __name__ == "__main__":
                 break
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             win.update_frame(rgb)
-            time.sleep(1/30)
+            time.sleep(1 / 30)
 
     threading.Thread(target=video_loop, daemon=True).start()
 

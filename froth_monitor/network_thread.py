@@ -1,7 +1,7 @@
 """Network Thread Module for Froth Tracker Application.
 
 This module defines the `NetworkThread` class, which runs in a separate thread to receive
-video frames and sensor data from a remote source over the network and emits signals 
+video frames and sensor data from a remote source over the network and emits signals
 when new data is available. This enables integration with remote data sources.
 """
 
@@ -10,7 +10,9 @@ import threading
 import time
 import numpy as np
 from PySide6.QtCore import QObject, Signal
-from froth_monitor.network.windows_receiver import VideoReceiver  # Adjust import path as needed
+from froth_monitor.network.windows_receiver import (
+    VideoReceiver,
+)  # Adjust import path as needed
 
 
 class NetworkThread(QObject):
@@ -31,7 +33,9 @@ class NetworkThread(QObject):
     # Signals to emit when new data is available
     frame_available = Signal(np.ndarray)
     sensor_data_available = Signal(dict)  # For LIDAR and other sensor data
-    data_available = Signal(dict, np.ndarray)  # Combined signal for both frame and sensor data
+    data_available = Signal(
+        dict, np.ndarray
+    )  # Combined signal for both frame and sensor data
 
     def __init__(self):
         """
@@ -71,16 +75,18 @@ class NetworkThread(QObject):
 
         try:
             # Initialize network receiver
-            self.video_receiver = VideoReceiver(address, port, verbose_level=verbose_level)
-            
+            self.video_receiver = VideoReceiver(
+                address, port, verbose_level=verbose_level
+            )
+
             # Start receiver thread
             self.running = True
             self.thread_ = threading.Thread(target=self._receiver_loop)
             self.thread_.daemon = True  # Thread will exit when main program exits
             self.thread_.start()
-            
+
             return True
-            
+
         except Exception as e:
             print(f"Failed to start network capture: {e}")
             return False
@@ -108,7 +114,6 @@ class NetworkThread(QObject):
         Supports pausing without closing the network connection.
         """
         while self.running and self.video_receiver:
-            print("Receiver loop running")
             try:
                 # If paused, just sleep a bit and continue the loop without receiving
                 if self.paused:
@@ -116,9 +121,14 @@ class NetworkThread(QObject):
                     continue
 
                 # Receive data from network
-                server_data, frame = self.video_receiver.recv()
-                
+                result = self.video_receiver.recv()
+                if result is None:
+                    server_data, frame = None, None
+                else:
+                    server_data, frame = result
+
                 if frame is None:
+                    print("Frame is None")
                     # No data received or connection closed
                     time.sleep(0.01)  # Small delay to prevent busy waiting
                     continue
@@ -127,16 +137,19 @@ class NetworkThread(QObject):
                 if frame is not None:
                     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-                # Skip frame if buffer is full (similar to CameraThread)
-                with self.buffer_lock:
-                    if self.buffer_size >= self.max_buffer:
-                        continue
-                    self.buffer_size += 1
+                # # Skip frame if buffer is full (similar to CameraThread)
+                # with self.buffer_lock:
+                #     if self.buffer_size >= self.max_buffer:
+                #         continue
+                #     self.buffer_size += 1
 
                 # Emit signals with the received data
                 if self.if_release:
+                    print("if release")
                     if frame is not None:
+                        print("Frame emit")
                         self.frame_available.emit(frame)
+
                     if server_data:
                         self.sensor_data_available.emit(server_data)
                     # Combined signal for convenience
@@ -144,7 +157,7 @@ class NetworkThread(QObject):
 
                 # Small delay to prevent maxing out CPU
                 time.sleep(0.001)
-                
+
             except Exception as e:
                 print(f"Error in network receiver loop: {e}")
                 time.sleep(0.1)  # Wait before retrying

@@ -1,6 +1,5 @@
 # import required libraries
 from vidgear.gears import VideoGear
-from vidgear.gears import NetGear
 
 # debug codes
 from jeston_api.lidar_data_stream import LidarDataStream
@@ -29,15 +28,21 @@ LIDAR_DEBUG = True  # Set to True to enable debug data stream
 
 def main():
     # Initialize VideoSender
-    video_sender = VideoSender(address=RECEIVER_NETWORK_ADDRESS, port=RECEIVER_NETWORK_PORT, verbose_level=2)
+    video_sender = VideoSender(
+        address=RECEIVER_NETWORK_ADDRESS, port=RECEIVER_NETWORK_PORT, verbose_level=2
+    )
 
     # Initialize LidarDataStream
     lidar_stream = LidarDataStream(source="debug" if LIDAR_DEBUG else "real")
 
     try:
         print("[Main] Starting video stream...")
-        lidar_stream = lidar_stream.generate_debug_data() if LIDAR_DEBUG else lidar_stream.start_stream()
-          
+        lidar_stream = (
+            lidar_stream.generate_debug_data()
+            if LIDAR_DEBUG
+            else lidar_stream.start_stream()
+        )
+
         # Main loop to capture and send video frames
         while True:
             frame = stream.read()
@@ -48,13 +53,13 @@ def main():
             additional_info = {
                 "camera_timestamp": time.time(),
                 "lidar_timestamp": lidar_timestamp,
-                "lidar_reading": lidar_reading
+                "lidar_reading": lidar_reading,
             }
             if frame is not None:
                 video_sender.send_frame(frame, message=additional_info)
             else:
                 print("[Main] No frame captured.")
-            
+
             time.sleep(1 / CAM_FPS)  # Control frame rate
 
     except KeyboardInterrupt:
@@ -63,6 +68,7 @@ def main():
         video_sender.close()
 
         print("[Main] Cleanup complete.")
+
 
 if __name__ == "__main__":
     main()

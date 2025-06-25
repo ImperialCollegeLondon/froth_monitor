@@ -3,12 +3,11 @@ TODO list:
 1. the code is scrapped from the windows version, we need to test where the device is on ubuntu
 """
 
-
 import random
 import time
 import re
 # import serial
-from datetime import datetime
+
 
 class LidarDataStream:
     def __init__(self, source, port=None, freq=20, offset_mm=0.0):

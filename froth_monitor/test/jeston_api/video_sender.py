@@ -20,12 +20,14 @@ class VideoSender:
             protocol="tcp",
             pattern=1,
             logging=True,
-            **options
+            **options,
         )
         self.verbose_level = verbose_level
 
         if self.verbose_level >= 2:
-            print(f"[VideoSender] Initialized NetGear server at {address}:{port} with options: {options}")
+            print(
+                f"[VideoSender] Initialized NetGear server at {address}:{port} with options: {options}"
+            )
 
     def send_frame(self, frame, message=None):
         """

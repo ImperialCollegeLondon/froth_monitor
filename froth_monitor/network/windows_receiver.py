@@ -1,5 +1,4 @@
 from vidgear.gears import NetGear
-import numpy as np
 
 
 class VideoReceiver:
@@ -17,7 +16,7 @@ class VideoReceiver:
         # activate Bidirectional mode
         options = {"bidirectional_mode": True}
 
-        # Define NetGear Client at given IP address and define parameters 
+        # Define NetGear Client at given IP address and define parameters
         # !!! change following IP address '192.168.x.xxx' with yours !!!
         self.client = NetGear(
             address=self.client_ip,
@@ -26,12 +25,13 @@ class VideoReceiver:
             pattern=1,
             receive_mode=True,
             logging=True,
-            **options
+            **options,
         )
 
         if self.verbose_level >= 2:
-            print(f"[VideoSender] Initialized NetGear server at {self.client_ip}:{self.client_port} with options: {options}")
-
+            print(
+                f"[VideoSender] Initialized NetGear server at {self.client_ip}:{self.client_port} with options: {options}"
+            )
 
     def recv(self):
         """
@@ -44,10 +44,13 @@ class VideoReceiver:
         data = self.client.recv()
 
         if self.verbose_level >= 5:
-            print("[VideoReceiver] Data received from server. length:", len(data) if data else "None")
-            
+            print(
+                "[VideoReceiver] Data received from server. length:",
+                len(data) if data else "None",
+            )
+
         return data
-    
+
     def close(self):
         """
         Safely close the NetGear client.

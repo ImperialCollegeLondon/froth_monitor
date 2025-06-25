@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-from PySide6.QtCore import QTimer, Qt, QRect
+from PySide6.QtCore import Qt, QRect
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtGui import QIcon
 
@@ -56,9 +56,9 @@ class AlgorithmConfigurationHandler:
     method to retrieve the selected algorithm and its parameters.
     """
 
-    def __init__(self, gui: MainGUIWindow, 
-                        camera_thread: CameraThread,
-                        frame_model: FrameModel):
+    def __init__(
+        self, gui: MainGUIWindow, camera_thread: CameraThread, frame_model: FrameModel
+    ):
         self.camera_thread = camera_thread
         self.overlay_widget = cast(OverlayWidget, None)
 
@@ -153,7 +153,7 @@ class AlgorithmConfigurationHandler:
             """
         )
         self.confirm_algo_button.clicked.connect(self._confirm_algo)
-        
+
         self.exit_button = QPushButton("Confirm and Exit")
         self.exit_button.setStyleSheet(
             """
@@ -185,7 +185,7 @@ class AlgorithmConfigurationHandler:
             "border: 1px solid #ccc; background-color: #f0f0f0;"
         )  # Example style
         right_layout.addWidget(self.video_canvas)
-        
+
         # Info bar
         self.info_bar = QLabel("Frame time: -- ms | Avg (15): -- ms")
         right_layout.addWidget(self.info_bar)
@@ -272,23 +272,42 @@ class AlgorithmConfigurationHandler:
             self.of_params["pyr_scale"] = float(
                 cast(QComboBox, self.param_table.cellWidget(0, 0)).currentText()
             )
-            self.of_params["levels"] = int(cast(QComboBox, self.param_table.cellWidget(1, 0)).currentText())
-            self.of_params["winsize"] = int(cast(QComboBox, self.param_table.cellWidget(2, 0)).currentText())
-            self.of_params["iterations"] = int(cast(QComboBox, self.param_table.cellWidget(3, 0)).currentText())
-            self.of_params["poly_n"] = int(cast(QComboBox, self.param_table.cellWidget(4, 0)).currentText())
+            self.of_params["levels"] = int(
+                cast(QComboBox, self.param_table.cellWidget(1, 0)).currentText()
+            )
+            self.of_params["winsize"] = int(
+                cast(QComboBox, self.param_table.cellWidget(2, 0)).currentText()
+            )
+            self.of_params["iterations"] = int(
+                cast(QComboBox, self.param_table.cellWidget(3, 0)).currentText()
+            )
+            self.of_params["poly_n"] = int(
+                cast(QComboBox, self.param_table.cellWidget(4, 0)).currentText()
+            )
 
-            self.frame_model.confirm_algorithm_n_params(selected_algorithm, 
-            self.of_params)
+            self.frame_model.confirm_algorithm_n_params(
+                selected_algorithm, self.of_params
+            )
         if selected_algorithm == "Lucas-Kanade":
-            winsize_str = cast(QComboBox, self.param_table.cellWidget(0, 0)).currentText()
-            winsize_tuple = eval(winsize_str)  # Safely convert string "(15, 15)" to tuple
+            winsize_str = cast(
+                QComboBox, self.param_table.cellWidget(0, 0)
+            ).currentText()
+            winsize_tuple = eval(
+                winsize_str
+            )  # Safely convert string "(15, 15)" to tuple
             self.lk_params["winSize"] = winsize_tuple
-            self.lk_params["maxLevel"] = int(cast(QComboBox, self.param_table.cellWidget(1, 0)).currentText())
-            criteria_val = cast(QComboBox, self.param_table.cellWidget(2, 0)).currentData()
+            self.lk_params["maxLevel"] = int(
+                cast(QComboBox, self.param_table.cellWidget(1, 0)).currentText()
+            )
+            criteria_val = cast(
+                QComboBox, self.param_table.cellWidget(2, 0)
+            ).currentData()
             self.lk_params["criteria"] = (criteria_val, 10, 0.03)
 
-            self.frame_model.confirm_algorithm_n_params(selected_algorithm, self.lk_params)
-        
+            self.frame_model.confirm_algorithm_n_params(
+                selected_algorithm, self.lk_params
+            )
+
         QMessageBox.information(
             self.dialog,
             "Algorithm Changed",
@@ -296,7 +315,6 @@ class AlgorithmConfigurationHandler:
         )
 
     def initialize_tool_window(self):
-
         # Initialize the video rectangle to the full canvas size
         # This will be updated when the first frame arrives
         self.video_rect = QRect(0, 0, self.canvas_width, self.canvas_height)
@@ -352,7 +370,7 @@ class AlgorithmConfigurationHandler:
 
         self.previous_process_time = time.time() - time_start
         self._update_info_bar()
-    
+
     def _update_info_bar(self):
         """
         Update the information bar with the current frame time and average time.
@@ -364,7 +382,7 @@ class AlgorithmConfigurationHandler:
         if len(self.accumulated_process_time) == 30:
             self.process_time_avg_30 = sum(self.accumulated_process_time) / 30
             self.accumulated_process_time = self.accumulated_process_time[1:]
-            
+
         self.info_bar.setText(
             f"Frame time: {self.previous_process_time * 1000:.2f} ms |\
                  Avg (30): {self.process_time_avg_30 * 1000:.2f} ms"
@@ -392,7 +410,7 @@ class AlgorithmConfigurationHandler:
         cropped_frame = frame[y : y + self.canvas_height, x : x + self.canvas_width]
 
         return cropped_frame
-        
+
     def _convert_frame_to_qimage(self, frame):
         """
         Convert an OpenCV frame (BGR) to a Qt QImage (RGB).
@@ -440,7 +458,9 @@ class AlgorithmConfigurationHandler:
         return cv2.resize(frame, (width, height))
 
     def _process_frame_with_model(self, resized_frame):
-        self.delta_pixels = self.frame_model.process_frame_for_algo_config(resized_frame)
+        self.delta_pixels = self.frame_model.process_frame_for_algo_config(
+            resized_frame
+        )
         self.overlay_widget.display_roi_for_algo_config(self.delta_pixels)
 
     def _display_frame_on_canvas(self, scaled_image):
@@ -480,20 +500,21 @@ class AlgorithmConfigurationHandler:
         QMessageBox.information(
             self.dialog,
             "Algorithm Configuration",
-            f"Algorithm: {selected_algorithm}\n Parameters:\n{param_str}"
+            f"Algorithm: {selected_algorithm}\n Parameters:\n{param_str}",
         )
 
         self.dialog.close()
 
-class VideoHandler:
 
-    def __init__(self, 
-        event_handler: 'EventHandler',
-        gui: MainGUIWindow, 
+class VideoHandler:
+    def __init__(
+        self,
+        event_handler: "EventHandler",
+        gui: MainGUIWindow,
         frame_model: FrameModel,
         camera_thread: CameraThread,
-        network_thread: NetworkThread):
-
+        network_thread: NetworkThread,
+    ):
         self.gui = gui
         self.event_handler = event_handler
         self.frame_model = frame_model
@@ -520,6 +541,7 @@ class VideoHandler:
         # Start network capture
         if self.network_thread.start_network_capture("0.0.0.0", 5001):
             print("Network capture started successfully")
+            self.playing = True
         else:
             print("Failed to start network capture")
 
@@ -671,12 +693,11 @@ class VideoHandler:
                 QMessageBox.warning(self.gui, "Warning", "Cannot resume video!")
                 return
 
+
 class CalibrationHandler:
     """Handles ruler calibration and arrow direction setup."""
-    def __init__(self, 
-    gui, 
-    frame_model,
-    overlay_widget):
+
+    def __init__(self, gui, frame_model, overlay_widget):
         self.gui = gui
         self.frame_model = frame_model
         self.overlay_widget = overlay_widget
@@ -799,6 +820,7 @@ class CalibrationHandler:
         # Update the status bar
         self.gui.statusBar().showMessage(f"arrow angle: {degree:.1f} degrees")
 
+
 class OverlayHandler:
     def __init__(self, gui, event_handler: "EventHandler") -> None:
         self.gui = gui
@@ -828,15 +850,16 @@ class OverlayHandler:
         # Bring the overlay to the front
         self.overlay_widget.raise_()
 
-class ROIHander:
 
-    def __init__(self,
-        event_handler: 'EventHandler',
+class ROIHander:
+    def __init__(
+        self,
+        event_handler: "EventHandler",
         gui: MainGUIWindow,
         frame_model: FrameModel,
         camera_thread: CameraThread,
-        overlay_widget: OverlayWidget):
-
+        overlay_widget: OverlayWidget,
+    ):
         self.gui = gui
         self.camera_thread = camera_thread
         self.frame_model = frame_model
@@ -907,10 +930,9 @@ class ROIHander:
         self.overlay_widget.update()
         self.gui.statusBar().showMessage("Last ROI deleted")
 
+
 class VelocityPlotter:
-    def __init__(self,
-        gui: MainGUIWindow,
-        frame_model: FrameModel):
+    def __init__(self, gui: MainGUIWindow, frame_model: FrameModel):
         self.gui = gui
         self.frame_model = frame_model
         self.plot_widget = self.gui.plot_widget
@@ -1031,24 +1053,30 @@ class VelocityPlotter:
             list_data.append(roi.average_velocity_past_30s)
 
         self.gui.table_widget.setData(list_data)
-        self.gui.table_widget.setHorizontalHeaderLabels(["ROI vs. mean_velocity (mm/s)"])
+        self.gui.table_widget.setHorizontalHeaderLabels(
+            ["ROI vs. mean_velocity (mm/s)"]
+        )
         self.gui.table_widget.setFormat("%.2f")
 
+
 class FrameProcessor:
-    def __init__(self,
-        event_handler: 'EventHandler',
+    def __init__(
+        self,
+        event_handler: "EventHandler",
         gui: MainGUIWindow,
         frame_model: FrameModel,
         camera_thread: CameraThread,
+        network_thread: NetworkThread,
         overlay_widget: OverlayWidget,
         video_recorder: VideoRecorder,
         roi_handler: ROIHander,
-        velocity_plotter: VelocityPlotter):
-
+        velocity_plotter: VelocityPlotter,
+    ):
         self.gui = gui
         self.event_handler = event_handler
         self.frame_model = frame_model
         self.camera_thread = camera_thread
+        self.network_thread = network_thread
         self.overlay_widget = overlay_widget
         self.video_recorder = video_recorder
         self.roi_handler = roi_handler
@@ -1056,7 +1084,6 @@ class FrameProcessor:
 
         self.canvas_width = self.gui.video_canvas_label.width()
         self.canvas_height = self.gui.video_canvas_label.height()
-
 
     # -----------------------------------Frame Processing-----------------------------------------------
     def process_new_frame(self, frame):
@@ -1069,10 +1096,11 @@ class FrameProcessor:
         Args:
             frame: The new frame from the camera thread
         """
-        if not self.event_handler.video_handler.playing:  # Access playing state from VideoHandler
+        if (
+            not self.event_handler.video_handler.playing
+        ):  # Access playing state from VideoHandler
             return
 
-        print("Processing new frame")
         # Store the current frame for potential further processing
         self.current_frame = frame
 
@@ -1092,6 +1120,45 @@ class FrameProcessor:
         self.camera_thread.if_release = False
         self._process_frame_with_model(resized_frame)
         self.camera_thread.if_release = True
+
+        # Display the frame on the canvas
+        pixmap = self._display_frame_on_canvas(scaled_image)
+
+        # Update the overlay position
+        self._update_overlay_position(pixmap)
+
+        # Record frame if recording is active
+        if self.event_handler.recording_active and self.video_recorder.is_active():
+            self.video_recorder.record_frame(frame)
+
+        # Update status bar
+        self._update_status_bar()
+
+    def process_new_frame_with_network_thread(self, frame):
+        if (
+            not self.event_handler.video_handler.playing
+        ):  # Access playing state from VideoHandler
+            return
+
+        # Store the current frame for potential further processing
+        self.current_frame = frame
+
+        # Convert frame to QImage and scale it
+        qt_image = self._convert_frame_to_qimage(frame)
+        scaled_image = self._scale_image_to_canvas(qt_image)
+
+        # Create a resized frame for processing
+        resized_frame = self._create_resized_frame(
+            frame, scaled_image.width(), scaled_image.height()
+        )
+
+        # Process the frame with the frame model
+
+        # Only allow to let frame pass in when the previous frame has been processed
+        # This is to prevent the overstacking of frames
+        self.network_thread.if_release = False
+        self._process_frame_with_model(resized_frame)
+        self.network_thread.if_release = True
 
         # Display the frame on the canvas
         pixmap = self._display_frame_on_canvas(scaled_image)
@@ -1215,6 +1282,7 @@ class FrameProcessor:
                 f"Frame: {self.current_frame_number} | Time: {self.frame_model.last_processed_time}"
             )
 
+
 class EventHandler:
     """
     Event handler class that connects GUI components with application logic.
@@ -1256,19 +1324,24 @@ class EventHandler:
         self.overlay_handler.initialize_tool_window()
         self.overlay_widget = self.overlay_handler.overlay_widget
 
-        self.handlers_initial_after_overlay_creation()    
+        self.handlers_initial_after_overlay_creation()
 
     def handlers_initial_after_overlay_creation(self):
         """
         Initialize the event handlers after the overlay widget is created.
         """
-        self.calibration_handler = CalibrationHandler(self.gui, self.frame_model, self.overlay_widget)
-        self.roi_handler = ROIHander(self, self.gui, self.frame_model, self.camera_thread, self.overlay_widget)
+        self.calibration_handler = CalibrationHandler(
+            self.gui, self.frame_model, self.overlay_widget
+        )
+        self.roi_handler = ROIHander(
+            self, self.gui, self.frame_model, self.camera_thread, self.overlay_widget
+        )
         self.frame_processor = FrameProcessor(
             self,
             self.gui,
             self.frame_model,
             self.camera_thread,
+            self.network_thread,
             self.overlay_widget,
             self.video_recorder,
             self.roi_handler,
@@ -1276,17 +1349,33 @@ class EventHandler:
         )
 
         # Connect camera thread signals to frame processor
-        self.camera_thread.frame_available.connect(self.frame_processor.process_new_frame)
-        self.network_thread.frame_available.connect(self.frame_processor.process_new_frame)
+        self.camera_thread.frame_available.connect(
+            self.frame_processor.process_new_frame
+        )
+        self.network_thread.frame_available.connect(
+            self.frame_processor.process_new_frame_with_network_thread
+        )
 
-        self.gui.confirm_arrow_button.clicked.connect(self.calibration_handler.confirm_arrow_n_ruler)
-        self.gui.add_arrow_button.clicked.connect(self.calibration_handler.start_arrow_drawing)
-        self.gui.calibration_button.clicked.connect(self.calibration_handler.start_ruler_calibration)
-        self.overlay_widget.ruler_measured.connect(self.calibration_handler.handle_ruler_measurement)
-        self.overlay_widget.arrow_drawn.connect(self.calibration_handler.handle_arrow_drawing)
-        
+        self.gui.confirm_arrow_button.clicked.connect(
+            self.calibration_handler.confirm_arrow_n_ruler
+        )
+        self.gui.add_arrow_button.clicked.connect(
+            self.calibration_handler.start_arrow_drawing
+        )
+        self.gui.calibration_button.clicked.connect(
+            self.calibration_handler.start_ruler_calibration
+        )
+        self.overlay_widget.ruler_measured.connect(
+            self.calibration_handler.handle_ruler_measurement
+        )
+        self.overlay_widget.arrow_drawn.connect(
+            self.calibration_handler.handle_arrow_drawing
+        )
+
         self.gui.add_roi_button.clicked.connect(self.roi_handler.add_roi)
-        self.overlay_widget.roi_created.connect(self.roi_handler.handle_roi_created)  # Connect to the signal emitted by OverlayWidget
+        self.overlay_widget.roi_created.connect(
+            self.roi_handler.handle_roi_created
+        )  # Connect to the signal emitted by OverlayWidget
         self.gui.delete_roi_button.clicked.connect(self.roi_handler.delete_last_roi)
 
     def handlers_initial_before_overlay_creation(self):
@@ -1312,8 +1401,9 @@ class EventHandler:
 
         # Initialize handlers
         self.overlay_handler = OverlayHandler(self.gui, self)
-        self.video_handler = VideoHandler(self, self.gui, self.frame_model, 
-                                        self.camera_thread, self.network_thread)
+        self.video_handler = VideoHandler(
+            self, self.gui, self.frame_model, self.camera_thread, self.network_thread
+        )
         self.velocity_plotter = VelocityPlotter(self.gui, self.frame_model)
 
     def connect_signals(self):
@@ -1346,15 +1436,16 @@ class EventHandler:
 
         if not if_paused:  # Access playing state from VideoHandler
             QMessageBox.information(
-                self.gui, "Information", 
+                self.gui,
+                "Information",
                 "Video was PAUSED by user,\
-                \nit is going to be CONTINUED now for algoritm configuration."
+                \nit is going to be CONTINUED now for algoritm configuration.",
             )
             self.video_handler.pause_play()  # Use VideoHandler's pause_play metho
 
-        dialog = AlgorithmConfigurationHandler(self.gui, 
-                                                self.camera_thread, 
-                                                self.frame_model)
+        dialog = AlgorithmConfigurationHandler(
+            self.gui, self.camera_thread, self.frame_model
+        )
         dialog.dialog.exec()
         pass
 
