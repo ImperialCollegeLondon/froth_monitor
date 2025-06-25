@@ -7,6 +7,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+froth_monitor/test/dummy_video.mp4
 .Python
 build/
 develop-eggs/

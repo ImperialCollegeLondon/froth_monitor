@@ -832,7 +832,6 @@ class MainGUIWindow(QMainWindow):
     # The createMenuBar, add_buttons, add_canvas_placeholder, and add_ROI_movement_placeholder methods
     # have been integrated into the new initUI method to create a more modern interface
 
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyleSheet("""

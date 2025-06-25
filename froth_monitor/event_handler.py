@@ -1485,7 +1485,7 @@ class EventHandler:
 
         # Connect GUI signals to handler methods
         self.connect_signals()
-    
+
     def trigger_jetson_mode(self):
         self.if_jetson = True
         self.camera_thread = cast(CameraThread, None)
