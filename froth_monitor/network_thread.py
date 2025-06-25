@@ -145,9 +145,9 @@ class NetworkThread(QObject):
 
                 # Emit signals with the received data
                 if self.if_release:
-                    print("if release")
+
                     if frame is not None:
-                        print("Frame emit")
+
                         self.frame_available.emit(frame)
 
                     if server_data:

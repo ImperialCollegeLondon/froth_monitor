@@ -514,18 +514,23 @@ class VideoHandler:
         frame_model: FrameModel,
         camera_thread: CameraThread,
         network_thread: NetworkThread,
+        video_thread: NetworkThread | CameraThread
     ):
         self.gui = gui
         self.event_handler = event_handler
         self.frame_model = frame_model
         self.camera_thread = camera_thread
         self.network_thread = network_thread
-
+        self.video_thread = video_thread
+        
         # Add missing state variables
         self.playing = False
         self.frame_width = 0
         self.frame_height = 0
         self.last_video_source = None
+
+        self.jetson_source_address = "0.0.0.0"
+        self.jetson_source_port = 5001
 
     def handle_video_import(self):
         if self.gui.webcam_radio.isChecked():
@@ -539,11 +544,15 @@ class VideoHandler:
         self.event_handler.if_jetson = True
 
         # Start network capture
-        if self.network_thread.start_network_capture("0.0.0.0", 5001):
-            print("Network capture started successfully")
+        if self.network_thread.start_network_capture(self.jetson_source_address, 
+                self.jetson_source_port):
             self.playing = True
+            self.event_handler.trigger_jetson_mode()
+
         else:
-            print("Failed to start network capture")
+            QMessageBox.critical(
+                self.gui, "Error", "Failed to start network capture."
+            )
 
     def import_local_video(self):
         """
@@ -566,7 +575,8 @@ class VideoHandler:
 
                 # Start playing the video
                 self.playing = True
-                self.event_handler.initialze_tool_window_n_handlers()
+                self.event_handler.trigger_normal_mode()
+
             else:
                 QMessageBox.critical(
                     self.gui, "Error", "Could not open the video file!"
@@ -638,7 +648,7 @@ class VideoHandler:
             self.playing = True
 
             # Initialize the tool window and handlers
-            self.event_handler.initialze_tool_window_n_handlers()
+            self.event_handler.trigger_normal_mode()
 
             # Close the dialog
             dialog.accept()
@@ -659,14 +669,14 @@ class VideoHandler:
                 return os.path.join(sys._MEIPASS, relative_path)  # type: ignore
             return relative_path
 
-        if not self.camera_thread.is_running() and not self.playing:
+        if not self.video_thread.is_running() and not self.playing:
             QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
             return
 
         if self.playing:
             # Pause the video using the camera thread's pause method
             # This keeps the video source open but stops emitting frames
-            self.camera_thread.pause()
+            self.video_thread.pause()
             self.playing = False
             self.gui.statusBar().showMessage("Video paused")
             # Change icon to play icon when paused
@@ -675,8 +685,8 @@ class VideoHandler:
             )
         else:
             # If the thread is running but paused, just resume it
-            if self.camera_thread.is_running() and self.camera_thread.is_paused():
-                self.camera_thread.resume()
+            if self.video_thread.is_running() and self.camera_thread.is_paused():
+                self.video_thread.resume()
                 self.playing = True
                 self.gui.statusBar().showMessage("Video resumed")
                 # Change icon to pause icon when playing
@@ -686,7 +696,13 @@ class VideoHandler:
 
             # If the thread is not running, we need to restart it
             elif hasattr(self, "last_video_source"):
-                self.camera_thread.start_capture(self.last_video_source)
+                if self.event_handler.if_jetson:
+                    self.video_thread.start_network_capture( # type: ignore
+                        self.jetson_source_address, self.jetson_source_port
+                    )
+                else:
+                    self.video_thread.start_capture(self.last_video_source) # type: ignore
+                # self.camera_thread.start_capture(self.last_video_source)
                 self.playing = True
                 self.gui.statusBar().showMessage("Video started")
             else:
@@ -857,11 +873,12 @@ class ROIHander:
         event_handler: "EventHandler",
         gui: MainGUIWindow,
         frame_model: FrameModel,
-        camera_thread: CameraThread,
+        video_thread: CameraThread | NetworkThread,
         overlay_widget: OverlayWidget,
     ):
         self.gui = gui
-        self.camera_thread = camera_thread
+        self.event_handler = event_handler
+        self.video_thread = video_thread
         self.frame_model = frame_model
         self.overlay_widget = overlay_widget
 
@@ -869,7 +886,7 @@ class ROIHander:
     def add_roi(self):
         """Add a new Region of Interest to the video."""
         # Check if video is loaded
-        if not self.camera_thread.is_running():
+        if not self.video_thread.is_running():
             QMessageBox.warning(
                 self.gui,
                 "Warning",
@@ -916,7 +933,7 @@ class ROIHander:
             roi_list: List of ROI objects to be displayed
         """
         # Check if video is loaded
-        if not self.camera_thread.is_running():
+        if not self.video_thread.is_running():
             QMessageBox.warning(
                 self.gui,
                 "Warning",
@@ -1065,8 +1082,7 @@ class FrameProcessor:
         event_handler: "EventHandler",
         gui: MainGUIWindow,
         frame_model: FrameModel,
-        camera_thread: CameraThread,
-        network_thread: NetworkThread,
+        video_thread: CameraThread | NetworkThread,
         overlay_widget: OverlayWidget,
         video_recorder: VideoRecorder,
         roi_handler: ROIHander,
@@ -1075,8 +1091,7 @@ class FrameProcessor:
         self.gui = gui
         self.event_handler = event_handler
         self.frame_model = frame_model
-        self.camera_thread = camera_thread
-        self.network_thread = network_thread
+        self.video_thread = video_thread
         self.overlay_widget = overlay_widget
         self.video_recorder = video_recorder
         self.roi_handler = roi_handler
@@ -1117,9 +1132,9 @@ class FrameProcessor:
 
         # Only allow to let frame pass in when the previous frame has been processed
         # This is to prevent the overstacking of frames
-        self.camera_thread.if_release = False
+        self.video_thread.if_release = False
         self._process_frame_with_model(resized_frame)
-        self.camera_thread.if_release = True
+        self.video_thread.if_release = True
 
         # Display the frame on the canvas
         pixmap = self._display_frame_on_canvas(scaled_image)
@@ -1142,7 +1157,7 @@ class FrameProcessor:
 
         # Store the current frame for potential further processing
         self.current_frame = frame
-
+        
         # Convert frame to QImage and scale it
         qt_image = self._convert_frame_to_qimage(frame)
         scaled_image = self._scale_image_to_canvas(qt_image)
@@ -1156,9 +1171,9 @@ class FrameProcessor:
 
         # Only allow to let frame pass in when the previous frame has been processed
         # This is to prevent the overstacking of frames
-        self.network_thread.if_release = False
+        self.video_thread.if_release = False
         self._process_frame_with_model(resized_frame)
-        self.network_thread.if_release = True
+        self.video_thread.if_release = True
 
         # Display the frame on the canvas
         pixmap = self._display_frame_on_canvas(scaled_image)
@@ -1316,7 +1331,19 @@ class EventHandler:
 
         # Connect GUI signals to handler methods
         self.connect_signals()
+    
+    def trigger_jetson_mode(self):
+        self.if_jetson = True
+        self.camera_thread = cast(CameraThread, None)
+        self.video_thread = self.network_thread
+        self.initialze_tool_window_n_handlers()
 
+    def trigger_normal_mode(self):
+        self.if_jetson = False
+        self.network_thread = cast(NetworkThread, None)
+        self.video_thread = self.camera_thread
+        self.initialze_tool_window_n_handlers()
+        
     def initialze_tool_window_n_handlers(self):
         if not self.video_handler.playing:  # Access playing state from VideoHandler
             return
@@ -1326,6 +1353,24 @@ class EventHandler:
 
         self.handlers_initial_after_overlay_creation()
 
+    def connect_signals(self):
+        """Connect GUI signals to their respective handler methods."""
+
+        # Connect menu actions directly
+        self.gui.import_button.clicked.connect(self.video_handler.handle_video_import)
+        self.gui.export_button.clicked.connect(self.export_settings)
+
+        # # Connect buttons directly using the gui reference
+        self.gui.play_pause_button.clicked.connect(self.video_handler.pause_play)
+
+        self.gui.algorithm_configuration.clicked.connect(
+            self.open_algorithm_configuration
+        )
+
+        self.gui.save_button.clicked.connect(self.save_data)
+        self.gui.record_button.clicked.connect(self.toggle_recording)
+        self.gui.simple_reset_button.clicked.connect(self.reset_mission)
+
     def handlers_initial_after_overlay_creation(self):
         """
         Initialize the event handlers after the overlay widget is created.
@@ -1334,14 +1379,13 @@ class EventHandler:
             self.gui, self.frame_model, self.overlay_widget
         )
         self.roi_handler = ROIHander(
-            self, self.gui, self.frame_model, self.camera_thread, self.overlay_widget
+            self, self.gui, self.frame_model, self.video_thread, self.overlay_widget
         )
         self.frame_processor = FrameProcessor(
             self,
             self.gui,
             self.frame_model,
-            self.camera_thread,
-            self.network_thread,
+            self.video_thread,
             self.overlay_widget,
             self.video_recorder,
             self.roi_handler,
@@ -1349,12 +1393,15 @@ class EventHandler:
         )
 
         # Connect camera thread signals to frame processor
-        self.camera_thread.frame_available.connect(
-            self.frame_processor.process_new_frame
-        )
-        self.network_thread.frame_available.connect(
-            self.frame_processor.process_new_frame_with_network_thread
-        )
+        if self.if_jetson:
+            self.video_thread.frame_available.connect(
+                self.frame_processor.process_new_frame_with_network_thread
+            )
+        else:
+            self.video_thread.frame_available.connect(
+                self.frame_processor.process_new_frame
+            )
+
 
         self.gui.confirm_arrow_button.clicked.connect(
             self.calibration_handler.confirm_arrow_n_ruler
@@ -1395,6 +1442,9 @@ class EventHandler:
         # Initialize camera thread for event-driven frame capture
         self.camera_thread = CameraThread()
         self.network_thread = NetworkThread()
+        self.video_thread: NetworkThread | CameraThread = \
+            cast(NetworkThread | CameraThread, CameraThread())
+            
         # Initialize video recorder
         self.video_recorder = VideoRecorder()
         self.recording_active = False
@@ -1402,27 +1452,13 @@ class EventHandler:
         # Initialize handlers
         self.overlay_handler = OverlayHandler(self.gui, self)
         self.video_handler = VideoHandler(
-            self, self.gui, self.frame_model, self.camera_thread, self.network_thread
+            self, self.gui, 
+            self.frame_model, 
+            self.camera_thread, 
+            self.network_thread,
+            self.video_thread
         )
         self.velocity_plotter = VelocityPlotter(self.gui, self.frame_model)
-
-    def connect_signals(self):
-        """Connect GUI signals to their respective handler methods."""
-
-        # Connect menu actions directly
-        self.gui.import_button.clicked.connect(self.video_handler.handle_video_import)
-        self.gui.export_button.clicked.connect(self.export_settings)
-
-        # # Connect buttons directly using the gui reference
-        self.gui.play_pause_button.clicked.connect(self.video_handler.pause_play)
-
-        self.gui.algorithm_configuration.clicked.connect(
-            self.open_algorithm_configuration
-        )
-
-        self.gui.save_button.clicked.connect(self.save_data)
-        self.gui.record_button.clicked.connect(self.toggle_recording)
-        self.gui.simple_reset_button.clicked.connect(self.reset_mission)
 
     def open_algorithm_configuration(self):
         """
@@ -1484,7 +1520,7 @@ class EventHandler:
     def toggle_recording(self):
         """Start or stop video recording."""
         # Check if video is loaded
-        if not self.camera_thread.is_running():
+        if not self.video_thread.is_running():
             QMessageBox.warning(
                 self.gui,
                 "Warning",
@@ -1588,7 +1624,7 @@ class EventHandler:
     def check_if_import(self) -> bool:
         """Check if a video file is being imported."""
 
-        if not self.camera_thread.is_running():
+        if not self.video_thread.is_running():
             QMessageBox.warning(
                 self.gui,
                 "Warning",
