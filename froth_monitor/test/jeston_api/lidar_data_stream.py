@@ -6,6 +6,7 @@ TODO list:
 import random
 import time
 import re
+from datetime import datetime
 # import serial
 
 
@@ -72,5 +73,5 @@ class LidarDataStream:
         while True:
             # Simulate Lidar data as a random float
             data = round(random.uniform(0.0, 100.0), 2)
-            timestamp = time.time()
+            timestamp = datetime.now().strftime("%H:%M:%S.%f")
             yield (timestamp, data)

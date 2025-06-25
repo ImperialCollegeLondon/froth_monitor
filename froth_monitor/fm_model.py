@@ -82,7 +82,9 @@ class ROI:
         self.calibrated_delta = self.calculate_real_delta(self.delta_pixels)
 
         # Update timestamp
-        self.timestamp = time.strftime("%H:%M:%S", time.localtime())
+        self.timestamp = datetime.now().strftime("%H:%M:%S.%f")
+
+        # self.timestamp = time.strftime("%H:%M:%S.%f", time.localtime())
         if_new_velo = self.calculate_velocity(self.calibrated_delta)
         if_new_average = self.calculate_average_velocity()
         self.delta_history.append(
@@ -130,16 +132,14 @@ class ROI:
         return projection_mm
 
     def calculate_velocity(self, delta) -> bool:
-        if self.timestamp == self.timestamp_buffer:
+        timestamp_buffer = self.timestamp[:8]
+        if timestamp_buffer == self.timestamp_buffer:
             self.current_velocity += delta
             return False
 
         else:
-            self.timestamp_buffer = self.timestamp
+            self.timestamp_buffer = timestamp_buffer
 
-            # if len(self.delta_history) == 1:
-            #     self.delta_history[0][-1] = self.current_velocity
-            # else:
             if len(self.delta_history) > 1:
                 self.delta_history[-1][-1] = self.current_velocity
 

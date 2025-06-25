@@ -592,19 +592,19 @@ class MainGUIWindow(QMainWindow):
         right_layout = QVBoxLayout(right_panel)
         right_layout.setSpacing(10)
 
-        self._create_video_canvas(right_layout)
+        self._create_video_canvas_n_table(right_layout)
         self._create_graph_display(right_layout)
 
         return right_panel
 
-    def _create_video_canvas(self, layout: QVBoxLayout) -> None:
+    def _create_video_canvas_n_table(self, layout: QVBoxLayout) -> None:
         """Create the video canvas with table on the right."""
-
+        
         # Create horizontal container for video + table
         video_table_container = QWidget()
         video_table_layout = QHBoxLayout(video_table_container)
 
-        # Video container (left side)
+        # Video container (left side)--------------------------------------------------
         self.video_container = QWidget()
         self.video_container.setMinimumSize(700, 400)
         self.video_container.setSizePolicy(
@@ -614,41 +614,80 @@ class MainGUIWindow(QMainWindow):
             "background-color: #333333; border-radius: 4px;"
         )
         video_container_layout = QVBoxLayout(self.video_container)
-
         self.video_canvas_label = QLabel("")
         self.video_canvas_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_canvas_label.setStyleSheet("background-color: #333333;")
         video_container_layout.addWidget(self.video_canvas_label)
 
+        # Table container (right side)--------------------------------------------------
         table_container = QWidget()
         table_container.setStyleSheet("background-color: #f0f0f0;")
         table_layout = QVBoxLayout(table_container)
-        table_label = QLabel("Average Velocity over the past 30s")
-        table_label.setStyleSheet("color: black; font-size: 14px; font-weight: bold;")
-        table_layout.addWidget(table_label)
+
+        table_label_1 = QLabel("Average Velocity over the past 30s")
+        table_label_1.setStyleSheet("color: black; font-size: 14px; font-weight: bold;")
+        self.table_label_2 = QLabel("Data of the last second")
+        self.table_label_2.setStyleSheet("color: black; font-size: 14px; font-weight: bold;")
 
         # Table widget (right side)
         example_1d_data = ["N/A"]
-        self.table_widget = pg.TableWidget()
-        self.table_widget.setData(example_1d_data)
-        self.table_widget.setHorizontalHeaderLabels(["ROI vs. mean_velocity (mm/s)"])
-        self.table_widget.setFormat("%.2f")
-        self.table_widget.setMinimumHeight(150)
-        self.table_widget.setMinimumWidth(250)  # Fixed width
+        self.velo_widget = pg.TableWidget()
+        self.velo_widget.setData(example_1d_data)
+        self.velo_widget.setHorizontalHeaderLabels(["mean_velocity (mm/s)"])
+        self.velo_widget.setFormat("%.2f")
+        self.velo_widget.setMinimumHeight(150)
+        self.velo_widget.setMinimumWidth(250)  # Fixed width
+        self.velo_widget.setStyleSheet(
+            """
+            background-color: #f0f0f0; 
+            font-size: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            """
+        )
 
         # Set minimum column width
-        self.table_widget.setColumnWidth(0, 200)  # Set column 0 to 200px width
+        self.velo_widget.setColumnWidth(0, 200)  # Set column 0 to 200px width
         # OR set minimum column width
-        self.table_widget.horizontalHeader().setMinimumSectionSize(
+        self.velo_widget.horizontalHeader().setMinimumSectionSize(
             150
         )  # Minimum for all columns
         # OR set specific column minimum width
-        self.table_widget.horizontalHeader().resizeSection(0, 200)
-
-        self.table_widget.setSizePolicy(
+        self.velo_widget.horizontalHeader().resizeSection(0, 200)
+        self.velo_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        table_layout.addWidget(self.table_widget)
+
+        # Table widget (right side)
+        example_2d_data = [["N/A", "N/A", "N/A"]]
+        self.fh_widget = pg.TableWidget()
+        self.fh_widget.setData(example_2d_data)
+        self.fh_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec"])
+        self.fh_widget.setFormat("%.2f")
+        self.fh_widget.setMinimumHeight(150)
+        self.fh_widget.setMinimumWidth(50)  # Fixed width
+        self.fh_widget.setStyleSheet(
+            """
+            background-color: #f0f0f0; 
+            font-size: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            """
+        )
+
+        # Set minimum column width
+        self.fh_widget.setColumnWidth(0, 80)  # Set column 0 to 200px width
+        self.fh_widget.setColumnWidth(1, 80)  # Set column 0 to 200px width
+        self.fh_widget.setColumnWidth(2, 80)  # Set column 0 to 200px width
+
+        self.fh_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+
+        table_layout.addWidget(table_label_1)
+        table_layout.addWidget(self.velo_widget)
+        table_layout.addWidget(self.table_label_2)
+        table_layout.addWidget(self.fh_widget)
 
         # Add to horizontal layout
         video_table_layout.addWidget(self.video_container, 1)
@@ -656,6 +695,8 @@ class MainGUIWindow(QMainWindow):
 
         layout.addWidget(video_table_container)
         self._create_media_controls(layout)
+        self.fh_widget.hide()
+        self.table_label_2.hide()
 
     def _create_export_settings(self) -> QGroupBox:
         """
@@ -746,6 +787,7 @@ class MainGUIWindow(QMainWindow):
         horizontal_layout.addWidget(self.plot_widget, 1)
         horizontal_layout.addWidget(self.froth_height_plot_widget, 1)
         layout.addLayout(horizontal_layout)
+        self.froth_height_plot_widget.hide()
 
     def _create_media_controls(self, layout: QVBoxLayout) -> None:
         """Create responsive media controls."""
@@ -780,6 +822,10 @@ class MainGUIWindow(QMainWindow):
         media_controls_layout.addStretch()
         layout.addWidget(media_controls_container)
 
+    def _trigger_jetson_mode(self) -> None:
+        self.fh_widget.setVisible(True)
+        self.table_label_2.setVisible(True)
+        self.froth_height_plot_widget.setVisible(True)
     # The createMenuBar, add_buttons, add_canvas_placeholder, and add_ROI_movement_placeholder methods
     # have been integrated into the new initUI method to create a more modern interface
 

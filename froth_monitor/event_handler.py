@@ -505,7 +505,6 @@ class AlgorithmConfigurationHandler:
 
         self.dialog.close()
 
-
 class VideoHandler:
     def __init__(
         self,
@@ -709,7 +708,6 @@ class VideoHandler:
                 QMessageBox.warning(self.gui, "Warning", "Cannot resume video!")
                 return
 
-
 class CalibrationHandler:
     """Handles ruler calibration and arrow direction setup."""
 
@@ -836,7 +834,6 @@ class CalibrationHandler:
         # Update the status bar
         self.gui.statusBar().showMessage(f"arrow angle: {degree:.1f} degrees")
 
-
 class OverlayHandler:
     def __init__(self, gui, event_handler: "EventHandler") -> None:
         self.gui = gui
@@ -865,7 +862,6 @@ class OverlayHandler:
         self.overlay_active = True
         # Bring the overlay to the front
         self.overlay_widget.raise_()
-
 
 class ROIHander:
     def __init__(
@@ -946,7 +942,6 @@ class ROIHander:
         self.frame_model.delete_last_roi()
         self.overlay_widget.update()
         self.gui.statusBar().showMessage("Last ROI deleted")
-
 
 class VelocityPlotter:
     def __init__(self, gui: MainGUIWindow, frame_model: FrameModel):
@@ -1054,8 +1049,8 @@ class VelocityPlotter:
     def update_ave_velo_table(self):
         """Update the average velocity table with data from all ROIs."""
         # Clear the table
-        self.gui.table_widget.clear()
-        self.gui.table_widget.setRowCount(len(self.frame_model.roi_list))
+        self.gui.velo_widget.clear()
+        self.gui.velo_widget.setRowCount(len(self.frame_model.roi_list))
 
         list_data = []
         # Add data to the table
@@ -1069,12 +1064,11 @@ class VelocityPlotter:
             # Add average velocity to the table
             list_data.append(roi.average_velocity_past_30s)
 
-        self.gui.table_widget.setData(list_data)
-        self.gui.table_widget.setHorizontalHeaderLabels(
+        self.gui.velo_widget.setData(list_data)
+        self.gui.velo_widget.setHorizontalHeaderLabels(
             ["ROI vs. mean_velocity (mm/s)"]
         )
-        self.gui.table_widget.setFormat("%.2f")
-
+        self.gui.velo_widget.setFormat("%.2f")
 
 class FrameProcessor:
     def __init__(
@@ -1297,6 +1291,75 @@ class FrameProcessor:
                 f"Frame: {self.current_frame_number} | Time: {self.frame_model.last_processed_time}"
             )
 
+class SensorDataProcessor:
+    def __init__(self, event_handler: "EventHandler",
+                 video_thread: CameraThread | NetworkThread):
+        self.event_handler = event_handler
+        self.video_thread = video_thread
+        self.gui = self.event_handler.gui
+
+        self.current_lidar_reading = 0.0
+        self.current_timestamp:str = cast(str, None)
+
+        self.lidar_reading_history = []
+        self.lidar_reading_history_av1s = []
+
+        self.lidar_reading_buffer = []
+        self.timestamp_last_mark: str = cast(str, None)
+
+    def process_sensor_data(self, sensor_data):
+        """
+        Process sensor data and update the GUI.
+
+        This method is called whenever new sensor data is received from the network thread.
+        It processes the sensor data and updates the GUI accordingly.
+
+        Args:
+            sensor_data: The new sensor data received from the network thread
+        """
+        if not self.event_handler.video_handler.playing:
+            return
+        
+
+        # Update the current lidar reading
+        self.current_lidar_reading = sensor_data["lidar_reading"]
+
+        # Update the lidar reading label
+        self.current_timestamp = sensor_data["lidar_timestamp"]
+
+        self.lidar_reading_history.append([[0, self.current_lidar_reading, \
+            self.current_timestamp]])
+
+        self._update_lidar_table()
+
+    def _update_lidar_table(self):
+        """
+        Update the lidar reading table with the latest data.
+        """
+
+        self.gui.fh_widget.setData(self.lidar_reading_history[-1])
+        self.gui.fh_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec"])
+        self.gui.fh_widget.setFormat("%.2f")
+        print(self.lidar_reading_history[-1])
+    
+    def calculate_velocity(self, delta) -> bool:
+        timestamp_buffer = self.current_timestamp[:8]
+        if timestamp_buffer == self.timestamp_buffer:
+            self.lidar_reading_buffer.append(self.current_lidar_reading)
+            return False
+
+
+        else:
+            self.timestamp_buffer = timestamp_buffer
+            average_fh = sum(self.lidar_reading_buffer) / len(self.lidar_reading_buffer)
+            self.lidar_reading_history_av1s.append([[0, average_fh, \
+                self.current_timestamp]])
+
+            self.lidar_reading_buffer = []
+            
+            return True
+        
+        
 
 class EventHandler:
     """
@@ -1337,6 +1400,7 @@ class EventHandler:
         self.camera_thread = cast(CameraThread, None)
         self.video_thread = self.network_thread
         self.initialze_tool_window_n_handlers()
+        self.gui._trigger_jetson_mode()
 
     def trigger_normal_mode(self):
         self.if_jetson = False
@@ -1392,10 +1456,17 @@ class EventHandler:
             self.velocity_plotter,
         )
 
+
         # Connect camera thread signals to frame processor
         if self.if_jetson:
+            self.sensor_data_processor = SensorDataProcessor(
+                self, self.network_thread
+            )
             self.video_thread.frame_available.connect(
                 self.frame_processor.process_new_frame_with_network_thread
+            )
+            self.video_thread.sensor_data_available.connect(    # type: ignore
+                self.sensor_data_processor.process_sensor_data # type: ignore
             )
         else:
             self.video_thread.frame_available.connect(
@@ -1444,7 +1515,7 @@ class EventHandler:
         self.network_thread = NetworkThread()
         self.video_thread: NetworkThread | CameraThread = \
             cast(NetworkThread | CameraThread, CameraThread())
-            
+
         # Initialize video recorder
         self.video_recorder = VideoRecorder()
         self.recording_active = False
