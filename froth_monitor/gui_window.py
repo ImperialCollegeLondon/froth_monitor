@@ -629,7 +629,7 @@ class MainGUIWindow(QMainWindow):
 
         table_label_1 = QLabel("Average Velocity over the past 30s")
         table_label_1.setStyleSheet("color: black; font-size: 14px; font-weight: bold;")
-        self.table_label_2 = QLabel("Data of the last second")
+        self.table_label_2 = QLabel("Data of the current frame")
         self.table_label_2.setStyleSheet("color: black; font-size: 14px; font-weight: bold;")
 
         # Table widget (right side)
@@ -755,9 +755,11 @@ class MainGUIWindow(QMainWindow):
         """Create responsive graph display."""
         velocity_label = QLabel("Velocity vs Time")
         velocity_label.setStyleSheet("font-weight: bold; font-size: 16px; color: black")
-        layout.addWidget(velocity_label)
+        # layout.addWidget(velocity_label)
 
         horizontal_layout = QHBoxLayout()
+        vertical_layout_1 = QVBoxLayout()
+        vertical_layout_2 = QVBoxLayout()
 
         # Responsive plot widget for velocity
         self.plot_widget = pg.PlotWidget()
@@ -773,6 +775,9 @@ class MainGUIWindow(QMainWindow):
         self.plot_widget.setLabel("bottom", "Time", units="secs")
         self.plot_widget.addLegend()
 
+        self.froth_height_label = QLabel("Froth Height vs Time")
+        self.froth_height_label.setStyleSheet("font-weight: bold; font-size: 16px; color: black")
+
         # New plot widget for froth height
         self.froth_height_plot_widget = pg.PlotWidget()
         self.froth_height_plot_widget.setBackground("white")
@@ -785,11 +790,18 @@ class MainGUIWindow(QMainWindow):
         self.froth_height_plot_widget.setLabel("left", "Froth Height", units="mm")
         self.froth_height_plot_widget.setLabel("bottom", "Time", units="secs")
         self.froth_height_plot_widget.addLegend()
-
+        
+        vertical_layout_1.addWidget(velocity_label)
+        vertical_layout_1.addWidget(self.plot_widget)
         # Add both plot widgets to horizontal layout
-        horizontal_layout.addWidget(self.plot_widget, 1)
-        horizontal_layout.addWidget(self.froth_height_plot_widget, 1)
+        # horizontal_layout.addWidget(self.plot_widget, 1)
+        # horizontal_layout.addWidget(self.froth_height_plot_widget, 1)
+        vertical_layout_2.addWidget(self.froth_height_label)
+        vertical_layout_2.addWidget(self.froth_height_plot_widget)
+        horizontal_layout.addLayout(vertical_layout_1)
+        horizontal_layout.addLayout(vertical_layout_2)
         layout.addLayout(horizontal_layout)
+        self.froth_height_label.hide()  # Hide the label by default
         self.froth_height_plot_widget.hide()
 
     def _create_media_controls(self, layout: QVBoxLayout) -> None:
@@ -828,6 +840,7 @@ class MainGUIWindow(QMainWindow):
     def _trigger_jetson_mode(self) -> None:
         self.fh_widget.setVisible(True)
         self.table_label_2.setVisible(True)
+        self.froth_height_label.setVisible(True)
         self.froth_height_plot_widget.setVisible(True)
     # The createMenuBar, add_buttons, add_canvas_placeholder, and add_ROI_movement_placeholder methods
     # have been integrated into the new initUI method to create a more modern interface

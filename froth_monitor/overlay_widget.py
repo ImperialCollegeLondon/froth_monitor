@@ -522,7 +522,7 @@ class OverlayWidget(QWidget):
             painter.drawText(number_x, number_y, sequence_number)
 
             # Draw the moving cross based on delta_pixels if available
-            if roi.delta_pixels is not None:
+            if roi.delta_pixels != (None, None):
                 delta_x, delta_y = roi.delta_pixels
 
                 if roi.cross_position is None:
