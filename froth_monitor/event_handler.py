@@ -1486,6 +1486,21 @@ class EventHandler:
 
         # Connect GUI signals to handler methods
         self.connect_signals()
+        self.initialize_gui_guidance()
+        self.update_guidance()
+
+    def initialize_gui_guidance(self):
+        self.step_import = False
+        self.step_algo_config = False
+        self.step_calibration = False
+        self.step_ROI_drawing = False
+        self.step_export = False
+    
+    def update_guidance(self):
+        if self.step_import == False:
+            self.gui._update_guidance("step_1")
+            return
+
 
     def trigger_jetson_mode(self):
         self.if_jetson = True
@@ -1501,7 +1516,8 @@ class EventHandler:
         self.video_thread = self.camera_thread
         self.video_handler.video_thread = self.video_thread
         self.initialze_tool_window_n_handlers()
-        
+    
+
     def initialze_tool_window_n_handlers(self):
         if not self.video_handler.playing:  # Access playing state from VideoHandler
             return
