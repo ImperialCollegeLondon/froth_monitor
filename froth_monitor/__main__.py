@@ -31,3 +31,15 @@ if __name__ == "__main__":
     handler = EventHandler(window)
     window.show()
     sys.exit(app.exec())
+
+### Air_rec Formula - unit of %
+### Stick with cm for the first version
+### (overflow's velocity (mm/s | distance/time)) * (froth height(mm | distance)) * (perimeter of cell (input from user) (mm | distance)) / 
+### over
+### (air flow into 1. (we can ask user to choose the unit, volume/time - m^3/hr (industrial scale), liters/min (lab scale), cm3/s)
+###                2. Ask for Jg (cm/s), calculate airflow based on (Jg*Area of cell)
+
+### Can display the value in real-time on graph
+### Average value display on the table
+
+### Graph - limit of y-label

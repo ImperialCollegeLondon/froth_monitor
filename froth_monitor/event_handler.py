@@ -57,9 +57,9 @@ class AlgorithmConfigurationHandler:
     """
 
     def __init__(
-        self, gui: MainGUIWindow, camera_thread: CameraThread, frame_model: FrameModel
+        self, gui: MainGUIWindow, video_thread: NetworkThread | CameraThread, frame_model: FrameModel
     ):
-        self.camera_thread = camera_thread
+        self.video_thread = video_thread
         self.overlay_widget = cast(OverlayWidget, None)
 
         self.frame_model = frame_model
@@ -114,7 +114,7 @@ class AlgorithmConfigurationHandler:
 
         self.initUI()
         self.initialize_tool_window()
-        self.camera_thread.frame_available.connect(self.process_new_frame)
+        self.video_thread.frame_available.connect(self.process_new_frame)
 
     def initUI(self):
         self.dialog = QDialog(self.gui)
@@ -361,9 +361,9 @@ class AlgorithmConfigurationHandler:
 
         # Only allow to let frame pass in when the previous frame has been processed
         # This is to prevent the overstacking of frames
-        self.camera_thread.if_release = False
+        self.video_thread.if_release = False
         self._process_frame_with_model(resized_frame)
-        self.camera_thread.if_release = True
+        self.video_thread.if_release = True
 
         # Display the frame on the canvas
         pixmap = self._display_frame_on_canvas(scaled_image)
@@ -667,6 +667,7 @@ class VideoHandler:
             if hasattr(sys, "_MEIPASS"):
                 return os.path.join(sys._MEIPASS, relative_path)  # type: ignore
             return relative_path
+        print(self.video_thread.is_running(), self.playing)
 
         if not self.video_thread.is_running() and not self.playing:
             QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
@@ -684,7 +685,7 @@ class VideoHandler:
             )
         else:
             # If the thread is running but paused, just resume it
-            if self.video_thread.is_running() and self.camera_thread.is_paused():
+            if self.video_thread.is_running() and self.video_thread.is_paused():
                 self.video_thread.resume()
                 self.playing = True
                 self.gui.statusBar().showMessage("Video resumed")
@@ -1404,7 +1405,7 @@ class SensorDataProcessor:
         max_fh = 0
         if self.lidar_reading_history_av1s_only_v:
             max_fh = max(
-                self.lidar_reading_history_av1s
+                self.lidar_reading_history_av1s_only_v
             )
 
         # Get the velocity history data
@@ -1490,6 +1491,7 @@ class EventHandler:
         self.if_jetson = True
         self.camera_thread = cast(CameraThread, None)
         self.video_thread = self.network_thread
+        self.video_handler.video_thread = self.video_thread
         self.initialze_tool_window_n_handlers()
         self.gui._trigger_jetson_mode()
 
@@ -1497,6 +1499,7 @@ class EventHandler:
         self.if_jetson = False
         self.network_thread = cast(NetworkThread, None)
         self.video_thread = self.camera_thread
+        self.video_handler.video_thread = self.video_thread
         self.initialze_tool_window_n_handlers()
         
     def initialze_tool_window_n_handlers(self):
@@ -1628,7 +1631,7 @@ class EventHandler:
         """
         if_paused = self.video_handler.playing
 
-        if not self.camera_thread.is_running():
+        if not self.video_thread.is_running():
             QMessageBox.warning(self.gui, "Warning", "No video source loaded!")
             return
 
@@ -1642,7 +1645,7 @@ class EventHandler:
             self.video_handler.pause_play()  # Use VideoHandler's pause_play metho
 
         dialog = AlgorithmConfigurationHandler(
-            self.gui, self.camera_thread, self.frame_model
+            self.gui, self.video_thread, self.frame_model
         )
         dialog.dialog.exec()
         pass

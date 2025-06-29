@@ -147,7 +147,7 @@ class NetworkThread(QObject):
                 if self.if_release:
 
                     if frame is not None:
-
+                        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                         self.frame_available.emit(frame)
 
                     if server_data:
