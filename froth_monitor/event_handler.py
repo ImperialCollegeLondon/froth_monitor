@@ -780,6 +780,7 @@ class CalibrationHandler(QObject):
             px_distance = float(self.gui.px2mm_result_textbox.text())
             self.frame_model.get_px_to_mm(px_distance)
             self.frame_model.get_overflow_direction(arrow_direction)
+            self.calibration_confirmed.emit()
 
         except ValueError:
             print(ValueError)
@@ -1500,7 +1501,6 @@ class EventHandler:
         self.step_export = False
     
     def update_guidance(self):
-        print("update guidance triggered")
 
         if self.export.finish_save_setting == True:
             self.gui._update_guidance("finish_export_setting")

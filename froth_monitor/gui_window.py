@@ -902,7 +902,12 @@ class MainGUIWindow(QMainWindow):
             self.add_arrow_button.setDisabled(False)
 
         if event == "step_3":
-            self.statusBar().showMessage("Step 4: ROI drawing")
+            self.statusBar().showMessage("Step 3: ROI drawing")
+            print("ROI drawing enabled")
+            self.roi_group.setStyleSheet(
+                self.ENABLED_ROI_BUTTON_STYLE
+            )
+            self.roi_group.setDisabled(False)
 
         if event == "finish_export_setting":
             self.save_button.setStyleSheet(
@@ -915,6 +920,7 @@ class MainGUIWindow(QMainWindow):
                 self.ENABLED_RECORD_BUTTON
             )
             self.record_button.setDisabled(False)
+        
 
 if __name__ == "__main__":
     """Main entry point for the application."""
