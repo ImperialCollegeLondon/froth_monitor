@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
     QRadioButton,
     QFrame,
 )
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QFont
 from datetime import datetime
 from openpyxl import Workbook
@@ -102,6 +103,7 @@ class Export(QFileDialog):
     write_csv(file_path: str, data: dict) -> None
         Writes the export data to an Excel file with separate sheets for each ROI.
     """
+    setting_finished = Signal()
 
     def __init__(self, gui) -> None:
         """
@@ -121,6 +123,7 @@ class Export(QFileDialog):
             font_big (QFont): Font used for larger text elements.
             font_small (QFont): Font used for smaller text elements.
         """
+        super().__init__()
         self.gui: QMainWindow = gui
         self.export_directory = ""
         self.video_directory = ""
@@ -344,7 +347,6 @@ class Export(QFileDialog):
             if_record_video (bool): Flag indicating whether to enable video recording.
         """
         self.record_video = if_record_video
-        print("if record video:", self.record_video)
 
     def select_video_directory(self, parent_dialog) -> None:
         """
@@ -418,6 +420,7 @@ class Export(QFileDialog):
             \n\n\nRecording export settings saved:\nDirectory: {self.video_directory}\nFilename: {self.video_filename}",
         )
         self.finish_save_setting = True
+        self.setting_finished.emit()
         dialog.accept()
 
     def excel_results(self, rois: list, arrow_angle: float, px2mm: float) -> bool:

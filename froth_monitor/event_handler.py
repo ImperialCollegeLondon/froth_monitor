@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QRect
+from PySide6.QtCore import Qt, QRect, QObject, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtGui import QIcon
 
@@ -709,10 +709,12 @@ class VideoHandler:
                 QMessageBox.warning(self.gui, "Warning", "Cannot resume video!")
                 return
 
-class CalibrationHandler:
+class CalibrationHandler(QObject):
     """Handles ruler calibration and arrow direction setup."""
 
+    calibration_confirmed = Signal()
     def __init__(self, gui, frame_model, overlay_widget):
+        super().__init__()
         self.gui = gui
         self.frame_model = frame_model
         self.overlay_widget = overlay_widget
@@ -1480,6 +1482,7 @@ class EventHandler:
         self.confirm_algo = False
         self.current_frame = None
         self.if_save = False
+        self.if_record = False
 
         # If using jetson import or not
         self.if_jetson = False
@@ -1497,11 +1500,33 @@ class EventHandler:
         self.step_export = False
     
     def update_guidance(self):
-        if self.step_import == False:
+        print("update guidance triggered")
+
+        if self.export.finish_save_setting == True:
+            self.gui._update_guidance("finish_export_setting")
+
+            if self.export.record_video == True:
+                self.gui._update_guidance("enable_recording")
+
+        if self.video_thread.is_running() == False:
             self.gui._update_guidance("step_1")
             return
 
+        else:
+            if self.calibration_handler.confirm_calibration == False:
+                self.gui._update_guidance("step_2")
+                return
 
+            else:
+                if self.step_ROI_drawing == False:
+                    self.gui._update_guidance("step_3")
+                    return
+                    
+                else:
+                    if self.step_export == False:
+                        self.gui._update_guidance("step_5")
+                        return
+    
     def trigger_jetson_mode(self):
         self.if_jetson = True
         self.camera_thread = cast(CameraThread, None)
@@ -1517,7 +1542,6 @@ class EventHandler:
         self.video_handler.video_thread = self.video_thread
         self.initialze_tool_window_n_handlers()
     
-
     def initialze_tool_window_n_handlers(self):
         if not self.video_handler.playing:  # Access playing state from VideoHandler
             return
@@ -1526,6 +1550,7 @@ class EventHandler:
         self.overlay_widget = self.overlay_handler.overlay_widget
 
         self.handlers_initial_after_overlay_creation()
+        self.update_guidance()
 
     def connect_signals(self):
         """Connect GUI signals to their respective handler methods."""
@@ -1549,8 +1574,12 @@ class EventHandler:
         """
         Initialize the event handlers after the overlay widget is created.
         """
+
         self.calibration_handler = CalibrationHandler(
             self.gui, self.frame_model, self.overlay_widget
+        )
+        self.calibration_handler.calibration_confirmed.connect(
+            self.update_guidance
         )
         self.roi_handler = ROIHander(
             self, self.gui, self.frame_model, self.video_thread, self.overlay_widget
@@ -1614,6 +1643,7 @@ class EventHandler:
         self.frame_model = FrameModel()
         self.current_frame_number = 0
         self.export = Export(self.gui)
+        self.export.setting_finished.connect(self.update_guidance)
 
         # Overlay related attributes
         self.overlay_widget: OverlayWidget = cast(OverlayWidget, None)

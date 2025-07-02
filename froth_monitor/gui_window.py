@@ -41,7 +41,7 @@ class MainGUIWindow(QMainWindow):
         self.resize(1200, 800)  # Default size, but resizable
         # self.showMaximized()
         self.setStyleSheet("background-color: #f0f0f0;")
-
+        self._create_stylesheets()
         # Initialize default arrow angle (90 degrees)
         self.arrow_angle = -np.pi / 2
 
@@ -99,6 +99,92 @@ class MainGUIWindow(QMainWindow):
         # Add panels with stretch factors
         content_layout.addWidget(left_panel, 0)  # Fixed proportion
         content_layout.addWidget(right_panel, 1)  #
+
+    def _create_stylesheets(self) -> None:
+        """Initialize stylesheets for UI elements."""
+
+        # Define stylesheet templates
+        self.DISABLED_BUTTON_STYLE = \
+        """
+            QPushButton {
+                background-color: #808080;
+                color: #404040;
+                font-size: 12px;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #909090;
+            }
+        """
+        
+        self.ENABLED_BUTTON_STYLE = \
+        """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+        """
+        
+        self.DISABLED_ROI_BUTTON_STYLE = \
+        """
+            QPushButton {
+                background-color: #808080;
+                color: #404040; font-size: 18px;
+                font-weight: bold; padding: 5px; border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            QLabel{
+                background-color: #3c4043; color: white; font-size: 14px;
+                font-weight: bold; padding: 8px; border-radius: 4px;
+            }
+            """
+        
+        self.ENABLED_ROI_BUTTON_STYLE = \
+        """
+            QPushButton {
+                background-color: #4285f4; color: white; font-size: 18px;
+                font-weight: bold; padding: 5px; border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            QLabel{
+                background-color: #3c4043; color: white; font-size: 14px;
+                font-weight: bold; padding: 8px; border-radius: 4px;
+            }
+        """
+
+        self.ENABLED_RECORD_BUTTON = \
+            """
+            QPushButton {
+                background-color: red; color: white; font-size: 13px;
+                padding: 8px; border-radius: 4px; min-height: 40px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
+
+        self.DISABLED_RECORD_BUTTON = \
+            """
+            QPushButton {
+                background-color: #808080;
+                color: #404040; font-size: 13px;
+                padding: 8px; border-radius: 4px; min-height: 40px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+            """
 
     def _show_window_size_notification(self) -> None:
         """Show the window size adjustment notification overlay."""
@@ -317,35 +403,12 @@ class MainGUIWindow(QMainWindow):
         )
         self.import_button = QPushButton("Import")
         self.import_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4;
-                color: white;
-                font-size: 12px;
-                padding: 8px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """
+            self.ENABLED_BUTTON_STYLE
         )
 
         self.algorithm_configuration = QPushButton("Algorithm Configuration")
         self.algorithm_configuration.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4;
-                color: white;
-                font-size: 12px;
-                font-weight: bold;
-                padding: 8px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """
+            self.ENABLED_BUTTON_STYLE
         )
 
         source_layout.addWidget(self.webcam_radio)
@@ -372,19 +435,7 @@ class MainGUIWindow(QMainWindow):
 
         self.calibration_button = QPushButton("Draw a line with length of")
         self.calibration_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4;
-                color: white;
-                font-size: 10px;
-                padding: 4px;
-                border-radius: 4px;
-                min-width: 80px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """
+            self.ENABLED_BUTTON_STYLE
         )
         # Remove fixed width, use size policy instead
         self.calibration_button.setSizePolicy(
@@ -438,19 +489,7 @@ class MainGUIWindow(QMainWindow):
 
         self.add_arrow_button = QPushButton("Draw Arrow")
         self.add_arrow_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4;
-                color: white;
-                font-size: 10px;
-                padding: 8px;
-                border-radius: 4px;
-                min-width: 80px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """
+            self.ENABLED_BUTTON_STYLE
         )
         # Remove fixed width
         self.add_arrow_button.setSizePolicy(
@@ -479,18 +518,7 @@ class MainGUIWindow(QMainWindow):
 
         self.confirm_arrow_button = QPushButton("Confirm calibration")
         self.confirm_arrow_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4;
-                color: white;
-                font-size: 12px;
-                padding: 4px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """
+            self.ENABLED_BUTTON_STYLE
         )
 
         calibration_layout.addLayout(roi_layout_1)
@@ -503,23 +531,11 @@ class MainGUIWindow(QMainWindow):
 
     def _create_roi_controls(self) -> QGroupBox:
         """Create responsive ROI controls."""
-        roi_group = QGroupBox()
-        roi_group.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4; color: white; font-size: 18px;
-                font-weight: bold; padding: 5px; border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            QLabel{
-                background-color: #3c4043; color: white; font-size: 14px;
-                font-weight: bold; padding: 8px; border-radius: 4px;
-            }
-            """
+        self.roi_group = QGroupBox()
+        self.roi_group.setStyleSheet(
+            self.ENABLED_ROI_BUTTON_STYLE
         )
-        roi_layout = QHBoxLayout(roi_group)
+        roi_layout = QHBoxLayout(self.roi_group)
 
         self.roi_text = QLabel("ROI")
 
@@ -540,7 +556,7 @@ class MainGUIWindow(QMainWindow):
         roi_layout.addWidget(self.add_roi_button, 0)
         roi_layout.addWidget(self.delete_roi_button, 0)
 
-        return roi_group
+        return self.roi_group
 
         # Helper to get resource path
 
@@ -576,15 +592,7 @@ class MainGUIWindow(QMainWindow):
 
         self.simple_reset_button = QPushButton("Reset")
         self.simple_reset_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4; color: white; font-size: 14px;
-                padding: 8px; border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """
+            self.ENABLED_BUTTON_STYLE
         )
         layout.addWidget(self.simple_reset_button)
 
@@ -716,35 +724,13 @@ class MainGUIWindow(QMainWindow):
         # roi_layout = QHBoxLayout()
         self.export_button = QPushButton("Export/Recording Settings")
         self.export_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4;
-                color: white;
-                font-size: 12px;
-                padding: 8px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """
+            self.ENABLED_BUTTON_STYLE
         )
         # self.calibration_button.setFixedWidth(100)
 
         self.save_button = QPushButton("Save")
         self.save_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4285f4;
-                color: white;
-                font-size: 12px;
-                padding: 8px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #3367d6;
-            }
-            """
+            self.ENABLED_BUTTON_STYLE
         )
         export_layout.addWidget(self.export_button)
         export_layout.addWidget(self.save_button)
@@ -853,9 +839,85 @@ class MainGUIWindow(QMainWindow):
 
     def _update_guidance(self, event: str) -> None:
         if event == "step_1":
+            self.statusBar().showMessage("Step 1: Import a Video Source")
+            self.algorithm_configuration.setStyleSheet(
+                self.DISABLED_BUTTON_STYLE
+            )
             self.algorithm_configuration.setDisabled(True)
 
+            self.calibration_button.setStyleSheet(
+                self.DISABLED_BUTTON_STYLE
+            )
+            self.calibration_button.setDisabled(True)
+
+            self.confirm_arrow_button.setStyleSheet(
+                self.DISABLED_BUTTON_STYLE
+            )
+            self.confirm_arrow_button.setDisabled(True)
+
+            self.add_arrow_button.setStyleSheet(
+                self.DISABLED_BUTTON_STYLE
+            )
+            self.add_arrow_button.setDisabled(True)
+            
+            self.roi_group.setStyleSheet(
+                self.DISABLED_ROI_BUTTON_STYLE
+            )
+            self.roi_group.setDisabled(True)
+
+            self.record_button.setStyleSheet(
+                self.DISABLED_BUTTON_STYLE
+            )
+            self.record_button.setDisabled(True)
+
+            self.simple_reset_button.setStyleSheet(
+                self.DISABLED_BUTTON_STYLE
+            )
+            self.simple_reset_button.setDisabled(True)
+
+            self.save_button.setStyleSheet(
+                self.DISABLED_BUTTON_STYLE
+            )
+            self.save_button.setDisabled(True)
+
+        if event == "step_2":
+            self.algorithm_configuration.setStyleSheet(
+                self.ENABLED_BUTTON_STYLE
+            )
+            self.algorithm_configuration.setDisabled(False)
+
+            self.calibration_button.setStyleSheet(
+                self.ENABLED_BUTTON_STYLE
+            )
+            self.calibration_button.setDisabled(False)
+
+            self.confirm_arrow_button.setStyleSheet(
+                self.ENABLED_BUTTON_STYLE
+            )
+            self.confirm_arrow_button.setDisabled(False)
+
+            self.add_arrow_button.setStyleSheet(
+                self.ENABLED_BUTTON_STYLE
+            )
+            self.add_arrow_button.setDisabled(False)
+
+        if event == "step_3":
+            self.statusBar().showMessage("Step 4: ROI drawing")
+
+        if event == "finish_export_setting":
+            self.save_button.setStyleSheet(
+                self.ENABLED_BUTTON_STYLE
+            )
+            self.save_button.setDisabled(False)
+
+        if event == "enable_recording":
+            self.record_button.setStyleSheet(
+                self.ENABLED_RECORD_BUTTON
+            )
+            self.record_button.setDisabled(False)
+
 if __name__ == "__main__":
+    """Main entry point for the application."""
     app = QApplication(sys.argv)
     app.setStyleSheet("""
         QLabel, QLineEdit, QRadioButton, QPushButton, QGroupBox, QMenuBar, QMenu, QMessageBox {
