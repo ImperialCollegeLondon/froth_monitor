@@ -565,6 +565,9 @@ class VideoHandler:
             # Store the video source for pause/resume functionality
             self.last_video_source = file_path
 
+            if self.camera_thread.is_running:
+                self.camera_thread.reset()
+
             # Start the camera thread with the selected video file
             if self.camera_thread.start_capture(file_path):
                 # Get video properties
@@ -635,6 +638,9 @@ class VideoHandler:
 
         # Store the camera index for pause/resume functionality
         self.last_video_source = camera_index
+
+        if self.camera_thread.is_running:
+            self.camera_thread.reset()
 
         # Start the camera thread with the selected camera
         if self.camera_thread.start_capture(camera_index):
@@ -780,7 +786,7 @@ class CalibrationHandler(QObject):
             px_distance = float(self.gui.px2mm_result_textbox.text())
             self.frame_model.get_px_to_mm(px_distance)
             self.frame_model.get_overflow_direction(arrow_direction)
-            self.calibration_confirmed.emit()
+
 
         except ValueError:
             print(ValueError)
@@ -792,6 +798,7 @@ class CalibrationHandler(QObject):
             return
 
         self.confirm_calibration = True
+        self.calibration_confirmed.emit()
         QMessageBox.information(
             self.gui,
             "Info",
@@ -1480,7 +1487,6 @@ class EventHandler:
         self.handlers_initial_before_overlay_creation()
 
         # Parameters of the event handling logic
-        self.confirm_algo = False
         self.current_frame = None
         self.if_save = False
         self.if_record = False
@@ -1570,6 +1576,44 @@ class EventHandler:
         self.gui.record_button.clicked.connect(self.toggle_recording)
         self.gui.simple_reset_button.clicked.connect(self.reset_mission)
 
+    def disconnect_signals(self):
+        # Connect menu actions directly
+        self.gui.import_button.clicked.disconnect(self.video_handler.handle_video_import)
+        self.gui.export_button.clicked.disconnect(self.export_settings)
+
+        # # Connect buttons directly using the gui reference
+        self.gui.play_pause_button.clicked.disconnect(self.video_handler.pause_play)
+
+        self.gui.algorithm_configuration.clicked.disconnect(
+            self.open_algorithm_configuration
+        )
+
+        self.gui.save_button.clicked.disconnect(self.save_data)
+        self.gui.record_button.clicked.disconnect(self.toggle_recording)
+        self.gui.simple_reset_button.clicked.disconnect(self.reset_mission)
+
+        self.gui.confirm_arrow_button.clicked.disconnect(
+            self.calibration_handler.confirm_arrow_n_ruler
+        )
+        self.gui.add_arrow_button.clicked.disconnect(
+            self.calibration_handler.start_arrow_drawing
+        )
+        self.gui.calibration_button.clicked.disconnect(
+            self.calibration_handler.start_ruler_calibration
+        )
+        self.overlay_widget.ruler_measured.disconnect(
+            self.calibration_handler.handle_ruler_measurement
+        )
+        self.overlay_widget.arrow_drawn.disconnect(
+            self.calibration_handler.handle_arrow_drawing
+        )
+
+        self.gui.add_roi_button.clicked.disconnect(self.roi_handler.add_roi)
+        self.overlay_widget.roi_created.disconnect(
+            self.roi_handler.handle_roi_created
+        )  # Connect to the signal emitted by OverlayWidget
+        self.gui.delete_roi_button.clicked.disconnect(self.roi_handler.delete_last_roi)
+
     def handlers_initial_after_overlay_creation(self):
         """
         Initialize the event handlers after the overlay widget is created.
@@ -1594,7 +1638,6 @@ class EventHandler:
             self.roi_handler,
             self.velocity_plotter,
         )
-
 
         # Connect camera thread signals to frame processor
         if self.if_jetson:
@@ -1640,6 +1683,7 @@ class EventHandler:
         self.canvas_height = self.gui.video_canvas_label.height()
 
         # Initialize the frame model for processing video frames
+        self.frame_model = cast(FrameModel, None)
         self.frame_model = FrameModel()
         self.current_frame_number = 0
         self.export = Export(self.gui)
@@ -1651,8 +1695,11 @@ class EventHandler:
         self.video_rect = QRect()
 
         # Initialize camera thread for event-driven frame capture
+        self.camera_thread = cast(CameraThread, None)
         self.camera_thread = CameraThread()
+        self.network_thread = cast(NetworkThread, None)
         self.network_thread = NetworkThread()
+        self.video_thread = cast(NetworkThread | CameraThread, None)
         self.video_thread: NetworkThread | CameraThread = \
             cast(NetworkThread | CameraThread, CameraThread())
 
@@ -1695,6 +1742,33 @@ class EventHandler:
         )
         dialog.dialog.exec()
         pass
+    
+    def reset_handlers(self):
+        # Overlay related attributes
+        self.video_rect = QRect()
+
+        # Initialize camera thread for event-driven frame capture
+        self.camera_thread = cast(CameraThread, None)
+        self.camera_thread = CameraThread()
+        self.network_thread = cast(NetworkThread, None)
+        self.network_thread = NetworkThread()
+        self.video_thread = cast(NetworkThread | CameraThread, None)
+        self.video_thread: NetworkThread | CameraThread = \
+            cast(NetworkThread | CameraThread, CameraThread())
+
+        # Initialize video recorder
+        self.video_recorder = VideoRecorder()
+        self.recording_active = False
+
+        # Initialize handlers
+        self.video_handler = cast(VideoHandler, None)
+        self.video_handler = VideoHandler(
+            self, self.gui, 
+            self.frame_model, 
+            self.camera_thread, 
+            self.network_thread,
+            self.video_thread
+        )
 
     def reset_mission(self):
         """Reset the application for a new mission."""
@@ -1717,16 +1791,24 @@ class EventHandler:
 
         # If we get here, either data was saved or user confirmed reset
         QMessageBox.information(self.gui, "Info", "Application reset for new mission.")
-
+    
         self.if_save = False
-        self.confirm_calibration = False
-        self.confirm_algo = False
+        self.calibration_handler.confirm_calibration = False
         self.current_frame_number = 0
-        self.camera_thread.reset()
+        
         self.gui.video_canvas_label.clear()
         self.gui.plot_widget.clear()
         self.frame_model.reset()
         self.overlay_widget.reset()
+
+        print("Disconnecting Signals")
+        self.disconnect_signals()
+        print("Initializing handlers")
+        self.reset_handlers()
+        print("Connecting Signals")
+        self.connect_signals()
+        print("Updating Guidance")
+        self.update_guidance()
 
     def toggle_recording(self):
         """Start or stop video recording."""

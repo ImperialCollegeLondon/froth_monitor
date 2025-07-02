@@ -901,6 +901,11 @@ class MainGUIWindow(QMainWindow):
             )
             self.add_arrow_button.setDisabled(False)
 
+            self.simple_reset_button.setStyleSheet(
+                self.ENABLED_BUTTON_STYLE
+            )
+            self.simple_reset_button.setDisabled(False)
+            
         if event == "step_3":
             self.statusBar().showMessage("Step 3: ROI drawing")
             print("ROI drawing enabled")

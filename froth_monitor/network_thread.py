@@ -128,7 +128,7 @@ class NetworkThread(QObject):
                     server_data, frame = result
 
                 if frame is None:
-                    print("Frame is None")
+                    print("Frame is None (Network Thread Mode)")
                     # No data received or connection closed
                     time.sleep(0.01)  # Small delay to prevent busy waiting
                     continue
