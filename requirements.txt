@@ -1,0 +1,90 @@
+# Requirements file for Froth Monitor - Windows Installation
+# This file contains all the necessary dependencies to run the Froth Monitor application on Windows
+
+# Core GUI Framework
+PySide6>=6.5.0
+
+# Computer Vision and Image Processing
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# Data Visualization and Plotting
+matplotlib>=3.7.0
+pyqtgraph>=0.13.0
+
+# Serial Communication (for LiDAR)
+pyserial>=3.5
+
+# Network Communication
+vidgear[core]>=0.3.0
+pyzmq>=25.0.0
+
+# Data Export and File Handling
+openpyxl>=3.1.0
+
+# Utility Libraries
+colorlog>=6.7.0
+requests>=2.31.0
+certifi>=2023.7.22
+charset-normalizer>=3.2.0
+idna>=3.4
+urllib3>=2.0.4
+
+# Date and Time Handling
+python-dateutil>=2.8.2
+
+# Mathematical and Scientific Computing
+scipy>=1.11.0
+
+# Progress Bars and CLI Tools
+tqdm>=4.65.0
+
+# Screen Capture (for video recording)
+mss>=9.0.0
+pyscreenshot>=3.1
+
+# Video Processing and Compression
+simplejpeg>=1.7.0
+yt-dlp>=2023.7.6
+
+# Build and Setup Tools
+setuptools>=68.0.0
+Cython>=3.0.0
+
+# Font and Text Rendering
+fonttools>=4.42.0
+
+# Parsing and Configuration
+pyparsing>=3.1.0
+packaging>=23.1
+
+# Color and Styling
+# colorama>=0.4.6
+
+# Graphics and Plotting Support
+# kiwisolver>=1.4.4
+# cycler>=0.11.0
+# contourpy>=1.1.0
+
+# Additional Utilities
+# six>=1.16.0
+# EasyProcess>=1.1
+# entrypoint2>=1.1
+
+# Optional: Development and Testing (uncomment if needed)
+# pytest>=7.4.0
+# flake8>=6.0.0
+# black>=23.7.0
+
+# Note: Some packages may have additional system dependencies on Windows:
+# - For video capture: Install Visual C++ Redistributable
+# - For serial communication: Ensure proper COM port drivers are installed
+# - For network features: Ensure Windows Firewall allows the application
+
+# Installation Instructions:
+# 1. Install Python 3.8 or higher
+# 2. Create a virtual environment: python -m venv froth_monitor_env
+# 3. Activate the environment: froth_monitor_env\Scripts\activate
+# 4. Install dependencies: pip install -r requirements_windows.txt
+# 5. Run the application: python -m froth_monitor
