@@ -406,18 +406,28 @@ class MainGUIWindow(QMainWindow):
             self.ENABLED_BUTTON_STYLE
         )
 
-        self.algorithm_configuration = QPushButton("Algorithm Configuration")
+        config_widget = QWidget()
+        config_layout = QHBoxLayout(config_widget)
+
+        self.algorithm_configuration = QPushButton("Algo Config")
         self.algorithm_configuration.setStyleSheet(
             self.ENABLED_BUTTON_STYLE
         )
 
+        self.lidar_configuration = QPushButton("LiDAR Config")
+        self.lidar_configuration.setStyleSheet(self.ENABLED_BUTTON_STYLE)
+        
+        config_layout.addWidget(self.algorithm_configuration)
+        config_layout.addWidget(self.lidar_configuration)
+        
         source_layout.addWidget(self.webcam_radio)
         source_layout.addWidget(self.prerecorded_radio)
         source_layout.addWidget(
             self.jetson_radio
         )  # Add this line to add the Jetson radio button to the layout
         source_layout.addWidget(self.import_button)
-        source_layout.addWidget(self.algorithm_configuration)
+        # source_layout.addWidget(self.algorithm_configuration)
+        source_layout.addWidget(config_widget)
 
         return source_group
 
