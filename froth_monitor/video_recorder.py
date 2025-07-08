@@ -11,6 +11,10 @@ import time
 import numpy as np
 from typing import Tuple, cast
 from PySide6.QtCore import QObject, Signal
+from froth_monitor.logger_config import get_logger
+
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 
 class VideoRecorder(QObject):
@@ -98,7 +102,7 @@ class VideoRecorder(QObject):
             try:
                 os.makedirs(directory)
             except OSError as e:
-                print(f"Error creating directory: {e}")
+                logger.error(f"Error creating directory: {e}")
                 return False
 
         # Generate output path with timestamp to avoid overwriting
@@ -113,7 +117,7 @@ class VideoRecorder(QObject):
         )
 
         if not self.video_writer.isOpened():
-            print("Failed to open video writer")
+            logger.error("Failed to open video writer")
             return False
 
         # Reset counters
@@ -144,7 +148,7 @@ class VideoRecorder(QObject):
             # Check if it's time to record the next frame
             if not self.is_video_file:
                 current_time = time.time()
-                print("Live recording")
+                logger.debug("Processing live recording frame")
                 if current_time - self.previous_frame_time > self.frame_interval:
                     num_interval = int(
                         (current_time - self.previous_frame_time) / self.frame_interval
@@ -184,9 +188,9 @@ class VideoRecorder(QObject):
         self.video_writer = None
         self.is_recording = False
 
-        # Print recording statistics
-        print(f"Recording stopped: {self.output_path}")
-        print(f"Frames recorded: {self.frame_count}")
+        # Log recording statistics
+        logger.info(f"Recording stopped: {self.output_path}")
+        logger.info(f"Frames recorded: {self.frame_count}")
 
         # Emit signal that recording has stopped
         self.recording_stopped.emit(self.output_path, self.frame_count)

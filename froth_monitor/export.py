@@ -44,7 +44,10 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QFont
 from datetime import datetime
 from openpyxl import Workbook
+from froth_monitor.logger_config import get_logger
 
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 class Export(QFileDialog):
     """
@@ -367,7 +370,7 @@ class Export(QFileDialog):
             )
             self.record_video = True
             if directory_display:  # Ensure the QLabel is found
-                print(self.video_directory)
+                logger.info(f"Recording video directory set to: {self.video_directory}")
                 directory_display.setText(self.video_directory)
 
     def select_data_directory(self, parent_dialog) -> None:
@@ -384,6 +387,7 @@ class Export(QFileDialog):
             # Update directory label in the parent dialog
             directory_display = parent_dialog.findChild(QLabel, "directory_display")
             if directory_display:  # Ensure the QLabel is found
+                logger.info(f"Export directory set to: {self.export_directory}")
                 directory_display.setText(self.export_directory)
 
     def save_export_settings(self, dialog: QDialog, filename_input: QLineEdit) -> None:

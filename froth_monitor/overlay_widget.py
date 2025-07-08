@@ -10,7 +10,10 @@ from PySide6.QtCore import Qt, QTimer, QRect, QPoint, Signal
 from PySide6.QtGui import QPainter, QFont, QColor, QPen, QPolygon
 import time
 import math
+from froth_monitor.logger_config import get_logger
 
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 class OverlayWidget(QWidget):
     """

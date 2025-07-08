@@ -40,7 +40,10 @@ from typing import cast
 from datetime import datetime
 from PySide6.QtCore import QRect
 from froth_monitor.image_analysis import VideoAnalysis
+from froth_monitor.logger_config import get_logger
 
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 class ROI:
     def __init__(self, roi_coordinate: QRect, px2mm, degree) -> None:
@@ -258,7 +261,6 @@ class FrameModel:
             maxLevel=2,
             criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
         )
-
         self.of_params = dict(
             pyr_scale=0.5,
             levels=int(3),
@@ -267,6 +269,7 @@ class FrameModel:
             poly_n=int(7),
             poly_sigma=1.5,
         )
+
 
     def confirm_algorithm_n_params(self, algorithm: str, params: dict) -> None:
         """
@@ -286,6 +289,7 @@ class FrameModel:
         elif algorithm == "Lucas-Kanade":
             self.lk_params = params
 
+        logger.info(f"Algorithm set as: {self.current_algorithm}, Parameters: {params}")
         self.algo_roi.get_algorithm_n_params(self.current_algorithm, params)
 
     def process_frame(self, frame: np.ndarray) -> tuple[int, list[ROI], bool, bool]:

@@ -26,7 +26,10 @@ import pyqtgraph as pg
 import sys
 import numpy as np
 import os
+from froth_monitor.logger_config import get_logger
 
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 class MainGUIWindow(QMainWindow):
     def __init__(self) -> None:

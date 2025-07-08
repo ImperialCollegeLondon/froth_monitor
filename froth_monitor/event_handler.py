@@ -5,10 +5,9 @@ It handles events triggered by user interactions with the GUI and manages the un
 data processing and analysis.
 """
 
-import cv2
+
 import sys
 import os
-import time
 from typing import cast
 from PySide6.QtWidgets import (
     QApplication,
@@ -23,9 +22,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QRect, QObject, Signal
-from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import QRect
 
 # Import MainGUIWindow at the beginning
 from froth_monitor.gui_window import MainGUIWindow
@@ -56,9 +53,11 @@ from froth_monitor.handlers.subhandlers import (
     FrameProcessor,
     SensorDataProcessor,
     VelocityPlotter
-
 )
+from froth_monitor.logger_config import get_logger
 
+# Initialize logger for this module
+logger = get_logger(__name__)
 class EventHandler:
     """
     Event handler class that connects GUI components with application logic.
@@ -79,7 +78,6 @@ class EventHandler:
 
     def __init__(self, gui: MainGUIWindow):
         self.gui = gui
-
         self.handlers_initial_before_overlay_creation()
 
         # Parameters of the event handling logic
@@ -407,13 +405,14 @@ class EventHandler:
         self.frame_model.reset()
         self.overlay_widget.reset()
 
-        print("Disconnecting Signals")
+        logger.info("===Starting a new mission===")
+        logger.info("Disconnecting Signals...")
         self.disconnect_signals()
-        print("Initializing handlers")
+        logger.info("Initializing handlers...")
         self.reset_handlers()
-        print("Connecting Signals")
+        logger.info("Connecting Signals...")
         self.connect_signals()
-        print("Updating Guidance")
+        logger.info("Updating Guidance...")
         self.update_guidance()
 
     def toggle_recording(self):

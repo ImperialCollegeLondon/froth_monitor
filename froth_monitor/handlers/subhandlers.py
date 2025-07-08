@@ -1084,10 +1084,11 @@ class VelocityPlotter:
                 list_data.append("N/A")
                 continue
 
-            print(list_data)
+            
             # Add average velocity to the table
             list_data.append(roi.average_velocity_past_30s)
 
+        print("List data:", list_data)
         self.gui.velo_widget.setData(list_data)
         self.gui.velo_widget.setHorizontalHeaderLabels(
             ["ROI vs. mean_velocity (mm/s)"]

@@ -23,7 +23,10 @@ Imports:
 import json
 import os
 from datetime import datetime
+from froth_monitor.logger_config import get_logger
 
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 class AutoSaver:
     """
@@ -123,8 +126,8 @@ class AutoSaver:
             with open(self.file_path, "w") as f:
                 json.dump(self.data, f, indent=4)
         except TypeError as e:
-            print(f"Serialization error: {e}")
-            print(f"Problematic data: {self.data}")
+            logger.error(f"Serialization error: {e}")
+            logger.error(f"Problematic data: {self.data}")
             raise
 
     def load_from_file(self) -> None:

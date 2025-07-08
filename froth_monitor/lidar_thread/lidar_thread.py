@@ -12,6 +12,10 @@ from datetime import datetime
 from typing import Optional
 import numpy as np
 from PySide6.QtCore import QObject, Signal
+from froth_monitor.logger_config import get_logger
+
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 
 class LidarThread(QObject):
@@ -93,11 +97,11 @@ class LidarThread(QObject):
             self.thread_ = threading.Thread(target=self._lidar_loop, daemon=True)
             self.thread_.start()
             
-            print(f"LiDAR capture started on {self.port}")
+            logger.info(f"LiDAR capture started on {self.port}")
             return True
             
         except Exception as e:
-            print(f"Failed to start LiDAR capture: {e}")
+            logger.error(f"Failed to start LiDAR capture: {e}")
             self.serial_connection = None
             return False
 
@@ -149,7 +153,7 @@ class LidarThread(QObject):
                     time.sleep(0.01)
                     
             except Exception as e:
-                print(f"Error in LiDAR reading loop: {e}")
+                logger.error(f"Error in LiDAR reading loop: {e}")
                 time.sleep(0.1)  # Sleep on error to avoid busy loop
 
     def _parse_lidar_data(self, line: str) -> Optional[float]:
@@ -185,7 +189,7 @@ class LidarThread(QObject):
         """
         if self.running:
             self.paused = True
-            print("LiDAR capture paused")
+            logger.info("LiDAR capture paused")
 
     def resume_lidar_capture(self):
         """
@@ -193,7 +197,7 @@ class LidarThread(QObject):
         """
         if self.running:
             self.paused = False
-            print("LiDAR capture resumed")
+            logger.info("LiDAR capture resumed")
 
     def stop_lidar_capture(self):
         """
@@ -212,11 +216,11 @@ class LidarThread(QObject):
                 try:
                     self.serial_connection.close()
                 except Exception as e:
-                    print(f"Error closing serial connection: {e}")
+                    logger.error(f"Error closing serial connection: {e}")
                 finally:
                     self.serial_connection = None
             
-            print("LiDAR capture stopped")
+            logger.info("LiDAR capture stopped")
 
     def is_running(self) -> bool:
         """
@@ -235,7 +239,7 @@ class LidarThread(QObject):
             offset_mm (float): Offset in millimeters to add to all measurements
         """
         self.distance_offset = offset_mm
-        print(f"LiDAR distance offset set to {offset_mm} mm")
+        logger.info(f"LiDAR distance offset set to {offset_mm} mm")
 
     def get_latest_data(self) -> Optional[dict]:
         """
@@ -281,11 +285,11 @@ class LidarThread(QObject):
                     formatted_timestamp = timestamp.strftime("%Y/%m/%d %H:%M:%S.%f")[:-3]
                     writer.writerow([formatted_timestamp, -distance])  # Inverted for compatibility
             
-            print(f"LiDAR data exported to {filename}")
+            logger.info(f"LiDAR data exported to {filename}")
             return True
             
         except Exception as e:
-            print(f"Failed to export LiDAR data: {e}")
+            logger.error(f"Failed to export LiDAR data: {e}")
             return False
 
     def clear_data(self):
@@ -294,4 +298,4 @@ class LidarThread(QObject):
         """
         self.full_timestamps.clear()
         self.full_distances.clear()
-        print("LiDAR data cleared")
+        logger.info("LiDAR data cleared")
