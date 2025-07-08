@@ -968,6 +968,8 @@ class VelocityPlotter:
         from the right edge and older data scrolling to the left. When the history exceeds
         30 elements, the oldest elements are removed to maintain the fixed window size.
         """
+        import numpy as np
+        
         # Clear the plot widget
         self.gui.plot_widget.clear()
 
@@ -989,15 +991,30 @@ class VelocityPlotter:
         # Fixed window size (3 seconds)
         WINDOW_SIZE = 30
 
+        # Helper function to sanitize velocity data
+        def sanitize_velocity_data(data):
+            """Remove invalid values (inf, nan, extremely large values) from velocity data."""
+            sanitized = []
+            for value in data:
+                if value is not None and np.isfinite(value) and abs(value) < 1e6:
+                    sanitized.append(value)
+                else:
+                    sanitized.append(0.0)  # Replace invalid values with 0
+            return sanitized
+
         # Find the maximum velocity across all ROIs for y-axis scaling
         max_velocity = 0
         if self.frame_model.roi_list and any(
             roi.velo_only_history for roi in self.frame_model.roi_list
         ):
-            max_velocity = max(
-                max(roi.velo_only_history) if roi.velo_only_history else 0
-                for roi in self.frame_model.roi_list
-            )
+            all_velocities = []
+            for roi in self.frame_model.roi_list:
+                if roi.velo_only_history:
+                    sanitized_history = sanitize_velocity_data(roi.velo_only_history)
+                    all_velocities.extend(sanitized_history)
+            
+            if all_velocities:
+                max_velocity = max(all_velocities)
 
         # Plot velocity history for each ROI
         for i, roi in enumerate(self.frame_model.roi_list):
@@ -1008,8 +1025,8 @@ class VelocityPlotter:
             # Get color for this ROI (cycle through colors if more ROIs than colors)
             color = colors[i % len(colors)]
 
-            # Get the velocity history data
-            history = roi.velo_only_history
+            # Get the velocity history data and sanitize it
+            history = sanitize_velocity_data(roi.velo_only_history)
 
             # Limit history to the most recent WINDOW_SIZE elements
             if len(history) > WINDOW_SIZE:
@@ -1032,7 +1049,7 @@ class VelocityPlotter:
             plot_x = []
             plot_y = []
             for x, y in zip(x_data, display_data):
-                if y is not None:
+                if y is not None and np.isfinite(y):
                     plot_x.append(x)
                     plot_y.append(y)
 
@@ -1046,7 +1063,7 @@ class VelocityPlotter:
         self.gui.plot_widget.setXRange(0, WINDOW_SIZE - 1)
 
         # Set appropriate y-axis range if there's data
-        if max_velocity > 0:
+        if max_velocity > 0 and np.isfinite(max_velocity):
             # Add some padding to the top of the y-axis
             self.gui.plot_widget.setYRange(0, max_velocity * 1.1)
 
@@ -1386,6 +1403,8 @@ class SensorDataProcessor:
         from the right edge and older data scrolling to the left. When the history exceeds
         30 elements, the oldest elements are removed to maintain the fixed window size.
         """
+        import numpy as np
+        
         # Clear the plot widget
         self.gui.froth_height_plot_widget.clear()
 
@@ -1407,15 +1426,27 @@ class SensorDataProcessor:
         # Fixed window size (3 seconds)
         WINDOW_SIZE = 30
 
-        # Find the maximum velocity across all ROIs for y-axis scaling
+        # Helper function to sanitize froth height data
+        def sanitize_data(data):
+            """Remove invalid values (inf, nan, extremely large values) from data."""
+            sanitized = []
+            for value in data:
+                if value is not None and np.isfinite(value) and abs(value) < 1e6:
+                    sanitized.append(value)
+                else:
+                    sanitized.append(0.0)  # Replace invalid values with 0
+            return sanitized
+
+        # Sanitize the lidar reading history
+        sanitized_history = sanitize_data(self.lidar_reading_history_av1s_only_v)
+
+        # Find the maximum froth height for y-axis scaling
         max_fh = 0
-        if self.lidar_reading_history_av1s_only_v:
-            max_fh = max(
-                self.lidar_reading_history_av1s_only_v
-            )
+        if sanitized_history:
+            max_fh = max(sanitized_history)
 
         # Get the velocity history data
-        history = self.lidar_reading_history_av1s_only_v
+        history = sanitized_history
 
         # Limit history to the most recent WINDOW_SIZE elements
         if len(history) > WINDOW_SIZE:
@@ -1438,7 +1469,7 @@ class SensorDataProcessor:
         plot_x = []
         plot_y = []
         for x, y in zip(x_data, display_data):
-            if y is not None:
+            if y is not None and np.isfinite(y):
                 plot_x.append(x)
                 plot_y.append(y)
 
@@ -1452,7 +1483,7 @@ class SensorDataProcessor:
         self.gui.froth_height_plot_widget.setXRange(0, WINDOW_SIZE - 1)
 
         # Set appropriate y-axis range if there's data
-        if max_fh > 0:
+        if max_fh > 0 and np.isfinite(max_fh):
             # Add some padding to the top of the y-axis
             self.gui.froth_height_plot_widget.setYRange(0, max_fh * 1.1)
 

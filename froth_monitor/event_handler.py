@@ -359,8 +359,8 @@ class EventHandler:
         if hasattr(self, 'video_thread') and self.video_thread:
             self.video_thread.reset()
 
-        self.lidar_thread = cast(LidarThread, None)
-        self.lidar_thread = LidarThread()
+        # self.lidar_thread = cast(LidarThread, None)
+        # self.lidar_thread = LidarThread()
 
         # Initialize video recorder
         self.video_recorder = VideoRecorder()

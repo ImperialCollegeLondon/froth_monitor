@@ -110,6 +110,7 @@ class ROI:
         """
 
         import math
+        import numpy as np
 
         # Convert degree to radians
         rad = math.radians(self.degree)
@@ -123,18 +124,39 @@ class ROI:
         # Extract delta_x and delta_y from delta_pixels
         delta_x, delta_y = delta_pixels
 
+        # Validate input values
+        if not (np.isfinite(delta_x) and np.isfinite(delta_y)):
+            return 0.0
+
         # Calculate the dot product (projection)
         projection = delta_x * direction_x + delta_y * direction_y
+
+        # Validate projection result
+        if not np.isfinite(projection):
+            return 0.0
 
         # Convert from pixels to millimeters
         projection_mm = projection * self.mm2px
 
+        # Final validation and clamp extreme values
+        if not np.isfinite(projection_mm) or abs(projection_mm) > 1e6:
+            return 0.0
+
         return projection_mm
 
     def calculate_velocity(self, delta) -> bool:
+        import numpy as np
+        
+        # Validate input delta
+        if not np.isfinite(delta) or abs(delta) > 1e6:
+            delta = 0.0
+        
         timestamp_buffer = self.timestamp[:8]
         if timestamp_buffer == self.timestamp_buffer:
             self.current_velocity += delta
+            # Validate accumulated velocity
+            if not np.isfinite(self.current_velocity) or abs(self.current_velocity) > 1e6:
+                self.current_velocity = 0.0
             return False
 
         else:
@@ -143,14 +165,35 @@ class ROI:
             if len(self.delta_history) > 1:
                 self.delta_history[-1][-1] = self.current_velocity
 
-            self.velo_only_history.append(self.current_velocity)
+            # Validate before appending to history
+            velocity_to_append = self.current_velocity
+            if not np.isfinite(velocity_to_append) or abs(velocity_to_append) > 1e6:
+                velocity_to_append = 0.0
+            
+            self.velo_only_history.append(velocity_to_append)
             self.current_velocity = delta
             return True
 
     def calculate_average_velocity(self) -> bool:
+        import numpy as np
+        
         if len(self.velo_only_history) % 30 == 0:  # Average velocity every 30 seconds
-            sum_last_30 = sum(self.velo_only_history[-30:])
-            self.average_velocity_past_30s = sum_last_30 / 30
+            # Get last 30 values and filter out any remaining invalid values
+            last_30 = self.velo_only_history[-30:]
+            valid_values = [v for v in last_30 if np.isfinite(v) and abs(v) < 1e6]
+            
+            if valid_values:
+                sum_last_30 = sum(valid_values)
+                average = sum_last_30 / len(valid_values)
+                
+                # Validate the calculated average
+                if np.isfinite(average) and abs(average) < 1e6:
+                    self.average_velocity_past_30s = average
+                else:
+                    self.average_velocity_past_30s = 0.0
+            else:
+                self.average_velocity_past_30s = 0.0
+            
             return True
         else:
             return False

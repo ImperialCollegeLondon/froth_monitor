@@ -116,6 +116,13 @@ class VideoAnalysis:
         gray_current: MatLike = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
         gray_previous: MatLike = cv2.cvtColor(self.previous_frame, cv2.COLOR_BGR2GRAY)
 
+        # Helper function to validate and sanitize flow values
+        def sanitize_flow_value(value):
+            """Ensure flow value is finite and within reasonable bounds."""
+            if not np.isfinite(value) or abs(value) > 1e6:
+                return 0.0
+            return float(value)
+
         if self.current_algorithm == "Farneback":
             flow = cv2.calcOpticalFlowFarneback(
                 prev=gray_previous,
@@ -127,8 +134,20 @@ class VideoAnalysis:
 
             flow_x = flow[..., 0]
             flow_y = flow[..., 1]
-            avg_flow_x = cast(float, np.mean(flow_x))  # type: ignore
-            avg_flow_y = cast(float, np.mean(flow_y))  # type: ignore
+            
+            # Filter out invalid values before calculating mean
+            valid_flow_x = flow_x[np.isfinite(flow_x)]
+            valid_flow_y = flow_y[np.isfinite(flow_y)]
+            
+            if len(valid_flow_x) > 0:
+                avg_flow_x = sanitize_flow_value(np.mean(valid_flow_x))
+            else:
+                avg_flow_x = 0.0
+                
+            if len(valid_flow_y) > 0:
+                avg_flow_y = sanitize_flow_value(np.mean(valid_flow_y))
+            else:
+                avg_flow_y = 0.0
 
         elif self.current_algorithm == "Lucas-Kanade":
             if getattr(self, "prev_pts", None) is None:
@@ -160,8 +179,22 @@ class VideoAnalysis:
 
                 if len(good_new) > 0 and len(good_old) > 0:
                     flow_vectors = good_new - good_old
-                    avg_flow_x = float(np.mean(flow_vectors[:, 0]))  # type: ignore
-                    avg_flow_y = float(np.mean(flow_vectors[:, 1]))  # type: ignore
+                    
+                    # Filter out invalid flow vectors
+                    valid_vectors_x = flow_vectors[:, 0]
+                    valid_vectors_y = flow_vectors[:, 1]
+                    valid_vectors_x = valid_vectors_x[np.isfinite(valid_vectors_x)]
+                    valid_vectors_y = valid_vectors_y[np.isfinite(valid_vectors_y)]
+                    
+                    if len(valid_vectors_x) > 0:
+                        avg_flow_x = sanitize_flow_value(np.mean(valid_vectors_x))
+                    else:
+                        avg_flow_x = 0.0
+                        
+                    if len(valid_vectors_y) > 0:
+                        avg_flow_y = sanitize_flow_value(np.mean(valid_vectors_y))
+                    else:
+                        avg_flow_y = 0.0
 
                 else:
                     avg_flow_x, avg_flow_y = 0.0, 0.0
