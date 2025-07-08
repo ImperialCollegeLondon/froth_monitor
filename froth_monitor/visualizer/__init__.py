@@ -1,1 +1,0 @@
-from .visualizer_window import VisualizerWindow

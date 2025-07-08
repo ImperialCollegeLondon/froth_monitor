@@ -21,7 +21,6 @@ The LiDAR integration consists of several key components:
 
 1. **`dummy_lidar.py`** - LiDAR simulator for testing
 2. **`test_lidar_integration.py`** - Standalone test application
-3. **`test_virtual_ports.py`** - Virtual port testing utility
 4. **`run_dummy_lidar.bat`** - Easy launcher for simulator
 
 ## Features
@@ -215,27 +214,6 @@ lidar_thread.data_available.connect(callback)  # Emitted when new data arrives
    - Check for electromagnetic interference
    - Verify stable power supply
    - Adjust distance offset if needed
-
-### Testing Steps
-
-1. **Test with dummy LiDAR**:
-   ```bash
-   python dummy_lidar.py COM3
-   python test_lidar_integration.py
-   ```
-
-2. **Test virtual ports**:
-   ```bash
-   python test_virtual_ports.py COM3
-   ```
-
-3. **Check available ports**:
-   ```python
-   import serial.tools.list_ports
-   ports = serial.tools.list_ports.comports()
-   for port in ports:
-       print(f"{port.device}: {port.description}")
-   ```
 
 ## Performance Considerations
 

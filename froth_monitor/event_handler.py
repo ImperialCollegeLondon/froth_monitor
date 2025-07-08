@@ -37,17 +37,16 @@ from froth_monitor.fm_model import FrameModel
 from froth_monitor.overlay_widget import OverlayWidget
 
 # Import the camera and network threads
-from froth_monitor.camera_thread import CameraThread
-from froth_monitor.network_thread import NetworkThread
+from froth_monitor.video_threads.camera_thread import CameraThread
+from froth_monitor.video_threads.network_thread import NetworkThread
 from froth_monitor.lidar_thread.lidar_thread import LidarThread
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
-from froth_monitor.lidar_thread.lidar_control_dialog import LidarControlDialog
 
 from froth_monitor.export import Export
 
 # Import the video recorder module
 from froth_monitor.video_recorder import VideoRecorder
-from froth_monitor.handlers.algo_handler import (
+from froth_monitor.handlers.subhandlers import (
     AlgorithmConfigurationHandler,
     LidarHandler,
     VideoHandler,
@@ -104,35 +103,31 @@ class EventHandler:
         self.step_export = False
     
     def update_guidance(self):
+        
+        # if no video is imported
+        if self.video_thread.is_running() == False:
+            self.gui._update_guidance("step_1")
 
+        else:
+            # if video is imported but calibration not finished
+            if self.calibration_handler.confirm_calibration == False:
+                self.gui._update_guidance("step_2")
+
+            else:
+                # if calibration is finished but ROI not drawn
+                if self.step_ROI_drawing == False:
+                    self.gui._update_guidance("step_3")
+                    
+        # if export setting finished
         if self.export.finish_save_setting == True:
             self.gui._update_guidance("finish_export_setting")
 
             if self.export.record_video == True:
                 self.gui._update_guidance("enable_recording")
 
-        if self.video_thread.is_running() == False:
-            self.gui._update_guidance("step_1")
-            return
-
-        else:
-            if self.calibration_handler.confirm_calibration == False:
-                self.gui._update_guidance("step_2")
-                return
-
-            else:
-                if self.step_ROI_drawing == False:
-                    self.gui._update_guidance("step_3")
-                    return
-                    
-                else:
-                    if self.step_export == False:
-                        self.gui._update_guidance("step_5")
-                        return
-    
     def trigger_jetson_mode(self):
         self.if_jetson = True
-        self.camera_thread = cast(CameraThread, None)
+        self.camera_thread.reset()
         self.video_thread = self.network_thread
         self.video_handler.video_thread = self.video_thread
         self.initialze_tool_window_n_handlers()
@@ -140,10 +135,11 @@ class EventHandler:
 
     def trigger_normal_mode(self):
         self.if_jetson = False
-        self.network_thread = cast(NetworkThread, None)
+        self.network_thread.reset()
         self.video_thread = self.camera_thread
         self.video_handler.video_thread = self.video_thread
         self.initialze_tool_window_n_handlers()
+        self.gui._trigger_normal_mode()
     
     def initialze_tool_window_n_handlers(self):
         if not self.video_handler.playing:  # Access playing state from VideoHandler
@@ -280,24 +276,20 @@ class EventHandler:
         self.canvas_height = self.gui.video_canvas_label.height()
 
         # Initialize the frame model for processing video frames
-        self.frame_model = cast(FrameModel, None)
         self.frame_model = FrameModel()
         self.current_frame_number = 0
+
         self.export = Export(self.gui)
         self.export.setting_finished.connect(self.update_guidance)
 
         # Overlay related attributes
-        self.overlay_widget: OverlayWidget = cast(OverlayWidget, None)
         self.overlay_active = False
         self.video_rect = QRect()
 
         # Initialize camera thread for event-driven frame capture
-        self.camera_thread = cast(CameraThread, None)
         self.camera_thread = CameraThread()
-        self.network_thread = cast(NetworkThread, None)
         self.network_thread = NetworkThread()
 
-        self.lidar_thread = cast(LidarThread, None)
         self.lidar_thread = LidarThread()
         
         # Initialize LiDAR data processor and connect signals
@@ -312,7 +304,6 @@ class EventHandler:
                                         
         self.gui.lidar_configuration.clicked.connect(self.lidar_handler.open_lidar_control)
 
-        self.video_thread = cast(NetworkThread | CameraThread, None)
         self.video_thread: NetworkThread | CameraThread = \
             cast(NetworkThread | CameraThread, CameraThread())
 
@@ -361,17 +352,15 @@ class EventHandler:
         self.video_rect = QRect()
 
         # Initialize camera thread for event-driven frame capture
-        self.camera_thread = cast(CameraThread, None)
-        self.camera_thread = CameraThread()
-        self.network_thread = cast(NetworkThread, None)
-        self.network_thread = NetworkThread()
+        if hasattr(self, 'camera_thread') and self.camera_thread:
+            self.camera_thread.reset()
+        if hasattr(self, 'network_thread') and self.network_thread:
+            self.network_thread.reset()
+        if hasattr(self, 'video_thread') and self.video_thread:
+            self.video_thread.reset()
 
         self.lidar_thread = cast(LidarThread, None)
         self.lidar_thread = LidarThread()
-
-        self.video_thread = cast(NetworkThread | CameraThread, None)
-        self.video_thread: NetworkThread | CameraThread = \
-            cast(NetworkThread | CameraThread, CameraThread())
 
         # Initialize video recorder
         self.video_recorder = VideoRecorder()

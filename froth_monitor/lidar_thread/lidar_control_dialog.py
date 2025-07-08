@@ -331,9 +331,9 @@ Std Dev: {stats.get('std_dev', 0):.1f} mm"""
         except Exception as e:
             print(f"Error updating LiDAR display: {e}")
 
-    def closeEvent(self, event):
+    def closeEvent(self, arg__1):
         """
         Handle dialog close event.
         """
         self.update_timer.stop()
-        event.accept()
+        arg__1.accept()

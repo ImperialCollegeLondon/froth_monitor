@@ -3,7 +3,7 @@
 from .image_analysis import VideoAnalysis
 from .autosaver import AutoSaver
 from .export import Export
-from .camera_thread import CameraThread
+
 
 
 try:

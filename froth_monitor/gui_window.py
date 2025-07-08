@@ -841,7 +841,7 @@ class MainGUIWindow(QMainWindow):
     # The createMenuBar, add_buttons, add_canvas_placeholder, and add_ROI_movement_placeholder methods
     # have been integrated into the new initUI method to create a more modern interface
 
-    def _toggle_normal_mode(self) -> None:
+    def _trigger_normal_mode(self) -> None:
         self.fh_widget.setVisible(False)
         self.table_label_2.setVisible(False)
         self.froth_height_label.setVisible(False)
