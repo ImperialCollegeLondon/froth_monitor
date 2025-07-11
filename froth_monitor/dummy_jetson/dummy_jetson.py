@@ -6,10 +6,7 @@ from jeston_api.lidar_data_stream import LidarDataStream
 from jeston_api.video_sender import VideoSender
 
 import time
-from froth_monitor.logger_config import get_logger
 
-# Initialize logger for this module
-logger = get_logger(__name__)
 # ---- Debug video source ----
 # open any valid video stream(for e.g `test.mp4` file)
 stream = VideoGear(source="dummy_video.mp4").start() # type: ignore

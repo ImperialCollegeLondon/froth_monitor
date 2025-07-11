@@ -41,6 +41,10 @@ from froth_monitor.export import Export
 # Import the video recorder module
 from froth_monitor.video_recorder import VideoRecorder
 # from froth_monitor.event_handler import EventHandler
+from froth_monitor.logger_config import get_logger
+
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 class AlgorithmConfigurationHandler:
     """
@@ -1506,12 +1510,14 @@ class LidarHandler:
         """Start LiDAR data capture."""
         try:
             success = self.lidar_thread.start_lidar_capture(port, baudrate)
+            logger.info(f"""
+            Try to start LiDAR capture on port {port} at {baudrate} baud.
+            """)
             if success:
-                QMessageBox.information(
-                    self.gui,
-                    "LiDAR Started",
-                    f"LiDAR capture started on {port}"
-                )
+                logger.info(f"""
+                Starting LiDAR capture on port {port} at {baudrate} baud.
+                """)
+                self.initialize_gui_lidar_mode()
                 return True
             else:
                 QMessageBox.warning(
@@ -1611,3 +1617,104 @@ class LidarHandler:
                 "Error",
                 f"Failed to open LiDAR control dialog: {str(e)}"
             )
+
+    def initialize_gui_lidar_mode(self):
+        self.gui._trigger_jetson_mode()
+
+    def update_fh_plot(self, lidar_reading_history_av1s_only_v):
+        """Update the velocity plot with data from all ROIs.
+
+        This method extracts velocity history data from each ROI in the frame_model's roi_list
+        and plots it on the plot_widget. Each ROI's velocity history is plotted as a separate
+        line with a different color and labeled in the legend.
+
+        The plot displays a fixed window of 30 elements (3 seconds) with new data appearing
+        from the right edge and older data scrolling to the left. When the history exceeds
+        30 elements, the oldest elements are removed to maintain the fixed window size.
+        """
+        import numpy as np
+        
+        # Clear the plot widget
+        self.gui.froth_height_plot_widget.clear()
+
+        # Check if there are any ROIs to plot
+        if not lidar_reading_history_av1s_only_v:
+            return
+
+        # Define a list of colors for different ROIs
+        colors = [
+            "r",
+            "g",
+            "b",
+            "c",
+            "m",
+            "y",
+            "w",
+        ]  # Red, green, blue, cyan, magenta, yellow, white
+
+        # Fixed window size (3 seconds)
+        WINDOW_SIZE = 30
+
+        # Helper function to sanitize froth height data
+        def sanitize_data(data):
+            """Remove invalid values (inf, nan, extremely large values) from data."""
+            sanitized = []
+            for value in data:
+                if value is not None and np.isfinite(value) and abs(value) < 1e6:
+                    sanitized.append(value)
+                else:
+                    sanitized.append(0.0)  # Replace invalid values with 0
+            return sanitized
+
+        # Sanitize the lidar reading history
+        sanitized_history = sanitize_data(lidar_reading_history_av1s_only_v)
+
+        # Find the maximum froth height for y-axis scaling
+        max_fh = 0
+        if sanitized_history:
+            max_fh = max(sanitized_history)
+
+        # Get the velocity history data
+        history = sanitized_history
+
+        # Limit history to the most recent WINDOW_SIZE elements
+        if len(history) > WINDOW_SIZE:
+            history = history[-WINDOW_SIZE:]
+
+        # Create a fixed-size array for display (30 elements)
+        display_data = [None] * WINDOW_SIZE
+
+        # Position the data at the right side of the display
+        # For example, if we have 5 elements, they go in positions 25-29 (0-indexed)
+        start_pos = WINDOW_SIZE - len(history)
+        for j, value in enumerate(history):
+            display_data[start_pos + j] = value
+
+        # Create x-axis data (fixed range from 0 to WINDOW_SIZE-1)
+        x_data = list(range(WINDOW_SIZE,0,-1))
+
+        # Create y-axis data with None values filtered out for plotting
+        # (pyqtgraph will skip None values when plotting)
+        plot_x = []
+        plot_y = []
+        for x, y in zip(x_data, display_data):
+            if y is not None and np.isfinite(y):
+                plot_x.append(x)
+                plot_y.append(y)
+
+        # Add the plot with a label for the legend
+        if plot_x and plot_y:  # Only plot if we have data
+            self.gui.froth_height_plot_widget.plot(
+                plot_x, plot_y, pen=colors[2], name=f"froth height"
+            )
+
+        # Set fixed x-axis range (0 to WINDOW_SIZE-1)
+        self.gui.froth_height_plot_widget.setXRange(0, WINDOW_SIZE - 1)
+
+        # Set appropriate y-axis range if there's data
+        if max_fh > 0 and np.isfinite(max_fh):
+            # Add some padding to the top of the y-axis
+            self.gui.froth_height_plot_widget.setYRange(0, max_fh * 1.1)
+
+        # Update the plot
+        self.gui.froth_height_plot_widget.update()

@@ -58,6 +58,7 @@ from froth_monitor.logger_config import get_logger
 
 # Initialize logger for this module
 logger = get_logger(__name__)
+
 class EventHandler:
     """
     Event handler class that connects GUI components with application logic.

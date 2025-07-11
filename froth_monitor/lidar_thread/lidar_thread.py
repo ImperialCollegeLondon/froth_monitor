@@ -58,7 +58,7 @@ class LidarThread(QObject):
         # Offset for distance measurements (in mm)
         self.distance_offset = 0.0
 
-    def start_lidar_capture(self, port: str = "COM3", baudrate: int = 115200, timeout: float = 1.0) -> bool:
+    def start_lidar_capture(self, port: str = "COM3", baudrate: int = 38400, timeout: float = 1.0) -> bool:
         """
         Start reading LiDAR data from the specified serial port.
 
@@ -84,7 +84,10 @@ class LidarThread(QObject):
             self.serial_connection = serial.Serial(
                 port=self.port,
                 baudrate=self.baudrate,
-                timeout=self.timeout
+                timeout=self.timeout,
+                bytesize=serial.EIGHTBITS, 
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
             )
             
             # Clear any existing data in the buffer
@@ -94,6 +97,11 @@ class LidarThread(QObject):
             # Start the reading thread
             self.running = True
             self.paused = False
+
+            self.serial_connection.write(f"iSET:7,{10}\r\n".encode())
+            time.sleep(0.1)
+            self.serial_connection.write(b"iFACM\r\n")
+
             self.thread_ = threading.Thread(target=self._lidar_loop, daemon=True)
             self.thread_.start()
             
@@ -112,6 +120,7 @@ class LidarThread(QObject):
         Supports pausing without closing the serial connection.
         """
         while self.running and self.serial_connection:
+
             try:
                 # If paused, just sleep a bit and continue the loop without reading
                 if self.paused:
@@ -119,20 +128,20 @@ class LidarThread(QObject):
                     continue
 
                 # Read data from serial port
-                if self.serial_connection.in_waiting > 0:
+                while self.serial_connection.in_waiting:
                     # line = self.serial_connection.readline().decode('utf-8').strip()
                     line = self.serial_connection.readline().decode("ascii", errors="ignore").strip()
-                    
+
                     if line:
                         # Parse LiDAR data (expecting format like "D=1.234m")
                         distance_mm = self._parse_lidar_data(line)
-                        
+
                         if distance_mm is not None:
                             # Apply offset
                             distance_mm += self.distance_offset
                             
                             # Create timestamp
-                            timestamp = datetime.now()
+                            timestamp = datetime.now().strftime("%H:%M:%S.%f")
                             
                             # Store data
                             self.full_timestamps.append(timestamp)
@@ -143,7 +152,7 @@ class LidarThread(QObject):
                                 'timestamp': timestamp,
                                 'distance_mm': distance_mm,
                                 'distance_mm_inverted': -distance_mm,  # For compatibility
-                                'formatted_timestamp': timestamp.strftime("%Y/%m/%d %H:%M:%S.%f")[:-3]
+                                'formatted_timestamp': timestamp
                             }
                             
                             # Emit signal with new data

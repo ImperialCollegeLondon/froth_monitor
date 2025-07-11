@@ -13,7 +13,10 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QFont
+from froth_monitor.logger_config import get_logger
 
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 class LidarControlDialog(QDialog):
     """
@@ -56,6 +59,10 @@ class LidarControlDialog(QDialog):
         """
         Set up the user interface.
         """
+        self.style_sheet_text = """
+        color:black;
+        """
+
         layout = QVBoxLayout(self)
         
         # Connection settings group
@@ -78,8 +85,9 @@ class LidarControlDialog(QDialog):
         connection_layout.addWidget(QLabel("Baud Rate:"), 1, 0)
         self.baudrate_spin = QSpinBox()
         self.baudrate_spin.setRange(9600, 921600)
-        self.baudrate_spin.setValue(115200)
+        self.baudrate_spin.setValue(38400)
         self.baudrate_spin.setSingleStep(9600)
+        self.baudrate_spin.setStyleSheet(self.style_sheet_text)
         connection_layout.addWidget(self.baudrate_spin, 1, 1)
         
         # Distance offset
@@ -88,6 +96,7 @@ class LidarControlDialog(QDialog):
         self.offset_spin.setRange(-1000.0, 1000.0)
         self.offset_spin.setValue(0.0)
         self.offset_spin.setSingleStep(1.0)
+        self.offset_spin.setStyleSheet(self.style_sheet_text)
         self.offset_spin.valueChanged.connect(self.update_offset)
         connection_layout.addWidget(self.offset_spin, 2, 1)
         
@@ -147,6 +156,7 @@ class LidarControlDialog(QDialog):
         self.stats_text = QTextEdit()
         self.stats_text.setMaximumHeight(150)
         self.stats_text.setReadOnly(True)
+        self.stats_text.setStyleSheet(self.style_sheet_text)
         stats_layout.addWidget(self.stats_text, 0, 0, 1, 2)
         
         layout.addWidget(stats_group)
@@ -209,13 +219,16 @@ class LidarControlDialog(QDialog):
         """
         port = self.port_combo.currentText()
         baudrate = self.baudrate_spin.value()
+
         
         if not port or port == "No ports found":
             QMessageBox.warning(self, "Warning", "Please select a valid serial port.")
             return
         
         success = self.event_handler.start_lidar_capture(port, baudrate)
+
         if success:
+
             self.update_controls_state()
 
     def stop_lidar(self):

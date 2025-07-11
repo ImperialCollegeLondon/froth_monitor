@@ -8,7 +8,10 @@ It handles data buffering, averaging, and GUI updates.
 from typing import cast, List
 from datetime import datetime
 from PySide6.QtWidgets import QMessageBox
+from froth_monitor.logger_config import get_logger
 
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 class LidarDataProcessor:
     """
@@ -63,8 +66,8 @@ class LidarDataProcessor:
             lidar_data (dict): Dictionary containing LiDAR measurement data
         """
         # Check if video is playing (only process data when active)
-        if not self.event_handler.video_handler.playing:
-            return
+        # if not self.event_handler.video_handler.playing:
+        #     return
 
         try:
             # Extract data from the LiDAR measurement
@@ -76,25 +79,50 @@ class LidarDataProcessor:
             self.current_lidar_reading = distance_mm
             self.current_timestamp = formatted_timestamp
 
-            # Add to buffer for averaging
-            self.lidar_reading_buffer.append(distance_mm)
-            if len(self.lidar_reading_buffer) > self.buffer_size:
-                self.lidar_reading_buffer.pop(0)  # Remove oldest reading
-
             # Add to historical data
             self.lidar_reading_history.append(distance_mm)
 
             # Update GUI periodically
             current_time = datetime.now()
-            time_diff = (current_time - self.last_update_time).total_seconds()
             
-            if time_diff >= self.update_interval:
+            if_update = self._if_update()
+            
+            if if_update:
                 self._update_gui()
                 self._calculate_averages()
                 self.last_update_time = current_time
 
         except Exception as e:
             print(f"Error processing LiDAR data: {e}")
+
+    def _if_update(self) -> bool:
+
+        try:
+            timestamp_buffer = self.current_timestamp[:8]
+
+            if self.timestamp_buffer is None:
+                self.timestamp_buffer = timestamp_buffer
+                self.lidar_reading_buffer.append(self.current_lidar_reading)
+                return False
+
+            if timestamp_buffer == self.timestamp_buffer:
+                self.lidar_reading_buffer.append(self.current_lidar_reading)
+                return False
+
+            else:
+                self.timestamp_buffer = timestamp_buffer
+                average_fh = sum(self.lidar_reading_buffer) / len(self.lidar_reading_buffer)
+                self.lidar_reading_history_av1s.append([[0, average_fh, \
+                    self.current_timestamp]])
+                self.lidar_reading_history_av1s_only_v.append(average_fh)
+
+                self.lidar_reading_buffer = []
+
+                return True
+
+        except Exception as e:
+            logger.error(f"Error calculating LiDAR averages: {e}")
+            return False
 
     def _update_gui(self):
         """
@@ -108,6 +136,7 @@ class LidarDataProcessor:
 
             # Update any LiDAR-specific GUI elements if they exist
             # This can be extended based on GUI requirements
+            self.event_handler.lidar_handler.update_fh_plot(self.lidar_reading_history_av1s_only_v)
             
         except Exception as e:
             print(f"Error updating GUI with LiDAR data: {e}")
