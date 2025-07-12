@@ -44,7 +44,11 @@ if __name__ == "__main__":
 ### (air flow into 1. (we can ask user to choose the unit, volume/time - m^3/hr (industrial scale), liters/min (lab scale), cm3/s)
 ###                2. Ask for Jg (cm/s), calculate airflow based on (Jg*Area of cell)
 
+### average value of velo/height within a second/several seconds
 ### Can display the value in real-time on graph
 ### Average value display on the table
 
 ### Graph - limit of y-label
+
+### Air-rec panel
+### User-defined air-flow

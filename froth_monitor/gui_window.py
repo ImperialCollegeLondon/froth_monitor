@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
 )
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QFont
 import pyqtgraph as pg
 import sys
 import numpy as np
@@ -188,6 +188,11 @@ class MainGUIWindow(QMainWindow):
                 background-color: #3367d6;
             }
             """
+
+        # Custom font styles
+        self.plot_label_style = {'color': '#000', 'font-size': '8pt'}
+        self.plot_tick_font = QFont()
+        self.plot_tick_font.setPixelSize(8)
 
     def _show_window_size_notification(self) -> None:
         """Show the window size adjustment notification overlay."""
@@ -429,8 +434,6 @@ class MainGUIWindow(QMainWindow):
             self.jetson_radio
         )  # Add this line to add the Jetson radio button to the layout
         source_layout.addWidget(self.import_button)
-        # source_layout.addWidget(self.algorithm_configuration)
-        source_layout.addWidget(config_widget)
 
         return source_group
 
@@ -638,6 +641,7 @@ class MainGUIWindow(QMainWindow):
             "background-color: #333333; border-radius: 4px;"
         )
         video_container_layout = QVBoxLayout(self.video_container)
+
         self.video_canvas_label = QLabel("")
         self.video_canvas_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_canvas_label.setStyleSheet("background-color: #333333;")
@@ -648,19 +652,33 @@ class MainGUIWindow(QMainWindow):
         table_container.setStyleSheet("background-color: #f0f0f0;")
         table_layout = QVBoxLayout(table_container)
 
-        table_label_1 = QLabel("Average Velocity over the past 30s")
+        self._create_table_group(table_layout)
+        table_layout.addSpacing(15)  # Add spacing after table group
+        
+        self._create_air_rec_graph(table_layout)
+        table_layout.addSpacing(15)  # Add spacing after air recovery graph
+        
+        self._create_config_group(table_layout)
+
+        # Add to horizontal layout
+        video_table_layout.addWidget(self.video_container, 1)
+        video_table_layout.addWidget(table_container, 0)
+
+        layout.addWidget(video_table_container)
+        self._create_media_controls(layout)
+    
+    def _create_table_group(self, layout) -> None:
+        table_label_1 = QLabel("Average froth data over the last second")
         table_label_1.setStyleSheet("color: black; font-size: 14px; font-weight: bold;")
-        self.table_label_2 = QLabel("Data of the current frame")
-        self.table_label_2.setStyleSheet("color: black; font-size: 14px; font-weight: bold;")
 
         # Table widget (right side)
-        example_1d_data = ["N/A"]
+        example_2d_data = [["N/A", "N/A", "N/A"]]
         self.velo_widget = pg.TableWidget()
-        self.velo_widget.setData(example_1d_data)
-        self.velo_widget.setHorizontalHeaderLabels(["mean_velocity (mm/s)"])
+        self.velo_widget.setData(example_2d_data)
+        self.velo_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec"])
         self.velo_widget.setFormat("%.2f")
-        self.velo_widget.setMinimumHeight(150)
-        self.velo_widget.setMinimumWidth(250)  # Fixed width
+        self.velo_widget.setMinimumHeight(110)
+        self.velo_widget.setMinimumWidth(50)  # Fixed width
         self.velo_widget.setStyleSheet(
             """
             background-color: #f0f0f0; 
@@ -671,56 +689,74 @@ class MainGUIWindow(QMainWindow):
         )
 
         # Set minimum column width
-        self.velo_widget.setColumnWidth(0, 200)  # Set column 0 to 200px width
-        # OR set minimum column width
-        self.velo_widget.horizontalHeader().setMinimumSectionSize(
-            150
-        )  # Minimum for all columns
-        # OR set specific column minimum width
-        self.velo_widget.horizontalHeader().resizeSection(0, 200)
+        self.velo_widget.setColumnWidth(0, 80)
+        self.velo_widget.setColumnWidth(1, 80)
+        self.velo_widget.setColumnWidth(2, 80)
+
+        # self.velo_widget.setFixedHeight(80) 
         self.velo_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
 
-        # Table widget (right side)
-        example_2d_data = [["N/A", "N/A", "N/A"]]
-        self.fh_widget = pg.TableWidget()
-        self.fh_widget.setData(example_2d_data)
-        self.fh_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec"])
-        self.fh_widget.setFormat("%.2f")
-        self.fh_widget.setMinimumHeight(150)
-        self.fh_widget.setMinimumWidth(50)  # Fixed width
-        self.fh_widget.setStyleSheet(
-            """
-            background-color: #f0f0f0; 
-            font-size: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            """
+        layout.addWidget(table_label_1)
+        layout.addWidget(self.velo_widget)
+
+    def _create_config_group(self, layout) -> None:
+        # source_group = QGroupBox("Config Group")
+        # source_group.setStyleSheet("""
+        # font-weight: bold; font-size: 14px; color: black;
+        # """)
+        # source_layout = QVBoxLayout(source_group)
+        # source_layout.setSpacing(10)
+        group_label = QLabel("Config Group")
+        group_label.setStyleSheet("""
+        font-weight: bold; font-size: 14px; color: black;
+        """)
+
+        config_widget = QWidget()
+        config_layout = QHBoxLayout(config_widget)
+
+        self.algorithm_configuration = QPushButton("Algorithm")
+        self.algorithm_configuration.setStyleSheet(
+            self.ENABLED_BUTTON_STYLE
         )
+        self.lidar_configuration = QPushButton("LiDAR")
+        self.lidar_configuration.setStyleSheet(self.ENABLED_BUTTON_STYLE)
+        self.air_rec_configuration = QPushButton("Air Rec")
+        self.air_rec_configuration.setStyleSheet(self.ENABLED_BUTTON_STYLE)
 
-        # Set minimum column width
-        self.fh_widget.setColumnWidth(0, 80)  # Set column 0 to 200px width
-        self.fh_widget.setColumnWidth(1, 80)  # Set column 0 to 200px width
-        self.fh_widget.setColumnWidth(2, 80)  # Set column 0 to 200px width
+        config_layout.addWidget(self.algorithm_configuration)
+        config_layout.addWidget(self.lidar_configuration)
+        config_layout.addWidget(self.air_rec_configuration)
 
-        self.fh_widget.setSizePolicy(
+        # source_layout.addWidget(config_widget)
+        # source_layout.addWidget(self.lidar_configuration)
+        layout.addWidget(group_label)
+        layout.addWidget(config_widget)
+
+    def _create_air_rec_graph(self, layout) -> None:
+        graph_label = QLabel("Air Recovery vs Time")
+        graph_label.setStyleSheet("font-weight: bold; font-size: 14px; color: black")
+
+        self.ar_plot_widget = pg.PlotWidget()
+        self.ar_plot_widget.setBackground("white")
+        self.ar_plot_widget.setMinimumHeight(150)
+        self.ar_plot_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
+        self.ar_plot_widget.showAxis("left")
+        self.ar_plot_widget.showAxis("bottom")
 
-        table_layout.addWidget(table_label_1)
-        table_layout.addWidget(self.velo_widget)
-        table_layout.addWidget(self.table_label_2)
-        table_layout.addWidget(self.fh_widget)
 
-        # Add to horizontal layout
-        video_table_layout.addWidget(self.video_container, 1)
-        video_table_layout.addWidget(table_container, 0)
+        # Apply custom fonts
+        self.ar_plot_widget.setLabel("left", "Air Recovery", units="mm/s", **self.plot_label_style)
+        self.ar_plot_widget.setLabel("bottom", "Time", units="secs", **self.plot_label_style)
+        self.ar_plot_widget.getAxis('left').setTickFont(self.plot_tick_font)
+        self.ar_plot_widget.getAxis('bottom').setTickFont(self.plot_tick_font)
+        self.ar_plot_widget.addLegend()
 
-        layout.addWidget(video_table_container)
-        self._create_media_controls(layout)
-        self.fh_widget.hide()
-        self.table_label_2.hide()
+        layout.addWidget(graph_label)
+        layout.addWidget(self.ar_plot_widget)
 
     def _create_export_settings(self) -> QGroupBox:
         """
@@ -837,16 +873,14 @@ class MainGUIWindow(QMainWindow):
         layout.addWidget(media_controls_container)
 
     def _trigger_jetson_mode(self) -> None:
-        self.fh_widget.setVisible(True)
-        self.table_label_2.setVisible(True)
         self.froth_height_label.setVisible(True)
         self.froth_height_plot_widget.setVisible(True)
     # The createMenuBar, add_buttons, add_canvas_placeholder, and add_ROI_movement_placeholder methods
     # have been integrated into the new initUI method to create a more modern interface
 
     def _trigger_normal_mode(self) -> None:
-        self.fh_widget.setVisible(False)
-        self.table_label_2.setVisible(False)
+        # self.fh_widget.setVisible(False)
+        # self.table_label_2.setVisible(False)
         self.froth_height_label.setVisible(False)
         self.froth_height_plot_widget.setVisible(False)
 

@@ -1035,7 +1035,7 @@ class VelocityPlotter:
             # Limit history to the most recent WINDOW_SIZE elements
             if len(history) > WINDOW_SIZE:
                 history = history[-WINDOW_SIZE:]
-
+                
             # Create a fixed-size array for display (30 elements)
             display_data = [None] * WINDOW_SIZE
 
@@ -1046,7 +1046,7 @@ class VelocityPlotter:
                 display_data[start_pos + j] = value
 
             # Create x-axis data (fixed range from 0 to WINDOW_SIZE-1)
-            x_data = list(range(WINDOW_SIZE,0,-1))
+            x_data = list(range(WINDOW_SIZE))
 
             # Create y-axis data with None values filtered out for plotting
             # (pyqtgraph will skip None values when plotting)
@@ -1088,7 +1088,6 @@ class VelocityPlotter:
                 list_data.append("N/A")
                 continue
 
-            
             # Add average velocity to the table
             list_data.append(roi.average_velocity_past_30s)
 
@@ -1320,181 +1319,6 @@ class FrameProcessor:
                 f"Frame: {self.current_frame_number} | Time: {self.frame_model.last_processed_time}"
             )
 
-class SensorDataProcessor:
-    def __init__(self, event_handler,
-                 video_thread: CameraThread | NetworkThread):
-        self.event_handler = event_handler
-        self.video_thread = video_thread
-        self.gui = self.event_handler.gui
-
-        self.current_lidar_reading = 0.0
-        self.current_timestamp:str = cast(str, None)
-
-        self.lidar_reading_history = []
-        self.lidar_reading_history_av1s = []
-        self.lidar_reading_history_av1s_only_v = []
-
-        self.lidar_reading_buffer = []
-        self.timestamp_buffer = cast(str, None)
-
-        self.lidar_reading_last_mark = 0.0
-
-    def process_sensor_data(self, sensor_data):
-        """
-        Process sensor data and update the GUI.
-
-        This method is called whenever new sensor data is received from the network thread.
-        It processes the sensor data and updates the GUI accordingly.
-
-        Args:
-            sensor_data: The new sensor data received from the network thread
-        """
-        if not self.event_handler.video_handler.playing:
-            return
-        
-
-        # Update the current lidar reading
-        self.current_lidar_reading = sensor_data["lidar_reading"]
-
-        # Update the lidar reading label
-        self.current_timestamp = sensor_data["lidar_timestamp"]
-
-        self.lidar_reading_history.append([[0, self.current_lidar_reading, \
-            self.current_timestamp]])
-
-        self._update_lidar_table()
-        self._calculate_velocity()
-        self._update_velocity_plot()
-
-    def _update_lidar_table(self):
-        """
-        Update the lidar reading table with the latest data.
-        """
-
-        self.gui.fh_widget.setData(self.lidar_reading_history[-1])
-        self.gui.fh_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec"])
-        self.gui.fh_widget.setFormat("%.2f")
-    
-    def _calculate_velocity(self) -> bool:
-        timestamp_buffer = self.current_timestamp[:8]
-
-        if self.timestamp_buffer is None:
-            self.timestamp_buffer = timestamp_buffer
-            self.lidar_reading_buffer.append(self.current_lidar_reading)
-            return False
-
-        if timestamp_buffer == self.timestamp_buffer:
-            self.lidar_reading_buffer.append(self.current_lidar_reading)
-            return False
-
-        else:
-            self.timestamp_buffer = timestamp_buffer
-            average_fh = sum(self.lidar_reading_buffer) / len(self.lidar_reading_buffer)
-            self.lidar_reading_history_av1s.append([[0, average_fh, \
-                self.current_timestamp]])
-            self.lidar_reading_history_av1s_only_v.append(average_fh)
-
-            self.lidar_reading_buffer = []
-            return True
-
-    def _update_velocity_plot(self):
-        """Update the velocity plot with data from all ROIs.
-
-        This method extracts velocity history data from each ROI in the frame_model's roi_list
-        and plots it on the plot_widget. Each ROI's velocity history is plotted as a separate
-        line with a different color and labeled in the legend.
-
-        The plot displays a fixed window of 30 elements (3 seconds) with new data appearing
-        from the right edge and older data scrolling to the left. When the history exceeds
-        30 elements, the oldest elements are removed to maintain the fixed window size.
-        """
-        import numpy as np
-        
-        # Clear the plot widget
-        self.gui.froth_height_plot_widget.clear()
-
-        # Check if there are any ROIs to plot
-        if not self.lidar_reading_history_av1s_only_v:
-            return
-
-        # Define a list of colors for different ROIs
-        colors = [
-            "r",
-            "g",
-            "b",
-            "c",
-            "m",
-            "y",
-            "w",
-        ]  # Red, green, blue, cyan, magenta, yellow, white
-
-        # Fixed window size (3 seconds)
-        WINDOW_SIZE = 30
-
-        # Helper function to sanitize froth height data
-        def sanitize_data(data):
-            """Remove invalid values (inf, nan, extremely large values) from data."""
-            sanitized = []
-            for value in data:
-                if value is not None and np.isfinite(value) and abs(value) < 1e6:
-                    sanitized.append(value)
-                else:
-                    sanitized.append(0.0)  # Replace invalid values with 0
-            return sanitized
-
-        # Sanitize the lidar reading history
-        sanitized_history = sanitize_data(self.lidar_reading_history_av1s_only_v)
-
-        # Find the maximum froth height for y-axis scaling
-        max_fh = 0
-        if sanitized_history:
-            max_fh = max(sanitized_history)
-
-        # Get the velocity history data
-        history = sanitized_history
-
-        # Limit history to the most recent WINDOW_SIZE elements
-        if len(history) > WINDOW_SIZE:
-            history = history[-WINDOW_SIZE:]
-
-        # Create a fixed-size array for display (30 elements)
-        display_data = [None] * WINDOW_SIZE
-
-        # Position the data at the right side of the display
-        # For example, if we have 5 elements, they go in positions 25-29 (0-indexed)
-        start_pos = WINDOW_SIZE - len(history)
-        for j, value in enumerate(history):
-            display_data[start_pos + j] = value
-
-        # Create x-axis data (fixed range from 0 to WINDOW_SIZE-1)
-        x_data = list(range(WINDOW_SIZE,0,-1))
-
-        # Create y-axis data with None values filtered out for plotting
-        # (pyqtgraph will skip None values when plotting)
-        plot_x = []
-        plot_y = []
-        for x, y in zip(x_data, display_data):
-            if y is not None and np.isfinite(y):
-                plot_x.append(x)
-                plot_y.append(y)
-
-        # Add the plot with a label for the legend
-        if plot_x and plot_y:  # Only plot if we have data
-            self.gui.froth_height_plot_widget.plot(
-                plot_x, plot_y, pen=colors[2], name=f"froth height"
-            )
-
-        # Set fixed x-axis range (0 to WINDOW_SIZE-1)
-        self.gui.froth_height_plot_widget.setXRange(0, WINDOW_SIZE - 1)
-
-        # Set appropriate y-axis range if there's data
-        if max_fh > 0 and np.isfinite(max_fh):
-            # Add some padding to the top of the y-axis
-            self.gui.froth_height_plot_widget.setYRange(0, max_fh * 1.1)
-
-        # Update the plot
-        self.gui.froth_height_plot_widget.update()
-
 class LidarHandler:
     def __init__(self,
                 lidar_thread: LidarThread,
@@ -1684,14 +1508,14 @@ class LidarHandler:
         # Create a fixed-size array for display (30 elements)
         display_data = [None] * WINDOW_SIZE
 
-        # Position the data at the right side of the display
-        # For example, if we have 5 elements, they go in positions 25-29 (0-indexed)
+        # Position the data so newest values appear on the right side
+        # Fill from the right side of the array (highest indices)
         start_pos = WINDOW_SIZE - len(history)
         for j, value in enumerate(history):
             display_data[start_pos + j] = value
 
-        # Create x-axis data (fixed range from 0 to WINDOW_SIZE-1)
-        x_data = list(range(WINDOW_SIZE,0,-1))
+        # Create x-axis data - higher x-values are on the right
+        x_data = list(range(WINDOW_SIZE))
 
         # Create y-axis data with None values filtered out for plotting
         # (pyqtgraph will skip None values when plotting)

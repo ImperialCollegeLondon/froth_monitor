@@ -51,7 +51,6 @@ from froth_monitor.handlers.subhandlers import (
     OverlayHandler,
     ROIHandler,
     FrameProcessor,
-    SensorDataProcessor,
     VelocityPlotter
 )
 from froth_monitor.logger_config import get_logger
@@ -233,15 +232,14 @@ class EventHandler:
 
         # Connect camera thread signals to frame processor
         if self.if_jetson:
-            self.sensor_data_processor = SensorDataProcessor(
-                self, self.network_thread
-            )
+
             self.video_thread.frame_available.connect(
                 self.frame_processor.process_new_frame_with_network_thread
             )
             self.video_thread.sensor_data_available.connect(    # type: ignore
                 self.sensor_data_processor.process_sensor_data # type: ignore
             )
+            
         else:
             self.video_thread.frame_available.connect(
                 self.frame_processor.process_new_frame
