@@ -105,7 +105,6 @@ class LidarThread(QObject):
             self.thread_ = threading.Thread(target=self._lidar_loop, daemon=True)
             self.thread_.start()
             
-            logger.info(f"LiDAR capture started on {self.port}")
             return True
             
         except Exception as e:

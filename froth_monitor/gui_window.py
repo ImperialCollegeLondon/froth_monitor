@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QFont
+from pkg_resources import non_empty_lines
 import pyqtgraph as pg
 import sys
 import numpy as np
@@ -652,13 +653,14 @@ class MainGUIWindow(QMainWindow):
         table_container.setStyleSheet("background-color: #f0f0f0;")
         table_layout = QVBoxLayout(table_container)
 
-        self._create_table_group(table_layout)
+
+        self._create_config_group(table_layout)
         table_layout.addSpacing(15)  # Add spacing after table group
         
-        self._create_air_rec_graph(table_layout)
+        self._create_table_group(table_layout)
         table_layout.addSpacing(15)  # Add spacing after air recovery graph
-        
-        self._create_config_group(table_layout)
+
+        self._create_air_rec_graph(table_layout)
 
         # Add to horizontal layout
         video_table_layout.addWidget(self.video_container, 1)
@@ -877,6 +879,10 @@ class MainGUIWindow(QMainWindow):
         self.froth_height_plot_widget.setVisible(True)
     # The createMenuBar, add_buttons, add_canvas_placeholder, and add_ROI_movement_placeholder methods
     # have been integrated into the new initUI method to create a more modern interface
+
+    def _trigger_lidar_mode(self) -> None:
+        self.froth_height_label.setVisible(True)
+        self.froth_height_plot_widget.setVisible(True)        
 
     def _trigger_normal_mode(self) -> None:
         # self.fh_widget.setVisible(False)

@@ -64,6 +64,7 @@ class ROI:
         self.timestamp_buffer = self.timestamp
         self.current_velocity = 0.0
         self.velo_only_history = []
+        self.velo_history_with_time = []
 
         self.average_velocity_past_30s = cast(float, None)
 
@@ -174,6 +175,7 @@ class ROI:
                 velocity_to_append = 0.0
             
             self.velo_only_history.append(velocity_to_append)
+            self.velo_history_with_time.append([velocity_to_append, self.timestamp_buffer])
             self.current_velocity = delta
             return True
 

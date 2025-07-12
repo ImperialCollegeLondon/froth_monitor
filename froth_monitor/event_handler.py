@@ -87,6 +87,7 @@ class EventHandler:
 
         # If using jetson import or not
         self.if_jetson = False
+        self.if_lidar = False
 
         # Connect GUI signals to handler methods
         self.connect_signals()
@@ -137,7 +138,9 @@ class EventHandler:
         self.video_thread = self.camera_thread
         self.video_handler.video_thread = self.video_thread
         self.initialze_tool_window_n_handlers()
-        self.gui._trigger_normal_mode()
+        
+        if not self.if_lidar:
+            self.gui._trigger_normal_mode()
     
     def initialze_tool_window_n_handlers(self):
         if not self.video_handler.playing:  # Access playing state from VideoHandler
@@ -245,7 +248,6 @@ class EventHandler:
                 self.frame_processor.process_new_frame
             )
 
-
         self.gui.confirm_arrow_button.clicked.connect(
             self.calibration_handler.confirm_arrow_n_ruler
         )
@@ -276,6 +278,18 @@ class EventHandler:
         self.frame_model = FrameModel()
         self.current_frame_number = 0
 
+        self.lidar_thread = LidarThread()
+        
+        # Initialize LiDAR data processor and connect signals
+        self.lidar_data_processor = LidarDataProcessor(
+            self, self.lidar_thread
+        )
+        self.lidar_thread.data_available.connect(
+            self.lidar_data_processor.process_lidar_data
+        )
+
+        self.velocity_plotter = VelocityPlotter(self.gui, self.frame_model, self.lidar_data_processor)
+
         self.export = Export(self.gui)
         self.export.setting_finished.connect(self.update_guidance)
 
@@ -287,17 +301,9 @@ class EventHandler:
         self.camera_thread = CameraThread()
         self.network_thread = NetworkThread()
 
-        self.lidar_thread = LidarThread()
-        
-        # Initialize LiDAR data processor and connect signals
-        self.lidar_data_processor = LidarDataProcessor(
-            self, self.lidar_thread
-        )
-        self.lidar_thread.data_available.connect(
-            self.lidar_data_processor.process_lidar_data
-        )
+
         self.lidar_handler = LidarHandler(self.lidar_thread, self.lidar_data_processor,
-                                        self.gui, self)
+                                        self.gui, self.velocity_plotter, self)
                                         
         self.gui.lidar_configuration.clicked.connect(self.lidar_handler.open_lidar_control)
 
@@ -317,7 +323,6 @@ class EventHandler:
             self.network_thread,
             self.video_thread
         )
-        self.velocity_plotter = VelocityPlotter(self.gui, self.frame_model)
 
     def open_algorithm_configuration(self):
         """

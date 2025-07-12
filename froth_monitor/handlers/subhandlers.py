@@ -954,11 +954,20 @@ class ROIHandler:
         self.overlay_widget.update()
         self.gui.statusBar().showMessage("Last ROI deleted")
 
+class TableDataHandler:
+    def __init__(self) -> None:
+        pass
+
 class VelocityPlotter:
-    def __init__(self, gui: MainGUIWindow, frame_model: FrameModel):
+    def __init__(self, gui: MainGUIWindow, frame_model: FrameModel, 
+    lidar_data_processor: LidarDataProcessor):
         self.gui = gui
         self.frame_model = frame_model
         self.plot_widget = self.gui.plot_widget
+        self.lidar_data_processor = lidar_data_processor
+
+        self.if_lidar = False
+        self.if_air_rec = False
 
     # ------------------------------------Plotting Functions------------------------------------------
     def update_velocity_plot(self):
@@ -1035,7 +1044,7 @@ class VelocityPlotter:
             # Limit history to the most recent WINDOW_SIZE elements
             if len(history) > WINDOW_SIZE:
                 history = history[-WINDOW_SIZE:]
-                
+
             # Create a fixed-size array for display (30 elements)
             display_data = [None] * WINDOW_SIZE
 
@@ -1074,29 +1083,129 @@ class VelocityPlotter:
         # Update the plot
         self.gui.plot_widget.update()
 
-    def update_ave_velo_table(self):
+    def update_table(self):
         """Update the average velocity table with data from all ROIs."""
         # Clear the table
         self.gui.velo_widget.clear()
         self.gui.velo_widget.setRowCount(len(self.frame_model.roi_list))
-
         list_data = []
+
         # Add data to the table
         for i, roi in enumerate(self.frame_model.roi_list):
-            # Skip if no velocity history
-            if roi.average_velocity_past_30s is None:
-                list_data.append("N/A")
-                continue
+            if self.if_lidar and len(self.lidar_data_processor.lidar_reading_history_av1s) > 1:
+                velo_n_fh = [roi.velo_history_with_time[-1], self.lidar_data_processor.lidar_reading_history_av1s[-1]]
+                logger.info("Velocity and Froth Height")
+                logger.info(velo_n_fh)
+                logger.info(self.lidar_data_processor.lidar_reading_history_av1s_only_v[-1])
 
-            # Add average velocity to the table
-            list_data.append(roi.average_velocity_past_30s)
+                # Add average velocity to the table
+                list_data.append(roi.average_velocity_past_30s)
 
-        print("List data:", list_data)
+        logger.info(f"Average_velocity_data: {list_data}")
         self.gui.velo_widget.setData(list_data)
         self.gui.velo_widget.setHorizontalHeaderLabels(
             ["ROI vs. mean_velocity (mm/s)"]
         )
         self.gui.velo_widget.setFormat("%.2f")
+
+    def update_fh_plot(self, lidar_reading_history_av1s_only_v):
+        """Update the velocity plot with data from all ROIs.
+
+        This method extracts velocity history data from each ROI in the frame_model's roi_list
+        and plots it on the plot_widget. Each ROI's velocity history is plotted as a separate
+        line with a different color and labeled in the legend.
+
+        The plot displays a fixed window of 30 elements (3 seconds) with new data appearing
+        from the right edge and older data scrolling to the left. When the history exceeds
+        30 elements, the oldest elements are removed to maintain the fixed window size.
+        """
+        import numpy as np
+        
+        # Clear the plot widget
+        self.gui.froth_height_plot_widget.clear()
+
+        # Check if there are any ROIs to plot
+        if not lidar_reading_history_av1s_only_v:
+            return
+
+        # Define a list of colors for different ROIs
+        colors = [
+            "r",
+            "g",
+            "b",
+            "c",
+            "m",
+            "y",
+            "w",
+        ]  # Red, green, blue, cyan, magenta, yellow, white
+
+        # Fixed window size (3 seconds)
+        WINDOW_SIZE = 30
+
+        # Helper function to sanitize froth height data
+        def sanitize_data(data):
+            """Remove invalid values (inf, nan, extremely large values) from data."""
+            sanitized = []
+            for value in data:
+                if value is not None and np.isfinite(value) and abs(value) < 1e6:
+                    sanitized.append(value)
+                else:
+                    sanitized.append(0.0)  # Replace invalid values with 0
+            return sanitized
+
+        # Sanitize the lidar reading history
+        sanitized_history = sanitize_data(lidar_reading_history_av1s_only_v)
+
+        # Find the maximum froth height for y-axis scaling
+        max_fh = 0
+        if sanitized_history:
+            max_fh = max(sanitized_history)
+
+        # Get the velocity history data
+        history = sanitized_history
+
+        # Limit history to the most recent WINDOW_SIZE elements
+        if len(history) > WINDOW_SIZE:
+            history = history[-WINDOW_SIZE:]
+
+        # Create a fixed-size array for display (30 elements)
+        display_data = [None] * WINDOW_SIZE
+
+        # Position the data so newest values appear on the right side
+        # Fill from the right side of the array (highest indices)
+        start_pos = WINDOW_SIZE - len(history)
+        for j, value in enumerate(history):
+            display_data[start_pos + j] = value
+
+        # Create x-axis data - higher x-values are on the right
+        x_data = list(range(WINDOW_SIZE))
+
+        # Create y-axis data with None values filtered out for plotting
+        # (pyqtgraph will skip None values when plotting)
+        plot_x = []
+        plot_y = []
+        for x, y in zip(x_data, display_data):
+            if y is not None and np.isfinite(y):
+                plot_x.append(x)
+                plot_y.append(y)
+
+        # Add the plot with a label for the legend
+        if plot_x and plot_y:  # Only plot if we have data
+            self.gui.froth_height_plot_widget.plot(
+                plot_x, plot_y, pen=colors[2], name=f"froth height"
+            )
+
+        # Set fixed x-axis range (0 to WINDOW_SIZE-1)
+        self.gui.froth_height_plot_widget.setXRange(0, WINDOW_SIZE - 1)
+
+        # Set appropriate y-axis range if there's data
+        if max_fh > 0 and np.isfinite(max_fh):
+            # Add some padding to the top of the y-axis
+            self.gui.froth_height_plot_widget.setYRange(0, max_fh * 1.1)
+
+        # Update the plot
+        self.gui.froth_height_plot_widget.update()
+
 
 class FrameProcessor:
     def __init__(
@@ -1271,10 +1380,7 @@ class FrameProcessor:
         # Update the velocity plot with the latest data
         if update_velo_plot:
             self.velocity_plotter.update_velocity_plot()
-
-        # Update the average velocity label
-        if update_average_velo:
-            self.velocity_plotter.update_ave_velo_table()
+            self.velocity_plotter.update_table()            
 
     def _display_frame_on_canvas(self, scaled_image):
         """
@@ -1324,11 +1430,13 @@ class LidarHandler:
                 lidar_thread: LidarThread,
                 lidar_data_processor: LidarDataProcessor,
                 gui: MainGUIWindow,
+                velocity_plotter: VelocityPlotter,
                 event_handler):
         self.lidar_thread = lidar_thread
         self.gui = gui
         self.event_handler = event_handler
         self.lidar_data_processor = lidar_data_processor
+        self.velocity_plotter = velocity_plotter
 
     def start_lidar_capture(self, port: str = "COM3", baudrate: int = 115200):
         """Start LiDAR data capture."""
@@ -1341,7 +1449,7 @@ class LidarHandler:
                 logger.info(f"""
                 Starting LiDAR capture on port {port} at {baudrate} baud.
                 """)
-                self.initialize_gui_lidar_mode()
+                self.initialize_lidar_mode()
                 return True
             else:
                 QMessageBox.warning(
@@ -1442,103 +1550,10 @@ class LidarHandler:
                 f"Failed to open LiDAR control dialog: {str(e)}"
             )
 
-    def initialize_gui_lidar_mode(self):
-        self.gui._trigger_jetson_mode()
+    def initialize_lidar_mode(self):
+        self.gui._trigger_lidar_mode()
+        self.velocity_plotter.if_lidar = True
+        self.event_handler.if_lidar = True
 
     def update_fh_plot(self, lidar_reading_history_av1s_only_v):
-        """Update the velocity plot with data from all ROIs.
-
-        This method extracts velocity history data from each ROI in the frame_model's roi_list
-        and plots it on the plot_widget. Each ROI's velocity history is plotted as a separate
-        line with a different color and labeled in the legend.
-
-        The plot displays a fixed window of 30 elements (3 seconds) with new data appearing
-        from the right edge and older data scrolling to the left. When the history exceeds
-        30 elements, the oldest elements are removed to maintain the fixed window size.
-        """
-        import numpy as np
-        
-        # Clear the plot widget
-        self.gui.froth_height_plot_widget.clear()
-
-        # Check if there are any ROIs to plot
-        if not lidar_reading_history_av1s_only_v:
-            return
-
-        # Define a list of colors for different ROIs
-        colors = [
-            "r",
-            "g",
-            "b",
-            "c",
-            "m",
-            "y",
-            "w",
-        ]  # Red, green, blue, cyan, magenta, yellow, white
-
-        # Fixed window size (3 seconds)
-        WINDOW_SIZE = 30
-
-        # Helper function to sanitize froth height data
-        def sanitize_data(data):
-            """Remove invalid values (inf, nan, extremely large values) from data."""
-            sanitized = []
-            for value in data:
-                if value is not None and np.isfinite(value) and abs(value) < 1e6:
-                    sanitized.append(value)
-                else:
-                    sanitized.append(0.0)  # Replace invalid values with 0
-            return sanitized
-
-        # Sanitize the lidar reading history
-        sanitized_history = sanitize_data(lidar_reading_history_av1s_only_v)
-
-        # Find the maximum froth height for y-axis scaling
-        max_fh = 0
-        if sanitized_history:
-            max_fh = max(sanitized_history)
-
-        # Get the velocity history data
-        history = sanitized_history
-
-        # Limit history to the most recent WINDOW_SIZE elements
-        if len(history) > WINDOW_SIZE:
-            history = history[-WINDOW_SIZE:]
-
-        # Create a fixed-size array for display (30 elements)
-        display_data = [None] * WINDOW_SIZE
-
-        # Position the data so newest values appear on the right side
-        # Fill from the right side of the array (highest indices)
-        start_pos = WINDOW_SIZE - len(history)
-        for j, value in enumerate(history):
-            display_data[start_pos + j] = value
-
-        # Create x-axis data - higher x-values are on the right
-        x_data = list(range(WINDOW_SIZE))
-
-        # Create y-axis data with None values filtered out for plotting
-        # (pyqtgraph will skip None values when plotting)
-        plot_x = []
-        plot_y = []
-        for x, y in zip(x_data, display_data):
-            if y is not None and np.isfinite(y):
-                plot_x.append(x)
-                plot_y.append(y)
-
-        # Add the plot with a label for the legend
-        if plot_x and plot_y:  # Only plot if we have data
-            self.gui.froth_height_plot_widget.plot(
-                plot_x, plot_y, pen=colors[2], name=f"froth height"
-            )
-
-        # Set fixed x-axis range (0 to WINDOW_SIZE-1)
-        self.gui.froth_height_plot_widget.setXRange(0, WINDOW_SIZE - 1)
-
-        # Set appropriate y-axis range if there's data
-        if max_fh > 0 and np.isfinite(max_fh):
-            # Add some padding to the top of the y-axis
-            self.gui.froth_height_plot_widget.setYRange(0, max_fh * 1.1)
-
-        # Update the plot
-        self.gui.froth_height_plot_widget.update()
+        self.velocity_plotter.update_fh_plot(lidar_reading_history_av1s_only_v)
