@@ -54,6 +54,7 @@ class ROI:
         self.cross_position = None
 
         self.delta_history = []
+        # timestamp, delta_pixels, calibrated_delta, velocity, froth_height, air_recovery
         self.arrow_dir = 0.0
         self.px2mm = px2mm
         self.mm2px = 1 / px2mm
@@ -65,6 +66,8 @@ class ROI:
         self.current_velocity = 0.0
         self.velo_only_history = []
         self.velo_history_with_time = []
+
+        self.history_with_fh = []
 
         self.average_velocity_past_30s = cast(float, None)
 
@@ -92,7 +95,7 @@ class ROI:
         if_new_velo = self.calculate_velocity(self.calibrated_delta)
         if_new_average = self.calculate_average_velocity()
         self.delta_history.append(
-            [self.timestamp, self.delta_pixels, self.calibrated_delta, None]
+            [self.timestamp, self.delta_pixels, self.calibrated_delta, None, None, None]
         )
 
         return if_new_velo, if_new_average
@@ -167,7 +170,7 @@ class ROI:
             self.timestamp_buffer = timestamp_buffer
 
             if len(self.delta_history) > 1:
-                self.delta_history[-1][-1] = self.current_velocity
+                self.delta_history[-1][3] = self.current_velocity
 
             # Validate before appending to history
             velocity_to_append = self.current_velocity
@@ -175,7 +178,7 @@ class ROI:
                 velocity_to_append = 0.0
             
             self.velo_only_history.append(velocity_to_append)
-            self.velo_history_with_time.append([velocity_to_append, self.timestamp_buffer])
+            self.velo_history_with_time.append([velocity_to_append, self.timestamp, time.time()])
             self.current_velocity = delta
             return True
 

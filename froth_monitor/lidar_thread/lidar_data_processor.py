@@ -6,6 +6,7 @@ It handles data buffering, averaging, and GUI updates.
 """
 
 from typing import cast, List
+import time
 from datetime import datetime
 from PySide6.QtWidgets import QMessageBox
 from froth_monitor.logger_config import get_logger
@@ -113,7 +114,7 @@ class LidarDataProcessor:
                 self.timestamp_buffer = timestamp_buffer
                 average_fh = sum(self.lidar_reading_buffer) / len(self.lidar_reading_buffer)
                 self.lidar_reading_history_av1s.append([[0, average_fh, \
-                    self.current_timestamp]])
+                    self.current_timestamp, time.time()]])
                 self.lidar_reading_history_av1s_only_v.append(average_fh)
 
                 self.lidar_reading_buffer = []

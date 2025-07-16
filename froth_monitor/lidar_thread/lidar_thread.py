@@ -286,12 +286,12 @@ class LidarThread(QObject):
                 writer = csv.writer(csvfile)
                 
                 # Write header
-                writer.writerow(['timestamp', 'distance_mm_inverted'])
+                writer.writerow(['timestamp', 'distance_mm'])
                 
                 # Write data
                 for timestamp, distance in zip(self.full_timestamps, self.full_distances):
                     formatted_timestamp = timestamp.strftime("%Y/%m/%d %H:%M:%S.%f")[:-3]
-                    writer.writerow([formatted_timestamp, -distance])  # Inverted for compatibility
+                    writer.writerow([formatted_timestamp, distance])  # Inverted for compatibility
             
             logger.info(f"LiDAR data exported to {filename}")
             return True

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QRect, QObject, Signal
+from PySide6.QtCore import Qt, QRect, QObject, Signal, QTimer
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtGui import QIcon
 
@@ -24,7 +24,7 @@ from PySide6.QtGui import QIcon
 from froth_monitor.gui_window import MainGUIWindow
 
 # Import FrameModel from fm_model module
-from froth_monitor.fm_model import FrameModel
+from froth_monitor.fm_model import FrameModel, ROI
 
 # Import the custom overlay widget
 from froth_monitor.overlay_widget import OverlayWidget
@@ -969,6 +969,10 @@ class VelocityPlotter:
         self.if_lidar = False
         self.if_air_rec = False
 
+        self.table_list_data = []
+        self.frame_lidar_hist = []
+        # self.table_list_data.append(["v(mm/s)", "f_height(mm)", "time"])
+
     # ------------------------------------Plotting Functions------------------------------------------
     def update_velocity_plot(self):
         """Update the velocity plot with data from all ROIs.
@@ -1086,27 +1090,13 @@ class VelocityPlotter:
     def update_table(self):
         """Update the average velocity table with data from all ROIs."""
         # Clear the table
-        self.gui.velo_widget.clear()
-        self.gui.velo_widget.setRowCount(len(self.frame_model.roi_list))
-        list_data = []
 
         # Add data to the table
         for i, roi in enumerate(self.frame_model.roi_list):
             if self.if_lidar and len(self.lidar_data_processor.lidar_reading_history_av1s) > 1:
-                velo_n_fh = [roi.velo_history_with_time[-1], self.lidar_data_processor.lidar_reading_history_av1s[-1]]
-                logger.info("Velocity and Froth Height")
-                logger.info(velo_n_fh)
-                logger.info(self.lidar_data_processor.lidar_reading_history_av1s_only_v[-1])
-
-                # Add average velocity to the table
-                list_data.append(roi.average_velocity_past_30s)
-
-        logger.info(f"Average_velocity_data: {list_data}")
-        self.gui.velo_widget.setData(list_data)
-        self.gui.velo_widget.setHorizontalHeaderLabels(
-            ["ROI vs. mean_velocity (mm/s)"]
-        )
-        self.gui.velo_widget.setFormat("%.2f")
+                # Start asynchronous matching - results will be handled by signal callbacks
+                self.start_matching_velo_n_lidar(i, roi, len(roi.delta_history)-2)
+                # Note: The actual processing now happens in _on_match_found callback
 
     def update_fh_plot(self, lidar_reading_history_av1s_only_v):
         """Update the velocity plot with data from all ROIs.
@@ -1206,6 +1196,164 @@ class VelocityPlotter:
         # Update the plot
         self.gui.froth_height_plot_widget.update()
 
+    def start_matching_velo_n_lidar(self, roi_number, roi, index):
+        """Start asynchronous matching of velocity and lidar data.
+        
+        Args:
+            velo_data: Velocity data with timestamp
+        """
+        if not hasattr(self, 'matcher'):
+            self.matcher = VelocityLidarMatcher(self.lidar_data_processor)
+            self.matcher.match_found.connect(self._on_match_found)
+            self.matcher.match_failed.connect(self._on_match_failed)
+        
+        logger.info(f"===Start matching frame and lidar {roi_number}===")
+        logger.info(f"Frame index {index}")
+        self.matcher.start_matching(roi, index)
+
+    def _on_match_found(self, roi, velo_data, lidar_data, index):
+        """Handle successful match between velocity and lidar data."""
+        velo_n_fh = [velo_data, lidar_data]
+        logger.info("Velocity and Froth Height Match Found:")
+        logger.info(velo_n_fh)
+
+        roi.delta_history[index][4] = lidar_data[0][1]
+        
+        self.table_list_data = [[velo_data[0], lidar_data[0][1], velo_data[1]]]
+        self.gui.velo_widget.setData(self.table_list_data )
+        self.gui.velo_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec"])
+        self.gui.velo_widget.setFormat("%.2f")
+        self.gui.velo_widget.setMinimumHeight(110)
+        self.gui.velo_widget.setMinimumWidth(50)  # Fixed width
+        self.gui.velo_widget.setStyleSheet(
+            """
+            background-color: #f0f0f0; 
+            font-size: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            """
+        )
+
+        self.frame_lidar_hist.append(self.table_list_data)
+        
+    def _on_match_failed(self, roi, velo_data, index):
+        """Handle failed match between velocity and lidar data."""
+        logger.info(f"No matching lidar data found for velocity timestamp: {velo_data[1][:8]}")
+    
+    def stop_matcher(self):
+        """Stop the velocity-lidar matcher if it exists."""
+        if hasattr(self, 'matcher'):
+            self.matcher.stop_matching()
+    
+class VelocityLidarMatcher(QObject):
+    """Asynchronous matcher for velocity and lidar data based on timestamps."""
+    
+    # Signals
+    match_found = Signal(ROI, list, list, int)  # velo_data, lidar_data, frame index
+    match_failed = Signal(ROI, list, int)  # velo_data
+    
+    def __init__(self, lidar_data_processor):
+        super().__init__()
+        self.lidar_data_processor = lidar_data_processor
+        self.roi: ROI = cast(ROI, None)
+        self.index = 0
+        self.matching_timer = QTimer()
+        self.matching_timer.timeout.connect(self._check_for_match)
+        self.current_velo_data = None
+        self.target_timestamp = None
+        self.current_roi_number = 0
+        self.start_time = cast(float, None)
+        self.max_wait_time = 1.0  # 1 second maximum wait
+        self.initial_lidar_count = 0
+        
+    def start_matching(self, roi: ROI, index):
+
+        """Start matching process for given velocity data."""
+        self.roi = roi
+        self.index = index
+
+        velo_data = roi.velo_history_with_time[-1]
+        self.current_velo_data = velo_data
+        self.target_timestamp = velo_data[1][:8] # Extract HH:MM:SS
+        self.target_time_marker = velo_data[2]
+        self.start_time = cast(float, None)
+
+        # Get current lidar data
+        lidar_history = self.lidar_data_processor.lidar_reading_history_av1s
+
+        if not lidar_history:
+            self.match_failed.emit(self.current_roi_number, velo_data)
+            return
+
+        self.initial_lidar_count = len(lidar_history)
+
+        # Check for immediate match
+        if self._check_immediate_match(lidar_history):
+            return
+
+        # Start timer for periodic checking
+        self.start_time = time.time()
+        self.matching_timer.start(100) # Check every 100ms
+        
+    def _check_immediate_match(self, lidar_history):
+        """Check for immediate match in current lidar data."""
+        latest_lidar_data = lidar_history[-1]
+        latest_lidar_timestamp = latest_lidar_data[0][2][:8]  # Extract HH:MM:SS
+        
+        # Scenario 1: Exact match
+        if self.target_timestamp == latest_lidar_timestamp:
+            self.match_found.emit(self.roi, self.current_velo_data, latest_lidar_data, self.index)
+            return True
+            
+        # Scenario 2: Lidar timestamp is later - search backwards
+        elif latest_lidar_timestamp > self.target_timestamp:
+            for lidar_data in reversed(lidar_history):
+                lidar_ts = lidar_data[2][:8]
+                if lidar_ts == self.target_timestamp:
+                    self.match_found.emit(self.roi, self.current_velo_data, latest_lidar_data, self.index)
+                    return True
+                elif lidar_ts < self.target_timestamp:
+                    break
+
+            # No match found in history
+            self.match_failed.emit(self.roi, self.current_velo_data, self.index)
+            return True
+            
+        # Scenario 3: Lidar timestamp is earlier - need to wait
+        return False
+        
+    def _check_for_match(self):
+        """Periodic check for new lidar data during waiting period."""
+        import time
+        
+        # Check timeout
+        if time.time() - self.start_time > self.max_wait_time:
+            self.matching_timer.stop()
+            self.match_failed.emit(self.roi, self.current_velo_data, self.index)
+            return
+            
+        # Check for new lidar data
+        current_lidar_history = self.lidar_data_processor.lidar_reading_history_av1s
+        if len(current_lidar_history) > self.initial_lidar_count:
+            # New data arrived
+            new_latest_data = current_lidar_history[-1]
+            new_latest_timestamp = new_latest_data[0][2][:8]
+            
+            if new_latest_timestamp == self.target_timestamp:
+                self.matching_timer.stop()
+                self.match_found.emit(self.roi, self.current_velo_data, new_latest_data, self.index)
+            elif new_latest_timestamp > self.target_timestamp:
+                # Timestamp jumped past target
+                self.matching_timer.stop()
+                self.match_failed.emit(self.roi, self.current_velo_data, self.index)
+            
+            # Update count for next iteration
+            self.initial_lidar_count = len(current_lidar_history)
+    
+    def stop_matching(self):
+        """Stop the matching timer if it's running."""
+        if self.matching_timer.isActive():
+            self.matching_timer.stop() 
 
 class FrameProcessor:
     def __init__(

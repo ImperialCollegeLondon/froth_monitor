@@ -668,7 +668,7 @@ class MainGUIWindow(QMainWindow):
 
         layout.addWidget(video_table_container)
         self._create_media_controls(layout)
-    
+
     def _create_table_group(self, layout) -> None:
         table_label_1 = QLabel("Average froth data over the last second")
         table_label_1.setStyleSheet("color: black; font-size: 14px; font-weight: bold;")
@@ -877,8 +877,6 @@ class MainGUIWindow(QMainWindow):
     def _trigger_jetson_mode(self) -> None:
         self.froth_height_label.setVisible(True)
         self.froth_height_plot_widget.setVisible(True)
-    # The createMenuBar, add_buttons, add_canvas_placeholder, and add_ROI_movement_placeholder methods
-    # have been integrated into the new initUI method to create a more modern interface
 
     def _trigger_lidar_mode(self) -> None:
         self.froth_height_label.setVisible(True)

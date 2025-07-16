@@ -500,6 +500,7 @@ class Export(QFileDialog):
                 delta_pixels = frame_data[1]
                 calibrated_delta = frame_data[2]
                 velocity = frame_data[3]
+                froth_height = frame_data[4]
 
                 # print("frame_index: ", frame_index + 1)
                 # print("delta_pixels: ", delta_pixels)
@@ -516,6 +517,7 @@ class Export(QFileDialog):
                         "delta_pixels_y(px/frame)": delta_pixels[1],
                         "calibrated_delta(px/frame)": calibrated_delta,
                         "Velocity(mm/s)": velocity,
+                        "Froth Height(mm)": froth_height,
                     }
                 )
 
@@ -554,6 +556,7 @@ class Export(QFileDialog):
                     "delta_pixels_y(px/frame)",
                     "calibrated_delta(px/frame)",
                     "Velocity(mm/s)",
+                    "Froth Height(mm)",
                 ]
             )
 
@@ -567,6 +570,7 @@ class Export(QFileDialog):
                         movement["delta_pixels_y(px/frame)"],
                         movement["calibrated_delta(px/frame)"],
                         movement["Velocity(mm/s)"],
+                        movement["Froth Height(mm)"],
                     ]
                 )
 
