@@ -51,7 +51,8 @@ from froth_monitor.handlers.subhandlers import (
     OverlayHandler,
     ROIHandler,
     FrameProcessor,
-    VelocityPlotter
+    VelocityPlotter,
+    AirRecoveryHandler
 )
 from froth_monitor.logger_config import get_logger
 
@@ -287,8 +288,12 @@ class EventHandler:
         self.lidar_thread.data_available.connect(
             self.lidar_data_processor.process_lidar_data
         )
+        
+        # Initialize Air Recovery data processor
+        from froth_monitor.air_recovery import AirRecoveryDataProcessor
+        self.air_recovery_data_processor = AirRecoveryDataProcessor(self)
 
-        self.velocity_plotter = VelocityPlotter(self.gui, self.frame_model, self.lidar_data_processor)
+        self.velocity_plotter = VelocityPlotter(self.gui, self.frame_model, self.lidar_data_processor, self.air_recovery_data_processor)
 
         self.export = Export(self.gui)
         self.export.setting_finished.connect(self.update_guidance)
@@ -306,6 +311,10 @@ class EventHandler:
                                         self.gui, self.velocity_plotter, self)
                                         
         self.gui.lidar_configuration.clicked.connect(self.lidar_handler.open_lidar_control)
+        
+        # Initialize Air Recovery handler
+        self.air_recovery_handler = AirRecoveryHandler(self.air_recovery_data_processor, self.gui, self)
+        self.gui.air_rec_configuration.clicked.connect(self.air_recovery_handler.open_air_recovery_control)
 
         self.video_thread: NetworkThread | CameraThread = \
             cast(NetworkThread | CameraThread, CameraThread())

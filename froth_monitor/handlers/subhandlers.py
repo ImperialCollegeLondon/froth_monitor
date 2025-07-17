@@ -35,6 +35,7 @@ from froth_monitor.video_threads.network_thread import NetworkThread
 from froth_monitor.lidar_thread.lidar_thread import LidarThread
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 from froth_monitor.lidar_thread.lidar_control_dialog import LidarControlDialog
+from froth_monitor.air_recovery import AirRecoveryDataProcessor
 
 from froth_monitor.export import Export
 
@@ -960,11 +961,12 @@ class TableDataHandler:
 
 class VelocityPlotter:
     def __init__(self, gui: MainGUIWindow, frame_model: FrameModel, 
-    lidar_data_processor: LidarDataProcessor):
+    lidar_data_processor: LidarDataProcessor, air_recovery_data_processor: AirRecoveryDataProcessor):
         self.gui = gui
         self.frame_model = frame_model
         self.plot_widget = self.gui.plot_widget
         self.lidar_data_processor = lidar_data_processor
+        self.air_recovery_data_processor = air_recovery_data_processor
 
         self.if_lidar = False
         self.if_air_rec = False
@@ -1217,11 +1219,16 @@ class VelocityPlotter:
         logger.info("Velocity and Froth Height Match Found:")
         logger.info(velo_n_fh)
 
-        roi.delta_history[index][4] = lidar_data[0][1]
+        froth_height = lidar_data[0][1]
+        velocity = velo_data[0]
+        timestamp = velo_data[1]
+        roi.delta_history[index][4] = froth_height
+        air_rec = self.air_rec_calculation(velocity, froth_height, timestamp)
+        logger.info(f"Air Recovery{air_rec}")
         
-        self.table_list_data = [[velo_data[0], lidar_data[0][1], velo_data[1]]]
+        self.table_list_data = [[velo_data[0], lidar_data[0][1], air_rec]]
         self.gui.velo_widget.setData(self.table_list_data )
-        self.gui.velo_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec"])
+        self.gui.velo_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec(%)"])
         self.gui.velo_widget.setFormat("%.2f")
         self.gui.velo_widget.setMinimumHeight(110)
         self.gui.velo_widget.setMinimumWidth(50)  # Fixed width
@@ -1245,6 +1252,38 @@ class VelocityPlotter:
         if hasattr(self, 'matcher'):
             self.matcher.stop_matching()
     
+    def air_rec_calculation(self, velocity, froth_height) -> float:
+        """
+        Calculate air recovery using the air recovery data processor.
+        
+        Args:
+            velocity (float): Overflow velocity in mm/s
+            froth_height (float): Froth height in mm
+            
+        Returns:
+            float: Air recovery percentage
+        """
+        try:
+            # Get current timestamp
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            
+            # Process data through air recovery processor
+            if hasattr(self, 'air_recovery_data_processor'):
+                self.air_recovery_data_processor.process_air_recovery_data(
+                    velocity, froth_height, timestamp
+                )
+                air_rec = self.air_recovery_data_processor.get_current_air_recovery()
+            else:
+                logger.warning("Air recovery data processor not available")
+                air_rec = 0.0
+                
+            return air_rec
+            
+        except Exception as e:
+            logger.error(f"Error in air recovery calculation: {e}")
+            return 0.0
+        
 class VelocityLidarMatcher(QObject):
     """Asynchronous matcher for velocity and lidar data based on timestamps."""
     
@@ -1572,6 +1611,29 @@ class FrameProcessor:
             self.gui.statusBar().showMessage(
                 f"Frame: {self.current_frame_number} | Time: {self.frame_model.last_processed_time}"
             )
+
+class AirRecoveryHandler:
+    """Handler for air recovery functionality."""
+    
+    def __init__(self, air_recovery_data_processor, gui: MainGUIWindow, event_handler):
+        self.air_recovery_data_processor = air_recovery_data_processor
+        self.gui = gui
+        self.event_handler = event_handler
+        
+    def open_air_recovery_control(self):
+        """Open the air recovery control dialog."""
+        try:
+            from froth_monitor.air_recovery import AirRecoveryControlDialog
+            dialog = AirRecoveryControlDialog(self.event_handler, self.gui)
+            dialog.show()
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                self.gui,
+                "Error",
+                f"Failed to open air recovery control dialog: {str(e)}"
+            )
+            logger.error(f"Error opening air recovery control dialog: {e}")
 
 class LidarHandler:
     def __init__(self,
