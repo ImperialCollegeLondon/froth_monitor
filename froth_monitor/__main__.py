@@ -49,6 +49,5 @@ if __name__ == "__main__":
 ### Average value display on the table
 
 ### Graph - limit of y-label
-
 ### Air-rec panel
 ### User-defined air-flow

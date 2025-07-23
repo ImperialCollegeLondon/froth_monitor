@@ -44,7 +44,9 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QFont
 from datetime import datetime
 from openpyxl import Workbook
+from typing import cast
 from froth_monitor.logger_config import get_logger
+from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 
 # Initialize logger for this module
 logger = get_logger(__name__)
@@ -427,10 +429,20 @@ class Export(QFileDialog):
         self.setting_finished.emit()
         dialog.accept()
 
-    def excel_results(self, rois: list, arrow_angle: float, px2mm: float) -> bool:
+    def excel_results(self, 
+    rois: list, 
+    arrow_angle: float, 
+    px2mm: float,
+    lidar_data_processor: LidarDataProcessor = cast(LidarDataProcessor, None)) -> bool:
         """
         Handles exporting data for the program.
         """
+        if lidar_data_processor is cast(LidarDataProcessor, None):
+            logger.info("No lidar data for export")
+
+        else:
+            logger.info("Lidar data deteccted")
+
         try:
             # Check if export directory and filename are set
             if not self.export_directory or not self.export_filename:
@@ -448,7 +460,7 @@ class Export(QFileDialog):
             export_data = self.collect_export_data(rois, arrow_angle, px2mm)
 
             # Step 2: Write to both CSV and JSON
-            self.write_csv(file_path_csv, export_data)
+            self.write_csv(file_path_csv, export_data, lidar_data_processor)
 
             QMessageBox.information(
                 self.gui,
@@ -502,13 +514,6 @@ class Export(QFileDialog):
                 velocity = frame_data[3]
                 froth_height = frame_data[4]
 
-                # print("frame_index: ", frame_index + 1)
-                # print("delta_pixels: ", delta_pixels)
-                # print("calibrated_delta: ", calibrated_delta)  # Print the calibrated_delta element
-                # print("Velocity: ", velocity)
-                # print("timestamp: ", timestamp)
-                # print("\n")
-
                 roi_data["Movement Data"].append(
                     {
                         "Frame Index": frame_index + 1,
@@ -525,7 +530,44 @@ class Export(QFileDialog):
 
         return data
 
-    def write_csv(self, file_path: str, data: dict) -> None:
+    def write_froth_height(self, wb: Workbook, lidar_data_processor):
+            sheet_name = 'Froth Height'
+            ws = wb.create_sheet(title=sheet_name)
+
+            # Add headers
+            ws.append([
+                'reading_index', 
+                'distance_mm'
+            ])
+                
+            try:
+                max_len = max(
+                    len(lidar_data_processor.lidar_reading_history),
+                    len(lidar_data_processor.lidar_reading_history_av1s),
+                    len(lidar_data_processor.lidar_reading_history_av1s_only_v)
+                )
+                
+                for i in range(max_len):
+                    distance = lidar_data_processor.lidar_reading_history[i] \
+                        if i < len(lidar_data_processor.lidar_reading_history) else None
+
+                    # Extract the average distance value from the nested list structure
+                    # avg_distance = None
+                    # if i < len(lidar_data_processor.lidar_reading_history_av1s):
+                    #     avg_data = lidar_data_processor.lidar_reading_history_av1s[i]
+                    #     if avg_data and len(avg_data) > 0 and len(avg_data[0]) > 1:
+                    #         avg_distance = avg_data[0][1]  # Extract the average_fh value
+
+                    # velocity = lidar_data_processor.lidar_reading_history_av1s_only_v[i] \
+                    #     if i < len(lidar_data_processor.lidar_reading_history_av1s_only_v) else None
+                    
+                    ws.append([i, distance])
+                    
+            except Exception as e:
+                logger.error(e)
+
+    def write_csv(self, file_path: str, data: dict, 
+    lidar_data_processor: LidarDataProcessor = cast(LidarDataProcessor, None)) -> None:
         """
         Writes the export data to an Excel file, with each ROI in a separate sheet.
         """
@@ -541,6 +583,9 @@ class Export(QFileDialog):
         first_sheet.append([data["Arrow Direction"]])  # pyright: ignore
         first_sheet.append(["Pixels per mm"])  # pyright: ignore
         first_sheet.append([data["Pixels per mm"]])  # pyright: ignore
+
+        if lidar_data_processor:
+            self.write_froth_height(wb, lidar_data_processor)
 
         # Create separate sheets for each ROI
         for roi in data["roi_data"]:

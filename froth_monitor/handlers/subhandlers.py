@@ -1221,9 +1221,8 @@ class VelocityPlotter:
 
         froth_height = lidar_data[0][1]
         velocity = velo_data[0]
-        timestamp = velo_data[1]
         roi.delta_history[index][4] = froth_height
-        air_rec = self.air_rec_calculation(velocity, froth_height, timestamp)
+        air_rec = self.air_rec_calculation(velocity, froth_height)
         logger.info(f"Air Recovery{air_rec}")
         
         self.table_list_data = [[velo_data[0], lidar_data[0][1], air_rec]]

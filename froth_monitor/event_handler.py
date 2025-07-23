@@ -31,6 +31,7 @@ from froth_monitor.gui_window import MainGUIWindow
 from froth_monitor.fm_model import FrameModel
 
 # Import the custom overlay widget
+from froth_monitor.lidar_thread import lidar_data_processor
 from froth_monitor.overlay_widget import OverlayWidget
 
 # Import the camera and network threads
@@ -547,9 +548,20 @@ class EventHandler:
 
     def save_data(self):
         """Save the current analysis data."""
-        self.if_save = self.export.excel_results(
-            self.frame_model.roi_list, self.frame_model.degree, self.frame_model.px2mm
-        )
+        if self.lidar_data_processor.get_statistics() is not cast(dict, None):
+            self.if_save = self.export.excel_results(
+                self.frame_model.roi_list, 
+                self.frame_model.degree, 
+                self.frame_model.px2mm,
+                self.lidar_data_processor
+            )
+        else:
+            self.if_save = self.export.excel_results(
+                self.frame_model.roi_list, 
+                self.frame_model.degree, 
+                self.frame_model.px2mm,
+                lidar_data_processor=cast(LidarDataProcessor, None)
+            )
 
 
 if __name__ == "__main__":

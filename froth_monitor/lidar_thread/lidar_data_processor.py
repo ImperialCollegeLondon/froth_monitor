@@ -287,7 +287,7 @@ class LidarDataProcessor:
             dict: Dictionary containing statistical data
         """
         if not self.lidar_reading_history:
-            return {}
+            return cast(dict, None)
         
         import statistics
         
@@ -311,4 +311,4 @@ class LidarDataProcessor:
             
         except Exception as e:
             print(f"Error calculating LiDAR statistics: {e}")
-            return {}
+            return cast(dict, None)
