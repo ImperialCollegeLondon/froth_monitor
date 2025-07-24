@@ -969,7 +969,6 @@ class DataHandler:
 
         self.table_list_data = []
         self.frame_lidar_hist = []
-        # self.table_list_data.append(["v(mm/s)", "f_height(mm)", "time"])
 
     # ------------------------------------Plotting Functions------------------------------------------
     def update_velocity_plot(self):
@@ -1094,7 +1093,160 @@ class DataHandler:
             if self.if_lidar and len(self.lidar_data_processor.lidar_reading_history_av1s) > 1:
                 # Start asynchronous matching - results will be handled by signal callbacks
                 self.start_matching_velo_n_lidar(i, roi, len(roi.delta_history)-2)
-                # Note: The actual processing now happens in _on_match_found callback
+
+    def update_arec_tablengraph(self):
+        import numpy as np
+        
+        table_list_data = []
+
+        for i, roi in enumerate(self.frame_model.roi_list):
+            list_data_a = roi.sum_history[len(roi.sum_history)-1][:3]
+            logger.info(f'selected summary history of the roi: {list_data_a}')
+            # timestamp, velocity, froth_height, air_recovery, air flow rate, crcted air flrt
+            table_list_data.append(list_data_a)
+
+        self.gui.velo_widget.setData(table_list_data)
+        self.gui.velo_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec(%)"])
+        self.gui.velo_widget.setFormat("%.2f")
+        self.gui.velo_widget.setMinimumHeight(110)
+        self.gui.velo_widget.setMinimumWidth(80)  # Fixed width
+        self.gui.velo_widget.setStyleSheet(
+            """
+            background-color: #f0f0f0; 
+            font-size: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            """
+        )
+        
+        # Update air recovery plot with data from all ROIs
+        self._update_air_recovery_plot()
+    
+    def _update_air_recovery_plot(self):
+        """Update the air recovery plot with data from all ROIs.
+
+        This method extracts air recovery history data from each ROI in the frame_model's roi_list
+        and plots it on the ar_plot_widget. Each ROI's air recovery history is plotted as a separate
+        line with a different color and labeled in the legend.
+
+        The plot displays a fixed window of 30 elements (3 seconds) with new data appearing
+        from the right edge and older data scrolling to the left. When the history exceeds
+        30 elements, the oldest elements are removed to maintain the fixed window size.
+        """
+        import numpy as np
+        
+        # Clear the air recovery plot widget
+        self.gui.ar_plot_widget.clear()
+
+        # Check if there are any ROIs to plot
+        if not self.frame_model.roi_list:
+            return
+
+        # Define a list of colors for different ROIs
+        colors = [
+            "r",
+            "g",
+            "b",
+            "c",
+            "m",
+            "y",
+            "w",
+        ]  # Red, green, blue, cyan, magenta, yellow, white
+
+        # Fixed window size (3 seconds)
+        WINDOW_SIZE = 30
+
+        # Helper function to sanitize air recovery data
+        def sanitize_air_recovery_data(data):
+            """Remove invalid values (inf, nan, extremely large values) from air recovery data."""
+            sanitized = []
+            for value in data:
+                if value is not None and np.isfinite(value) and abs(value) < 1e6:
+                    sanitized.append(value)
+                else:
+                    sanitized.append(0.0)  # Replace invalid values with 0
+            return sanitized
+
+        # Extract air recovery history from sum_history (4th element, index 3)
+        def extract_air_recovery_history(roi):
+            """Extract air recovery values from roi.sum_history."""
+            air_recovery_history = []
+            for entry in roi.sum_history:
+                if len(entry) > 3:  # Ensure air_recovery exists (4th element)
+                    air_recovery_history.append(entry[3])  # air_recovery is at index 3
+                else:
+                    air_recovery_history.append(0.0)  # Default value if not available
+            return air_recovery_history
+
+        # Find the maximum air recovery across all ROIs for y-axis scaling
+        max_air_recovery = 0
+        if self.frame_model.roi_list and any(
+            roi.sum_history for roi in self.frame_model.roi_list
+        ):
+            all_air_recoveries = []
+            for roi in self.frame_model.roi_list:
+                if roi.sum_history:
+                    air_recovery_history = extract_air_recovery_history(roi)
+                    sanitized_history = sanitize_air_recovery_data(air_recovery_history)
+                    all_air_recoveries.extend(sanitized_history)
+            
+            if all_air_recoveries:
+                max_air_recovery = max(all_air_recoveries)
+
+        # Plot air recovery history for each ROI
+        for i, roi in enumerate(self.frame_model.roi_list):
+            # Skip if no sum_history
+            if not roi.sum_history:
+                continue
+
+            # Get color for this ROI (cycle through colors if more ROIs than colors)
+            color = colors[i % len(colors)]
+
+            # Get the air recovery history data and sanitize it
+            air_recovery_history = extract_air_recovery_history(roi)
+            history = sanitize_air_recovery_data(air_recovery_history)
+
+            # Limit history to the most recent WINDOW_SIZE elements
+            if len(history) > WINDOW_SIZE:
+                history = history[-WINDOW_SIZE:]
+
+            # Create a fixed-size array for display (30 elements)
+            display_data = [None] * WINDOW_SIZE
+
+            # Position the data at the right side of the display
+            # For example, if we have 5 elements, they go in positions 25-29 (0-indexed)
+            start_pos = WINDOW_SIZE - len(history)
+            for j, value in enumerate(history):
+                display_data[start_pos + j] = value
+
+            # Create x-axis data (fixed range from 0 to WINDOW_SIZE-1)
+            x_data = list(range(WINDOW_SIZE))
+
+            # Create y-axis data with None values filtered out for plotting
+            # (pyqtgraph will skip None values when plotting)
+            plot_x = []
+            plot_y = []
+            for x, y in zip(x_data, display_data):
+                if y is not None and np.isfinite(y):
+                    plot_x.append(x)
+                    plot_y.append(y)
+
+            # Add the plot with a label for the legend
+            if plot_x and plot_y:  # Only plot if we have data
+                self.gui.ar_plot_widget.plot(
+                    plot_x, plot_y, pen=color, name=f"ROI {i + 1}"
+                )
+
+        # Set fixed x-axis range (0 to WINDOW_SIZE-1)
+        self.gui.ar_plot_widget.setXRange(0, WINDOW_SIZE - 1)
+
+        # Set appropriate y-axis range if there's data
+        if max_air_recovery > 0 and np.isfinite(max_air_recovery):
+            # Add some padding to the top of the y-axis
+            self.gui.ar_plot_widget.setYRange(0, max_air_recovery * 1.1)
+
+        # Update the plot
+        self.gui.ar_plot_widget.update()
 
     def update_fh_plot(self, lidar_reading_history_av1s_only_v):
         """Update the velocity plot with data from all ROIs.
@@ -1201,16 +1353,17 @@ class DataHandler:
             velo_data: Velocity data with timestamp
         """
         if not hasattr(self, 'matcher'):
-            self.matcher = VelocityLidarMatcher(self.lidar_data_processor)
-            self.matcher.match_found.connect(self._on_match_found)
-            self.matcher.match_failed.connect(self._on_match_failed)
+            roi.matcher = VelocityLidarMatcher(self.lidar_data_processor)
+            roi.matcher.match_found.connect(self._on_match_found)
+            roi.matcher.match_failed.connect(self._on_match_failed)
         
         logger.info(f"===Start matching frame and lidar for ROI {roi_number + 1}===")
         logger.info(f"Frame index {index}")
-        self.matcher.start_matching(roi, index)
+        roi.matcher.start_matching(roi, index)
 
     def _on_match_found(self, roi, velo_data, lidar_data, index):
         """Handle successful match between velocity and lidar data."""
+
         velo_n_fh = [velo_data, lidar_data]
         logger.info("Velocity and Froth Height Match Found:")
         logger.info(velo_n_fh)
@@ -1221,32 +1374,17 @@ class DataHandler:
         roi.delta_history[index][4] = froth_height
         air_rec = self.air_rec_calculation(roi, velocity, froth_height, timestamp)
         logger.info(f"Air Recovery{air_rec}")
-        
-        self.table_list_data = [[velo_data[0], lidar_data[0][1], air_rec]]
-        self.gui.velo_widget.setData(self.table_list_data )
-        self.gui.velo_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec(%)"])
-        self.gui.velo_widget.setFormat("%.2f")
-        self.gui.velo_widget.setMinimumHeight(110)
-        self.gui.velo_widget.setMinimumWidth(50)  # Fixed width
-        self.gui.velo_widget.setStyleSheet(
-            """
-            background-color: #f0f0f0; 
-            font-size: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            """
-        )
 
-        self.frame_lidar_hist.append(self.table_list_data)
-        
+        self.update_arec_tablengraph()
+
     def _on_match_failed(self, roi, velo_data, index):
         """Handle failed match between velocity and lidar data."""
         logger.info(f"No matching lidar data found for velocity timestamp: {velo_data[1][:8]}")
     
-    def stop_matcher(self):
+    def stop_matcher(self, roi):
         """Stop the velocity-lidar matcher if it exists."""
-        if hasattr(self, 'matcher'):
-            self.matcher.stop_matching()
+        if hasattr(roi, 'matcher'):
+            roi.matcher.stop_matching()
     
     def air_rec_calculation(self, roi, velocity, froth_height, timestamp) -> float:
         """
@@ -1282,7 +1420,7 @@ class DataHandler:
     
     def roi_sum_history_append(self, roi, timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm):
         roi.sum_history.append([timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm])
-        logger.info(f"roi's sum_history{roi.sum_history}")
+
 
 class VelocityLidarMatcher(QObject):
     """Asynchronous matcher for velocity and lidar data based on timestamps."""

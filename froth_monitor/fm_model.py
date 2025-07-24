@@ -71,10 +71,9 @@ class ROI:
         self.velo_only_history = []
         self.velo_history_with_time = []
 
-        self.history_with_fh = []
-
         self.average_velocity_past_30s = cast(float, None)
-
+        self.matcher = None
+        
     def process_frame(self, frame: np.ndarray) -> tuple[bool, bool]:
         """
         Process a cropped frame using the VideoAnalysis.analyze function and store the results.

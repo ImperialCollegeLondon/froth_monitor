@@ -751,7 +751,7 @@ class MainGUIWindow(QMainWindow):
 
 
         # Apply custom fonts
-        self.ar_plot_widget.setLabel("left", "Air Recovery", units="mm/s", **self.plot_label_style)
+        self.ar_plot_widget.setLabel("left", "Air Recovery", units="%", **self.plot_label_style)
         self.ar_plot_widget.setLabel("bottom", "Time", units="secs", **self.plot_label_style)
         self.ar_plot_widget.getAxis('left').setTickFont(self.plot_tick_font)
         self.ar_plot_widget.getAxis('bottom').setTickFont(self.plot_tick_font)
