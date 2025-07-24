@@ -955,11 +955,7 @@ class ROIHandler:
         self.overlay_widget.update()
         self.gui.statusBar().showMessage("Last ROI deleted")
 
-class TableDataHandler:
-    def __init__(self) -> None:
-        pass
-
-class VelocityPlotter:
+class DataHandler:
     def __init__(self, gui: MainGUIWindow, frame_model: FrameModel, 
     lidar_data_processor: LidarDataProcessor, air_recovery_data_processor: AirRecoveryDataProcessor):
         self.gui = gui
@@ -1089,7 +1085,7 @@ class VelocityPlotter:
         # Update the plot
         self.gui.plot_widget.update()
 
-    def update_table(self):
+    def update_velo_table(self):
         """Update the average velocity table with data from all ROIs."""
         # Clear the table
 
@@ -1209,7 +1205,7 @@ class VelocityPlotter:
             self.matcher.match_found.connect(self._on_match_found)
             self.matcher.match_failed.connect(self._on_match_failed)
         
-        logger.info(f"===Start matching frame and lidar {roi_number}===")
+        logger.info(f"===Start matching frame and lidar for ROI {roi_number + 1}===")
         logger.info(f"Frame index {index}")
         self.matcher.start_matching(roi, index)
 
@@ -1221,8 +1217,9 @@ class VelocityPlotter:
 
         froth_height = lidar_data[0][1]
         velocity = velo_data[0]
+        timestamp = velo_data[1]
         roi.delta_history[index][4] = froth_height
-        air_rec = self.air_rec_calculation(velocity, froth_height)
+        air_rec = self.air_rec_calculation(roi, velocity, froth_height, timestamp)
         logger.info(f"Air Recovery{air_rec}")
         
         self.table_list_data = [[velo_data[0], lidar_data[0][1], air_rec]]
@@ -1251,7 +1248,7 @@ class VelocityPlotter:
         if hasattr(self, 'matcher'):
             self.matcher.stop_matching()
     
-    def air_rec_calculation(self, velocity, froth_height) -> float:
+    def air_rec_calculation(self, roi, velocity, froth_height, timestamp) -> float:
         """
         Calculate air recovery using the air recovery data processor.
         
@@ -1264,14 +1261,14 @@ class VelocityPlotter:
         """
         try:
             # Get current timestamp
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%H:%M:%S")
             
             # Process data through air recovery processor
             if hasattr(self, 'air_recovery_data_processor'):
-                self.air_recovery_data_processor.process_air_recovery_data(
-                    velocity, froth_height, timestamp
-                )
+                if self.air_recovery_data_processor is not None:
+                    timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm = \
+                        self.air_recovery_data_processor.process_air_recovery_data(velocity, froth_height, timestamp) # type: ignore
+
+                    self.roi_sum_history_append(roi, timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm)
                 air_rec = self.air_recovery_data_processor.get_current_air_recovery()
             else:
                 logger.warning("Air recovery data processor not available")
@@ -1282,7 +1279,11 @@ class VelocityPlotter:
         except Exception as e:
             logger.error(f"Error in air recovery calculation: {e}")
             return 0.0
-        
+    
+    def roi_sum_history_append(self, roi, timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm):
+        roi.sum_history.append([timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm])
+        logger.info(f"roi's sum_history{roi.sum_history}")
+
 class VelocityLidarMatcher(QObject):
     """Asynchronous matcher for velocity and lidar data based on timestamps."""
     
@@ -1403,7 +1404,7 @@ class FrameProcessor:
         overlay_widget: OverlayWidget,
         video_recorder: VideoRecorder,
         roi_handler: ROIHandler,
-        velocity_plotter: VelocityPlotter,
+        velocity_plotter: DataHandler,
     ):
         self.gui = gui
         self.event_handler = event_handler
@@ -1566,7 +1567,7 @@ class FrameProcessor:
         # Update the velocity plot with the latest data
         if update_velo_plot:
             self.velocity_plotter.update_velocity_plot()
-            self.velocity_plotter.update_table()            
+            self.velocity_plotter.update_velo_table()            
 
     def _display_frame_on_canvas(self, scaled_image):
         """
@@ -1639,7 +1640,7 @@ class LidarHandler:
                 lidar_thread: LidarThread,
                 lidar_data_processor: LidarDataProcessor,
                 gui: MainGUIWindow,
-                velocity_plotter: VelocityPlotter,
+                velocity_plotter: DataHandler,
                 event_handler):
         self.lidar_thread = lidar_thread
         self.gui = gui

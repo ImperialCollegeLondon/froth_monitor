@@ -55,6 +55,10 @@ class ROI:
 
         self.delta_history = []
         # timestamp, delta_pixels, calibrated_delta, velocity, froth_height, air_recovery
+
+        self.sum_history = []
+        # timestamp, velocity, froth_height, air_recovery, air flow rate, crcted air flrt
+        
         self.arrow_dir = 0.0
         self.px2mm = px2mm
         self.mm2px = 1 / px2mm

@@ -52,7 +52,7 @@ from froth_monitor.handlers.subhandlers import (
     OverlayHandler,
     ROIHandler,
     FrameProcessor,
-    VelocityPlotter,
+    DataHandler,
     AirRecoveryHandler
 )
 from froth_monitor.logger_config import get_logger
@@ -232,7 +232,7 @@ class EventHandler:
             self.overlay_widget,
             self.video_recorder,
             self.roi_handler,
-            self.velocity_plotter,
+            self.data_handler,
         )
 
         # Connect camera thread signals to frame processor
@@ -294,7 +294,7 @@ class EventHandler:
         from froth_monitor.air_recovery import AirRecoveryDataProcessor
         self.air_recovery_data_processor = AirRecoveryDataProcessor(self)
 
-        self.velocity_plotter = VelocityPlotter(self.gui, self.frame_model, self.lidar_data_processor, self.air_recovery_data_processor)
+        self.data_handler = DataHandler(self.gui, self.frame_model, self.lidar_data_processor, self.air_recovery_data_processor)
 
         self.export = Export(self.gui)
         self.export.setting_finished.connect(self.update_guidance)
@@ -309,7 +309,7 @@ class EventHandler:
 
 
         self.lidar_handler = LidarHandler(self.lidar_thread, self.lidar_data_processor,
-                                        self.gui, self.velocity_plotter, self)
+                                        self.gui, self.data_handler, self)
                                         
         self.gui.lidar_configuration.clicked.connect(self.lidar_handler.open_lidar_control)
         

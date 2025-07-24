@@ -61,7 +61,10 @@ class AirRecoveryDataProcessor:
         self.last_stats_update = datetime.now()
         self.stats_update_interval = 1.0  # seconds
 
-    def process_air_recovery_data(self, velocity: float, froth_height: float, timestamp: str = cast(str, None)):
+    def process_air_recovery_data(self, 
+    velocity: float, 
+    froth_height: float, 
+    timestamp: str) -> tuple[str, float, float, float, str, float] | None:
         """
         Process new velocity and froth height data to calculate air recovery.
 
@@ -71,10 +74,6 @@ class AirRecoveryDataProcessor:
             timestamp (str, optional): Timestamp string, defaults to current time
         """
         try:
-            # Use current time if no timestamp provided
-            if timestamp is None:
-                timestamp = datetime.now().strftime("%H:%M:%S")
-
             # Update current readings
             self.current_velocity = velocity
             self.current_froth_height = froth_height
@@ -106,8 +105,16 @@ class AirRecoveryDataProcessor:
 
             logger.debug(f"Air recovery calculated: {air_recovery:.2f}% (V={velocity:.1f}, FH={froth_height:.1f})")
 
+            current_air_flow = f'{self.air_flow_rate} {self.air_flow_unit}'
+            current_air_flow_in_mm = self._get_air_flow_in_mm3_per_s()
+
+            return timestamp, velocity, froth_height, \
+                air_recovery, current_air_flow, current_air_flow_in_mm
+
         except Exception as e:
             logger.error(f"Error processing air recovery data: {e}")
+
+
 
     def _calculate_air_recovery(self, velocity: float, froth_height: float) -> float:
         """

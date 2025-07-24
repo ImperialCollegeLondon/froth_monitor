@@ -457,7 +457,7 @@ class Export(QFileDialog):
             file_path_csv = f"{self.export_directory}/{self.export_filename}.csv"
 
             # Step 1: Collect data
-            export_data = self.collect_export_data(rois, arrow_angle, px2mm)
+            export_data = self.collect_export_data_normal(rois, arrow_angle, px2mm)
 
             # Step 2: Write to both CSV and JSON
             self.write_csv(file_path_csv, export_data, lidar_data_processor)
@@ -475,7 +475,7 @@ class Export(QFileDialog):
             )
             return False
 
-    def collect_export_data(self, rois: list, arrow_angle: float, px2mm: float) -> dict:
+    def collect_export_data_normal(self, rois: list, arrow_angle: float, px2mm: float) -> dict:
         """
         Collects and structures export data from the given regions of interest (ROIs).
 
@@ -505,7 +505,27 @@ class Export(QFileDialog):
             roi_data = {
                 "ROI Index": i + 1,
                 "Movement Data": [],
+                "Summary": []
             }
+
+            for frame_index, frame_data in enumerate(roi.sum_history):
+                timestamp = frame_data[0]
+                velocity = frame_data[1]
+                froth_height = frame_data[2]
+                air_recovery = frame_data[3]
+                air_flow_rate = frame_data[4]
+                crct_air_flow_rate = frame_data[5]
+
+                roi_data["Summary"].append(
+                    {
+                        "Timestamp": timestamp,
+                        "velocity": velocity,
+                        "froth_height": froth_height,
+                        "air_recovery": air_recovery,
+                        "air_flow_rate": air_flow_rate,
+                        "crct_air_flow_rate": crct_air_flow_rate
+                    }
+                )
 
             for frame_index, frame_data in enumerate(roi.delta_history):
                 timestamp = frame_data[0]
@@ -529,6 +549,8 @@ class Export(QFileDialog):
             data["roi_data"].append(roi_data)
 
         return data
+
+
 
     def write_froth_height(self, wb: Workbook, lidar_data_processor):
             sheet_name = 'Froth Height'
@@ -575,7 +597,6 @@ class Export(QFileDialog):
         wb = Workbook()
 
         # Add the arrow direction in the first sheet
-        # arrow_sheet = wb.active
         first_sheet = wb.active
 
         first_sheet.title = "Calibration Data"  # pyright: ignore
@@ -589,7 +610,7 @@ class Export(QFileDialog):
 
         # Create separate sheets for each ROI
         for roi in data["roi_data"]:
-            sheet_name = f"ROI {roi['ROI Index']}"
+            sheet_name = f"ROI {roi['ROI Index']} Movement Data"
             ws = wb.create_sheet(title=sheet_name)
 
             # Add headers
@@ -618,6 +639,27 @@ class Export(QFileDialog):
                         movement["Froth Height(mm)"],
                     ]
                 )
+
+            sheet_name = f"ROI {roi['ROI Index']} Summary"
+            ws_2 = wb.create_sheet(title=sheet_name)
+            ws_2.append([
+                "Timestamp",
+                "velocity",
+                "froth_height",
+                "air_recovery",
+                "air_flow_rate",
+                "air_flow_rate_in_mm3/s"
+            ])
+
+            for summary in roi["Summary"]:
+                ws_2.append([
+                    summary["Timestamp"],
+                    summary["velocity(mm/s)"],
+                    summary["froth_height(mm)"],
+                    summary["air_recovery(%)"],
+                    summary["air_flow_rate"],
+                    summary["crct_air_flow_rate"]
+                ])
 
         # Save the workbook
         wb.save(file_path)
