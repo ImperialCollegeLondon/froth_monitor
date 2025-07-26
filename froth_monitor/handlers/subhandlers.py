@@ -1100,16 +1100,21 @@ class DataHandler:
         table_list_data = []
 
         for i, roi in enumerate(self.frame_model.roi_list):
-            list_data_a = roi.sum_history[len(roi.sum_history)-1][:3]
+            timestamp = roi.sum_history[len(roi.sum_history)-1][0][:8]
+            list_data_a = roi.sum_history[len(roi.sum_history)-1][1:4]
             logger.info(f'selected summary history of the roi: {list_data_a}')
             # timestamp, velocity, froth_height, air_recovery, air flow rate, crcted air flrt
-            table_list_data.append(list_data_a)
+            table_list_data.append([timestamp] + list_data_a)
 
         self.gui.velo_widget.setData(table_list_data)
-        self.gui.velo_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec(%)"])
+        self.gui.velo_widget.setHorizontalHeaderLabels(["timestamp", "v(mm/s)", "f_height(mm)", "air_rec(%)"])
         self.gui.velo_widget.setFormat("%.2f")
         self.gui.velo_widget.setMinimumHeight(110)
-        self.gui.velo_widget.setMinimumWidth(80)  # Fixed width
+        self.gui.velo_widget.setColumnWidth(0, 65)
+        self.gui.velo_widget.setColumnWidth(1, 65)
+        self.gui.velo_widget.setColumnWidth(2, 65)
+        self.gui.velo_widget.setColumnWidth(3, 65)
+
         self.gui.velo_widget.setStyleSheet(
             """
             background-color: #f0f0f0; 

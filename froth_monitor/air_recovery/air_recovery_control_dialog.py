@@ -59,8 +59,87 @@ class AirRecoveryControlDialog(QDialog):
         """
         Set up the user interface.
         """
-        self.style_sheet_text = """
-        color:black;
+        self._create_stylesheets()
+        
+    def _create_stylesheets(self):
+        """
+        Initialize stylesheets for UI elements to match main GUI.
+        """
+        # Primary button style (matches main GUI ENABLED_BUTTON_STYLE)
+        self.PRIMARY_BUTTON_STYLE = """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+        """
+        
+        # Secondary button style (matches main GUI DISABLED_BUTTON_STYLE)
+        self.SECONDARY_BUTTON_STYLE = """
+            QPushButton {
+                background-color: #808080;
+                color: #404040;
+                font-size: 12px;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #909090;
+            }
+        """
+        
+        # Input field style
+        self.INPUT_FIELD_STYLE = """
+            background-color: white;
+            color: black;
+            font-size: 12px;
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        """
+        
+        # Label style for dark backgrounds
+        self.DARK_LABEL_STYLE = """
+            background-color: #3c4043;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 8px;
+            border-radius: 4px;
+        """
+        
+        # ComboBox style
+        self.COMBO_BOX_STYLE = """
+            QComboBox {
+                background-color: #f0f0f0;
+                font-size: 12px;
+                color: black;
+                padding: 5px;
+                border-radius: 4px;
+                border: 1px solid #ccc;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #666;
+                margin-right: 5px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                color: black;
+                selection-background-color: #4285f4;
+                selection-color: white;
+                border: 1px solid #ccc;
+            }
         """
 
         layout = QVBoxLayout(self)
@@ -75,7 +154,7 @@ class AirRecoveryControlDialog(QDialog):
         self.perimeter_spin.setRange(1.0, 100000.0)
         self.perimeter_spin.setValue(1000.0)
         self.perimeter_spin.setSingleStep(10.0)
-        self.perimeter_spin.setStyleSheet(self.style_sheet_text)
+        self.perimeter_spin.setStyleSheet(self.INPUT_FIELD_STYLE)
         self.perimeter_spin.valueChanged.connect(self.update_configuration)
         config_layout.addWidget(self.perimeter_spin, 0, 1)
         
@@ -110,7 +189,7 @@ class AirRecoveryControlDialog(QDialog):
         self.flow_rate_spin.setRange(0.1, 10000.0)
         self.flow_rate_spin.setValue(100.0)
         self.flow_rate_spin.setSingleStep(1.0)
-        self.flow_rate_spin.setStyleSheet(self.style_sheet_text)
+        self.flow_rate_spin.setStyleSheet(self.INPUT_FIELD_STYLE)
         self.flow_rate_spin.valueChanged.connect(self.update_configuration)
         direct_layout.addWidget(self.flow_rate_spin, 0, 1)
         
@@ -118,7 +197,7 @@ class AirRecoveryControlDialog(QDialog):
         direct_layout.addWidget(QLabel("Unit:"), 0, 2)
         self.flow_unit_combo = QComboBox()
         self.flow_unit_combo.addItems(["L/min", "m3/hr", "cm3/s"])
-        self.flow_unit_combo.setStyleSheet(self.style_sheet_text)
+        self.flow_unit_combo.setStyleSheet(self.COMBO_BOX_STYLE)
         self.flow_unit_combo.currentTextChanged.connect(self.update_configuration)
         direct_layout.addWidget(self.flow_unit_combo, 0, 3)
         
@@ -134,7 +213,7 @@ class AirRecoveryControlDialog(QDialog):
         self.jg_spin.setRange(0.01, 100.0)
         self.jg_spin.setValue(1.0)
         self.jg_spin.setSingleStep(0.1)
-        self.jg_spin.setStyleSheet(self.style_sheet_text)
+        self.jg_spin.setStyleSheet(self.INPUT_FIELD_STYLE)
         self.jg_spin.valueChanged.connect(self.update_configuration)
         jg_layout.addWidget(self.jg_spin, 0, 1)
         
@@ -144,7 +223,7 @@ class AirRecoveryControlDialog(QDialog):
         self.cell_area_spin.setRange(1.0, 1e10)
         self.cell_area_spin.setValue(1000000.0)
         self.cell_area_spin.setSingleStep(1000.0)
-        self.cell_area_spin.setStyleSheet(self.style_sheet_text)
+        self.cell_area_spin.setStyleSheet(self.INPUT_FIELD_STYLE)
         self.cell_area_spin.valueChanged.connect(self.update_configuration)
         jg_layout.addWidget(self.cell_area_spin, 1, 1)
         
@@ -153,10 +232,12 @@ class AirRecoveryControlDialog(QDialog):
         # Apply configuration and reset buttons
         apply_layout = QHBoxLayout()
         self.apply_config_btn = QPushButton("Apply Configuration")
+        self.apply_config_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
         self.apply_config_btn.clicked.connect(self.apply_configuration)
         apply_layout.addWidget(self.apply_config_btn)
         
         self.reset_config_btn = QPushButton("Reset Configuration")
+        self.reset_config_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
         self.reset_config_btn.clicked.connect(self.reset_configuration)
         apply_layout.addWidget(self.reset_config_btn)
         
@@ -201,7 +282,7 @@ class AirRecoveryControlDialog(QDialog):
         self.stats_text = QTextEdit()
         self.stats_text.setMaximumHeight(150)
         self.stats_text.setReadOnly(True)
-        self.stats_text.setStyleSheet(self.style_sheet_text)
+        self.stats_text.setStyleSheet(self.INPUT_FIELD_STYLE)
         stats_layout.addWidget(self.stats_text, 0, 0, 1, 2)
         
         layout.addWidget(stats_group)
@@ -210,10 +291,12 @@ class AirRecoveryControlDialog(QDialog):
         data_layout = QHBoxLayout()
         
         self.export_btn = QPushButton("Export Data")
+        self.export_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
         self.export_btn.clicked.connect(self.export_data)
         data_layout.addWidget(self.export_btn)
         
         self.clear_btn = QPushButton("Clear Data")
+        self.clear_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
         self.clear_btn.clicked.connect(self.clear_data)
         data_layout.addWidget(self.clear_btn)
         
@@ -224,6 +307,7 @@ class AirRecoveryControlDialog(QDialog):
         close_layout.addStretch()
         
         self.close_btn = QPushButton("Close")
+        self.close_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
         self.close_btn.clicked.connect(self.close)
         close_layout.addWidget(self.close_btn)
         

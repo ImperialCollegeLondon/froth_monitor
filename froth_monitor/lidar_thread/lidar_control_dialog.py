@@ -53,14 +53,95 @@ class LidarControlDialog(QDialog):
         self.update_timer.start(1000)  # Update every second
         
         self.setup_ui()
+        self.refresh_ports()  # Load full device names on startup
         self.update_controls_state()
 
     def setup_ui(self):
         """
         Set up the user interface.
         """
-        self.style_sheet_text = """
-        color:black;
+        self._create_stylesheets()
+        
+    def _create_stylesheets(self):
+        """
+        Initialize stylesheets for UI elements to match main GUI.
+        """
+        # Primary button style (matches main GUI ENABLED_BUTTON_STYLE)
+        self.PRIMARY_BUTTON_STYLE = """
+            QPushButton {
+                background-color: #4285f4;
+                color: white;
+                font-size: 12px;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #3367d6;
+            }
+        """
+        
+        # Secondary button style (matches main GUI DISABLED_BUTTON_STYLE)
+        self.SECONDARY_BUTTON_STYLE = """
+            QPushButton {
+                background-color: #808080;
+                color: #404040;
+                font-size: 12px;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #909090;
+            }
+        """
+        
+        # Input field style
+        self.INPUT_FIELD_STYLE = """
+            background-color: white;
+            color: black;
+            font-size: 12px;
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        """
+        
+        # Label style for dark backgrounds
+        self.DARK_LABEL_STYLE = """
+            background-color: #3c4043;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 8px;
+            border-radius: 4px;
+        """
+        
+        self.COMBO_BOX_STYLE = \
+            """
+            QComboBox {
+                background-color: #f0f0f0;
+                font-size: 12px;
+                color: black;
+                padding: 5px;
+                border-radius: 4px;
+                border: 1px solid #ccc;
+            }
+            QComboBox::drop-down {
+                border: none;
+                color: black;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #666;
+                margin-right: 5px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                color: black;
+                selection-background-color: #4285f4;
+                selection-color: white;
+                border: 1px solid #ccc;
+            }
         """
 
         layout = QVBoxLayout(self)
@@ -73,11 +154,17 @@ class LidarControlDialog(QDialog):
         connection_layout.addWidget(QLabel("Serial Port:"), 0, 0)
         self.port_combo = QComboBox()
         self.port_combo.setEditable(True)
-        self.port_combo.addItems(["COM3", "COM4", "COM5", "COM6", "COM7", "COM8"])
+        self.port_combo.setStyleSheet(self.COMBO_BOX_STYLE)
+            
+        # Add default ports with device names as user data
+        default_ports = ["COM3", "COM4", "COM5", "COM6", "COM7", "COM8"]
+        for port in default_ports:
+            self.port_combo.addItem(port, port)
         connection_layout.addWidget(self.port_combo, 0, 1)
         
         # Refresh ports button
         self.refresh_ports_btn = QPushButton("Refresh")
+        self.refresh_ports_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
         self.refresh_ports_btn.clicked.connect(self.refresh_ports)
         connection_layout.addWidget(self.refresh_ports_btn, 0, 2)
         
@@ -87,7 +174,7 @@ class LidarControlDialog(QDialog):
         self.baudrate_spin.setRange(9600, 921600)
         self.baudrate_spin.setValue(38400)
         self.baudrate_spin.setSingleStep(9600)
-        self.baudrate_spin.setStyleSheet(self.style_sheet_text)
+        self.baudrate_spin.setStyleSheet(self.INPUT_FIELD_STYLE)
         connection_layout.addWidget(self.baudrate_spin, 1, 1)
         
         # Distance offset
@@ -96,7 +183,7 @@ class LidarControlDialog(QDialog):
         self.offset_spin.setRange(-1000.0, 1000.0)
         self.offset_spin.setValue(0.0)
         self.offset_spin.setSingleStep(1.0)
-        self.offset_spin.setStyleSheet(self.style_sheet_text)
+        self.offset_spin.setStyleSheet(self.INPUT_FIELD_STYLE)
         self.offset_spin.valueChanged.connect(self.update_offset)
         connection_layout.addWidget(self.offset_spin, 2, 1)
         
@@ -106,18 +193,22 @@ class LidarControlDialog(QDialog):
         control_layout = QHBoxLayout()
         
         self.start_btn = QPushButton("Start LiDAR")
+        self.start_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
         self.start_btn.clicked.connect(self.start_lidar)
         control_layout.addWidget(self.start_btn)
         
         self.stop_btn = QPushButton("Stop LiDAR")
+        self.stop_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
         self.stop_btn.clicked.connect(self.stop_lidar)
         control_layout.addWidget(self.stop_btn)
         
         self.pause_btn = QPushButton("Pause")
+        self.pause_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
         self.pause_btn.clicked.connect(self.pause_lidar)
         control_layout.addWidget(self.pause_btn)
         
         self.resume_btn = QPushButton("Resume")
+        self.resume_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
         self.resume_btn.clicked.connect(self.resume_lidar)
         control_layout.addWidget(self.resume_btn)
         
@@ -156,7 +247,7 @@ class LidarControlDialog(QDialog):
         self.stats_text = QTextEdit()
         self.stats_text.setMaximumHeight(150)
         self.stats_text.setReadOnly(True)
-        self.stats_text.setStyleSheet(self.style_sheet_text)
+        self.stats_text.setStyleSheet(self.INPUT_FIELD_STYLE)
         stats_layout.addWidget(self.stats_text, 0, 0, 1, 2)
         
         layout.addWidget(stats_group)
@@ -165,10 +256,12 @@ class LidarControlDialog(QDialog):
         data_layout = QHBoxLayout()
         
         self.export_btn = QPushButton("Export Data")
+        self.export_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
         self.export_btn.clicked.connect(self.export_data)
         data_layout.addWidget(self.export_btn)
         
         self.clear_btn = QPushButton("Clear Data")
+        self.clear_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
         self.clear_btn.clicked.connect(self.clear_data)
         data_layout.addWidget(self.clear_btn)
         
@@ -179,6 +272,7 @@ class LidarControlDialog(QDialog):
         close_layout.addStretch()
         
         self.close_btn = QPushButton("Close")
+        self.close_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
         self.close_btn.clicked.connect(self.close)
         close_layout.addWidget(self.close_btn)
         
@@ -194,15 +288,33 @@ class LidarControlDialog(QDialog):
             current_text = self.port_combo.currentText()
             self.port_combo.clear()
             
-            # Get available ports
-            ports = [port.device for port in serial.tools.list_ports.comports()]
+            # Get available ports with full descriptions
+            ports = serial.tools.list_ports.comports()
             
             if ports:
-                self.port_combo.addItems(ports)
-                # Try to restore previous selection
+                for port in ports:
+                    # Use full description if available, otherwise fall back to device name
+                    if port.description and port.description != 'n/a':
+                        display_name = f"{port.description} ({port.device})"
+                    else:
+                        display_name = port.device
+                    
+                    # Store the actual device name as user data for connection
+                    self.port_combo.addItem(display_name, port.device)
+                
+                # Try to restore previous selection by checking both display text and device name
                 index = self.port_combo.findText(current_text)
+                if index < 0:
+                    # If display text doesn't match, try to find by device name
+                    for i in range(self.port_combo.count()):
+                        if self.port_combo.itemData(i) == current_text:
+                            index = i
+                            break
+                
                 if index >= 0:
                     self.port_combo.setCurrentIndex(index)
+                
+                
             else:
                 self.port_combo.addItem("No ports found")
                 
@@ -217,9 +329,14 @@ class LidarControlDialog(QDialog):
         """
         Start LiDAR data capture.
         """
-        port = self.port_combo.currentText()
+        # Get the actual device name from user data, fall back to display text if not available
+        port_data = self.port_combo.currentData()
+        if port_data:
+            port = port_data
+        else:
+            port = self.port_combo.currentText()
+        
         baudrate = self.baudrate_spin.value()
-
         
         if not port or port == "No ports found":
             QMessageBox.warning(self, "Warning", "Please select a valid serial port.")
@@ -228,7 +345,6 @@ class LidarControlDialog(QDialog):
         success = self.event_handler.start_lidar_capture(port, baudrate)
 
         if success:
-
             self.update_controls_state()
 
     def stop_lidar(self):

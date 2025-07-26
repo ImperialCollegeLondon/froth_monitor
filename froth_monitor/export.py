@@ -288,8 +288,8 @@ class Export(QFileDialog):
         layout.addWidget(video_label)
 
         # Create radio buttons
-        yes_radio = QRadioButton("Yes (Enable video recording)")
-        no_radio = QRadioButton("No")
+        yes_radio = QRadioButton("Save recording in the same directory")
+        no_radio = QRadioButton("Select a different directory for saving recording")
         video_radio_layout = QHBoxLayout()
         video_radio_layout.addWidget(yes_radio)
         video_radio_layout.addWidget(no_radio)
