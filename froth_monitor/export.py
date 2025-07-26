@@ -519,11 +519,11 @@ class Export(QFileDialog):
                 roi_data["Summary"].append(
                     {
                         "Timestamp": timestamp,
-                        "velocity": velocity,
-                        "froth_height": froth_height,
-                        "air_recovery": air_recovery,
-                        "air_flow_rate": air_flow_rate,
-                        "crct_air_flow_rate": crct_air_flow_rate
+                        "Velocity(mm/s)": velocity,
+                        "Froth Height(mm)": froth_height,
+                        "Air Recovery(%)": air_recovery,
+                        "Air Flow Rate": air_flow_rate,
+                        "Air Flow Rate in (mm3/s)": crct_air_flow_rate
                     }
                 )
 
@@ -549,8 +549,6 @@ class Export(QFileDialog):
             data["roi_data"].append(roi_data)
 
         return data
-
-
 
     def write_froth_height(self, wb: Workbook, lidar_data_processor):
             sheet_name = 'Froth Height'
@@ -654,11 +652,11 @@ class Export(QFileDialog):
             for summary in roi["Summary"]:
                 ws_2.append([
                     summary["Timestamp"],
-                    summary["velocity(mm/s)"],
-                    summary["froth_height(mm)"],
-                    summary["air_recovery(%)"],
-                    summary["air_flow_rate"],
-                    summary["crct_air_flow_rate"]
+                    summary["Velocity(mm/s)"],
+                    summary["Froth Height(mm)"],
+                    summary["Air Recovery(%)"],
+                    summary["Air Flow Rate"],
+                    summary["Air Flow Rate in (mm3/s)"]
                 ])
 
         # Save the workbook

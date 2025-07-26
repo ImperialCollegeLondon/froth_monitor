@@ -13,14 +13,16 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QLineEdit,
     QRadioButton,
     QFrame,
     QGroupBox,
     QSpinBox,
+    QDoubleSpinBox,
     QSizePolicy,
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QIcon, QFont
 from pkg_resources import non_empty_lines
 import pyqtgraph as pg
@@ -46,11 +48,6 @@ class MainGUIWindow(QMainWindow):
         # self.showMaximized()
         self.setStyleSheet("background-color: #f0f0f0;")
         self._create_stylesheets()
-        # Initialize default arrow angle (90 degrees)
-        self.arrow_angle = -np.pi / 2
-
-        # Initialize default px2mm value (1.0)
-        self.px2mm = 1.0
 
         # Initialize overlay related attributes
         self.overlay_widget = None
@@ -661,6 +658,9 @@ class MainGUIWindow(QMainWindow):
         table_layout.addSpacing(15)  # Add spacing after air recovery graph
 
         self._create_air_rec_graph(table_layout)
+        
+        # Add air flow control panel (initially hidden)
+        self._create_air_flow_control_panel(table_layout)
 
         # Add to horizontal layout
         video_table_layout.addWidget(self.video_container, 1)
@@ -679,7 +679,7 @@ class MainGUIWindow(QMainWindow):
         self.velo_widget.setData(example_2d_data)
         self.velo_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec"])
         self.velo_widget.setFormat("%.2f")
-        self.velo_widget.setMinimumHeight(110)
+        self.velo_widget.setMinimumHeight(80)
         self.velo_widget.setMinimumWidth(50)  # Fixed width
         self.velo_widget.setStyleSheet(
             """
@@ -742,7 +742,7 @@ class MainGUIWindow(QMainWindow):
 
         self.ar_plot_widget = pg.PlotWidget()
         self.ar_plot_widget.setBackground("white")
-        self.ar_plot_widget.setMinimumHeight(150)
+        self.ar_plot_widget.setMinimumHeight(100)
         self.ar_plot_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
@@ -759,7 +759,94 @@ class MainGUIWindow(QMainWindow):
 
         layout.addWidget(graph_label)
         layout.addWidget(self.ar_plot_widget)
+        
+    def _create_air_flow_control_panel(self, layout) -> None:
+        """Create the air flow control panel that appears after configuration."""
+        self.air_flow_control_group = QGroupBox()
+        self.air_flow_control_group.setStyleSheet(
+            "QGroupBox { border: 1px solid #ccc; border-radius: 1px; margin: 1px; padding: 1px; }"
+        )
+        self.air_flow_control_group.setVisible(False)  # Initially hidden
+        
+        control_layout = QVBoxLayout(self.air_flow_control_group)
+        
+        # Method label
+        self.flow_method_label = QLabel("Method: Not Configured")
+        self.flow_method_label.setStyleSheet("font-weight: normal; font-size: 8px; color: #666;")
+        control_layout.addWidget(self.flow_method_label)
+        
+        # Direct flow rate controls (initially hidden)
+        self.direct_flow_widget = QWidget()
+        direct_layout = QHBoxLayout(self.direct_flow_widget)
+        direct_layout.setContentsMargins(0, 0, 0, 0)
+        
+        direct_layout.addWidget(QLabel("Flow Rate:"))
+        self.main_flow_rate_spin = QDoubleSpinBox()
+        self.main_flow_rate_spin.setRange(0.1, 10000.0)
+        self.main_flow_rate_spin.setValue(100.0)
+        self.main_flow_rate_spin.setSingleStep(1.0)
+        self.main_flow_rate_spin.setStyleSheet("background-color: white; font-size: 18px; padding: 2px; border-radius: 2px;")
+        direct_layout.addWidget(self.main_flow_rate_spin)
+        
+        self.main_flow_unit_label = QLabel("L/min")
+        direct_layout.addWidget(self.main_flow_unit_label)
+        direct_layout.addStretch()
+        
+        control_layout.addWidget(self.direct_flow_widget)
+        
+        # Jg controls (initially hidden)
+        self.jg_flow_widget = QWidget()
+        jg_layout = QGridLayout(self.jg_flow_widget)
+        jg_layout.setContentsMargins(0, 0, 0, 0)
+        
+        jg_layout.addWidget(QLabel("Jg (cm/s):"), 0, 0)
+        self.main_jg_spin = QDoubleSpinBox()
+        self.main_jg_spin.setRange(0.01, 100.0)
+        self.main_jg_spin.setValue(1.0)
+        self.main_jg_spin.setSingleStep(0.1)
+        self.main_jg_spin.setStyleSheet("background-color: white; font-size: 12px; padding: 5px; border-radius: 4px;")
+        jg_layout.addWidget(self.main_jg_spin, 0, 1)
+        
+        control_layout.addWidget(self.jg_flow_widget)
+        
+        # Apply button
+        self.apply_flow_btn = QPushButton("Apply Changes")
+        self.apply_flow_btn.setStyleSheet(self.ENABLED_BUTTON_STYLE)
+        control_layout.addWidget(self.apply_flow_btn)
+        
+        layout.addWidget(self.air_flow_control_group)
+        
+        # Initially hide both control widgets
+        self.direct_flow_widget.setVisible(False)
+        self.jg_flow_widget.setVisible(False)
+        
+    def show_air_flow_control_panel(self, event):
+        """Show the air flow control panel and configure it based on current settings."""
 
+        if event == "jg_method":
+            # Configure for Jg method
+            self.flow_method_label.setText("Method: Jg (Superficial Gas Velocity)")
+            self.direct_flow_widget.setVisible(False)
+            self.jg_flow_widget.setVisible(True)
+            
+
+        elif event == "normal_method":
+            # Configure for direct flow rate method
+            self.flow_method_label.setText("Method: Direct Air Flow Rate")
+            self.direct_flow_widget.setVisible(True)
+            self.jg_flow_widget.setVisible(False)
+
+        
+        # Connect apply button
+        # self.apply_flow_btn.clicked.connect(self.apply_main_flow_changes)
+        
+        # Show the panel
+        self.air_flow_control_group.setVisible(True)
+            
+    def hide_air_flow_control_panel(self):
+        """Hide the air flow control panel."""
+        self.air_flow_control_group.setVisible(False)
+    
     def _create_export_settings(self) -> QGroupBox:
         """
         Create the calibration controls.

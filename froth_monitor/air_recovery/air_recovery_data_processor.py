@@ -45,6 +45,10 @@ class AirRecoveryDataProcessor:
         self.use_jg_calculation = False
         self.jg_value = 1.0  # cm/s, superficial gas velocity
         self.cell_area = 1000000.0  # mm², default value
+        
+        # Configuration state tracking
+        self.is_configured = False
+        self.configuration_locked = False
 
         # Historical data storage
         self.air_recovery_history = []  # All air recovery calculations
@@ -104,8 +108,12 @@ class AirRecoveryDataProcessor:
             self._update_gui()
 
             logger.debug(f"Air recovery calculated: {air_recovery:.2f}% (V={velocity:.1f}, FH={froth_height:.1f})")
-
-            current_air_flow = f'{self.air_flow_rate} {self.air_flow_unit}'
+            
+            if self.use_jg_calculation:
+                current_air_flow = f'{self.jg_value} cm/s'
+            else:
+                current_air_flow = f'{self.air_flow_rate} {self.air_flow_unit}'
+            
             current_air_flow_in_mm = self._get_air_flow_in_mm3_per_s()
 
             return timestamp, velocity, froth_height, \
@@ -113,8 +121,6 @@ class AirRecoveryDataProcessor:
 
         except Exception as e:
             logger.error(f"Error processing air recovery data: {e}")
-
-
 
     def _calculate_air_recovery(self, velocity: float, froth_height: float) -> float:
         """
@@ -228,6 +234,7 @@ class AirRecoveryDataProcessor:
         self.air_flow_rate = max(0.0, flow_rate)
         self.air_flow_unit = unit
         self.use_jg_calculation = False
+        self.is_configured = True
         logger.info(f"Air flow rate set to {self.air_flow_rate} {self.air_flow_unit}")
 
     def set_jg_parameters(self, jg: float, cell_area: float):
@@ -235,7 +242,33 @@ class AirRecoveryDataProcessor:
         self.jg_value = max(0.0, jg)
         self.cell_area = max(0.0, cell_area)
         self.use_jg_calculation = True
+        self.is_configured = True
         logger.info(f"Jg parameters set: Jg={self.jg_value} cm/s, Area={self.cell_area} mm²")
+        
+    def lock_configuration(self):
+        """Lock the current configuration to prevent changes."""
+        if self.is_configured:
+            self.configuration_locked = True
+            logger.info("Air flow rate locked")
+        else:
+            logger.warning("Cannot lock configuration - not yet configured")
+            
+    def is_configuration_locked(self) -> bool:
+        """Check if configuration is locked."""
+        return self.configuration_locked
+        
+    def reset_configuration(self):
+        """Reset configuration state and unlock settings."""
+        self.is_configured = False
+        self.configuration_locked = False
+        # Reset to default values
+        self.cell_perimeter = 1000.0
+        self.air_flow_rate = 100.0
+        self.air_flow_unit = "L/min"
+        self.use_jg_calculation = False
+        self.jg_value = 1.0
+        self.cell_area = 1000000.0
+        logger.info("Air recovery configuration reset to defaults")
 
     # Data access methods
     def get_current_air_recovery(self) -> float:
@@ -264,7 +297,9 @@ class AirRecoveryDataProcessor:
             'air_flow_unit': self.air_flow_unit,
             'use_jg_calculation': self.use_jg_calculation,
             'jg_value': self.jg_value,
-            'cell_area': self.cell_area
+            'cell_area': self.cell_area,
+            'is_configured': self.is_configured,
+            'configuration_locked': self.configuration_locked
         }
 
     # Data management methods

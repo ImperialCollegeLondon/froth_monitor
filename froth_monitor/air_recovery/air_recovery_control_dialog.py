@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QComboBox, QTextEdit, QGroupBox, QFileDialog,
     QMessageBox, QCheckBox, QRadioButton, QButtonGroup
 )
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtGui import QFont
 from froth_monitor.logger_config import get_logger
 
@@ -28,8 +28,10 @@ class AirRecoveryControlDialog(QDialog):
     - Viewing statistics and historical data
     - Exporting data
     """
+    configuration_lock = Signal()
+    configuration_unlock = Signal()
 
-    def __init__(self, event_handler, parent=None):
+    def __init__(self, air_recovery_data_processor, parent = None):
         """
         Initialize the air recovery control dialog.
         
@@ -38,8 +40,8 @@ class AirRecoveryControlDialog(QDialog):
             parent: Parent widget
         """
         super().__init__(parent)
-        self.event_handler = event_handler
-        self.air_recovery_processor = event_handler.air_recovery_data_processor
+
+        self.air_recovery_processor = air_recovery_data_processor
         
         self.setWindowTitle("Air Recovery Control")
         self.setModal(False)
@@ -148,11 +150,16 @@ class AirRecoveryControlDialog(QDialog):
         
         layout.addWidget(self.jg_flow_group)
         
-        # Apply configuration button
+        # Apply configuration and reset buttons
         apply_layout = QHBoxLayout()
         self.apply_config_btn = QPushButton("Apply Configuration")
         self.apply_config_btn.clicked.connect(self.apply_configuration)
         apply_layout.addWidget(self.apply_config_btn)
+        
+        self.reset_config_btn = QPushButton("Reset Configuration")
+        self.reset_config_btn.clicked.connect(self.reset_configuration)
+        apply_layout.addWidget(self.reset_config_btn)
+        
         apply_layout.addStretch()
         layout.addLayout(apply_layout)
         
@@ -261,6 +268,12 @@ class AirRecoveryControlDialog(QDialog):
             
             self.on_flow_method_changed()
             
+            # Update UI based on configuration lock state
+            if config.get('configuration_locked', False):
+                self.update_ui_for_locked_state()
+            else:
+                self.update_ui_for_unlocked_state()
+            
         except Exception as e:
             logger.error(f"Error loading air recovery configuration: {e}")
 
@@ -293,10 +306,18 @@ class AirRecoveryControlDialog(QDialog):
                     self.flow_unit_combo.currentText()
                 )
             
+            # Lock configuration after first application
+            self.air_recovery_processor.lock_configuration()
+            
+            # Update GUI to reflect locked state
+            self.update_ui_for_locked_state()
+
+            
             QMessageBox.information(
                 self,
                 "Configuration Applied",
-                "Air recovery configuration has been successfully applied."
+                "Air recovery configuration has been successfully applied and locked.\n"
+                "The air flow control panel is now available in the main window."
             )
             
         except Exception as e:
@@ -306,6 +327,57 @@ class AirRecoveryControlDialog(QDialog):
                 f"Failed to apply configuration: {str(e)}"
             )
             logger.error(f"Error applying air recovery configuration: {e}")
+            
+    def reset_configuration(self):
+        """
+        Reset the air recovery configuration to defaults.
+        """
+        reply = QMessageBox.question(
+            self,
+            "Confirm Reset",
+            "Are you sure you want to reset the air recovery configuration?\n"
+            "This will unlock the settings and restore default values.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                # Reset processor configuration
+                self.air_recovery_processor.reset_configuration()
+                
+                # Reload default values in UI
+                self.load_current_configuration()
+                
+                # Update UI to reflect unlocked state
+                self.update_ui_for_unlocked_state()
+                
+                QMessageBox.information(
+                    self,
+                    "Configuration Reset",
+                    "Air recovery configuration has been reset to defaults."
+                )
+                
+            except Exception as e:
+                QMessageBox.warning(
+                    self,
+                    "Reset Error",
+                    f"Failed to reset configuration: {str(e)}"
+                )
+                logger.error(f"Error resetting air recovery configuration: {e}")
+                
+    def update_ui_for_locked_state(self):
+        """
+        Update UI elements to reflect locked configuration state.
+        """
+        self.configuration_lock.emit()
+        
+    def update_ui_for_unlocked_state(self):
+        """
+        Update UI elements to reflect unlocked configuration state.
+        """
+        # Enable flow method radio buttons
+        self.configuration_unlock.emit()
 
     def export_data(self):
         """
