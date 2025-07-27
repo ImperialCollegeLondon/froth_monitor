@@ -236,10 +236,10 @@ class AirRecoveryControlDialog(QDialog):
         self.apply_config_btn.clicked.connect(self.apply_configuration)
         apply_layout.addWidget(self.apply_config_btn)
         
-        self.reset_config_btn = QPushButton("Reset Configuration")
-        self.reset_config_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
-        self.reset_config_btn.clicked.connect(self.reset_configuration)
-        apply_layout.addWidget(self.reset_config_btn)
+        # self.reset_config_btn = QPushButton("Reset Configuration")
+        # self.reset_config_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
+        # self.reset_config_btn.clicked.connect(self.reset_configuration)
+        # apply_layout.addWidget(self.reset_config_btn)
         
         apply_layout.addStretch()
         layout.addLayout(apply_layout)
@@ -296,7 +296,7 @@ class AirRecoveryControlDialog(QDialog):
         data_layout.addWidget(self.export_btn)
         
         self.clear_btn = QPushButton("Clear Data")
-        self.clear_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
+        self.clear_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
         self.clear_btn.clicked.connect(self.clear_data)
         data_layout.addWidget(self.clear_btn)
         
@@ -307,7 +307,7 @@ class AirRecoveryControlDialog(QDialog):
         close_layout.addStretch()
         
         self.close_btn = QPushButton("Close")
-        self.close_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
+        self.close_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
         self.close_btn.clicked.connect(self.close)
         close_layout.addWidget(self.close_btn)
         

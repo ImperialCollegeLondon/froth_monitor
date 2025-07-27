@@ -674,10 +674,10 @@ class MainGUIWindow(QMainWindow):
         table_label_1.setStyleSheet("color: black; font-size: 14px; font-weight: bold;")
 
         # Table widget (right side)
-        example_2d_data = [["N/A", "N/A", "N/A"]]
+        example_2d_data = [["N/A", "N/A", "N/A", "N/A"]]
         self.velo_widget = pg.TableWidget()
         self.velo_widget.setData(example_2d_data)
-        self.velo_widget.setHorizontalHeaderLabels(["v(mm/s)", "f_height(mm)", "air_rec"])
+        self.velo_widget.setHorizontalHeaderLabels(["timestamp", "v(mm/s)", "f_height(mm)", "air_rec(%)"])
         self.velo_widget.setFormat("%.2f")
         self.velo_widget.setMinimumHeight(80)
         self.velo_widget.setMinimumWidth(50)  # Fixed width
@@ -704,12 +704,6 @@ class MainGUIWindow(QMainWindow):
         layout.addWidget(self.velo_widget)
 
     def _create_config_group(self, layout) -> None:
-        # source_group = QGroupBox("Config Group")
-        # source_group.setStyleSheet("""
-        # font-weight: bold; font-size: 14px; color: black;
-        # """)
-        # source_layout = QVBoxLayout(source_group)
-        # source_layout.setSpacing(10)
         group_label = QLabel("Config Group")
         group_label.setStyleSheet("""
         font-weight: bold; font-size: 14px; color: black;

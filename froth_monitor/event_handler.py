@@ -375,11 +375,36 @@ class EventHandler:
         # self.lidar_thread = LidarThread()
 
         # Initialize video recorder
-        self.video_recorder = VideoRecorder()
-        self.recording_active = False
+        # self.video_recorder = VideoRecorder()
+        self.video_recorder.reset()
+        if self.recording_active:
+            # Stop recording
+            success, output_path, frame_count = self.video_recorder.stop_recording()
+
+            if success:
+                self.recording_active = False
+                self.gui.record_button.setText("  Start Recording")
+                self.gui.record_button.setStyleSheet(
+                    "QPushButton {\
+                        background-color: red; color: white; font-size: 15px; \
+                        padding: 5px; border-radius: 4px;\
+                    }\
+                    QPushButton:hover {\
+                        background-color: #3367d6;\
+                    }"
+                )
+
+                # Show success message with recording statistics
+                QMessageBox.information(
+                    self.gui,
+                    "Recording Completed",
+                    f"Video saved to: {output_path}\nFrames recorded: {frame_count}",
+                )
+
+                self.gui.statusBar().showMessage(f"Recording stopped: {output_path}")
 
         # Initialize handlers
-        self.video_handler = cast(VideoHandler, None)
+        # self.video_handler = cast(VideoHandler, None)
         self.video_handler = VideoHandler(
             self, self.gui, 
             self.frame_model, 

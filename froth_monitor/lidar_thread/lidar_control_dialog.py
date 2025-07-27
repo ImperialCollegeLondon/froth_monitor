@@ -261,7 +261,7 @@ class LidarControlDialog(QDialog):
         data_layout.addWidget(self.export_btn)
         
         self.clear_btn = QPushButton("Clear Data")
-        self.clear_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
+        self.clear_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
         self.clear_btn.clicked.connect(self.clear_data)
         data_layout.addWidget(self.clear_btn)
         
@@ -272,7 +272,7 @@ class LidarControlDialog(QDialog):
         close_layout.addStretch()
         
         self.close_btn = QPushButton("Close")
-        self.close_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
+        self.close_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
         self.close_btn.clicked.connect(self.close)
         close_layout.addWidget(self.close_btn)
         
@@ -411,11 +411,22 @@ class LidarControlDialog(QDialog):
         is_running = self.lidar_thread.is_running()
         is_connected = self.lidar_thread.running
         
-        # Update button states
-        self.start_btn.setEnabled(not is_connected)
-        self.stop_btn.setEnabled(is_connected)
-        self.pause_btn.setEnabled(is_running)
-        self.resume_btn.setEnabled(is_connected and not is_running)
+        # Update button states and styles
+        start_enabled = not is_connected
+        self.start_btn.setEnabled(start_enabled)
+        self.start_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE if start_enabled else self.SECONDARY_BUTTON_STYLE)
+        
+        stop_enabled = is_connected
+        self.stop_btn.setEnabled(stop_enabled)
+        self.stop_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE if stop_enabled else self.SECONDARY_BUTTON_STYLE)
+        
+        pause_enabled = is_running
+        self.pause_btn.setEnabled(pause_enabled)
+        self.pause_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE if pause_enabled else self.SECONDARY_BUTTON_STYLE)
+        
+        resume_enabled = is_connected and not is_running
+        self.resume_btn.setEnabled(resume_enabled)
+        self.resume_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE if resume_enabled else self.SECONDARY_BUTTON_STYLE)
         
         # Update status label
         if is_running:
