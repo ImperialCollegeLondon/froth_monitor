@@ -362,6 +362,9 @@ class EventHandler:
     def reset_handlers(self):
         # Overlay related attributes
         self.video_rect = QRect()
+        
+        self.frame_model.reset()
+        self.overlay_widget.reset()
 
         # Initialize camera thread for event-driven frame capture
         if hasattr(self, 'camera_thread') and self.camera_thread:
@@ -374,9 +377,7 @@ class EventHandler:
         # self.lidar_thread = cast(LidarThread, None)
         # self.lidar_thread = LidarThread()
 
-        # Initialize video recorder
-        # self.video_recorder = VideoRecorder()
-        self.video_recorder.reset()
+        # Reset video recorders
         if self.recording_active:
             # Stop recording
             success, output_path, frame_count = self.video_recorder.stop_recording()
@@ -403,7 +404,7 @@ class EventHandler:
 
                 self.gui.statusBar().showMessage(f"Recording stopped: {output_path}")
 
-        # Initialize handlers
+        # Reset video handler
         # self.video_handler = cast(VideoHandler, None)
         self.video_handler = VideoHandler(
             self, self.gui, 
@@ -441,8 +442,6 @@ class EventHandler:
         
         self.gui.video_canvas_label.clear()
         self.gui.plot_widget.clear()
-        self.frame_model.reset()
-        self.overlay_widget.reset()
 
         logger.info("===Starting a new mission===")
         logger.info("Disconnecting Signals...")

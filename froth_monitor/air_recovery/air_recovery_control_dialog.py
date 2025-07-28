@@ -395,12 +395,11 @@ class AirRecoveryControlDialog(QDialog):
             
             # Update GUI to reflect locked state
             self.update_ui_for_locked_state()
-
             
             QMessageBox.information(
                 self,
                 "Configuration Applied",
-                "Air recovery configuration has been successfully applied and locked.\n"
+                "Air recovery configuration has been successfully applied.\n"
                 "The air flow control panel is now available in the main window."
             )
             
