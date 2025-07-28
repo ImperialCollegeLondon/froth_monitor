@@ -1,90 +1,45 @@
 # Requirements file for Froth Monitor - Windows Installation
 # This file contains all the necessary dependencies to run the Froth Monitor application on Windows
+# Generated from pyproject.toml dependencies
 
-# Core GUI Framework
-PySide6>=6.5.0
-
-# Computer Vision and Image Processing
-opencv-python>=4.8.0
-numpy>=1.24.0
-Pillow>=10.0.0
-
-# Data Visualization and Plotting
-matplotlib>=3.7.0
-pyqtgraph>=0.13.0
-
-# Serial Communication (for LiDAR)
+# Core dependencies from pyproject.toml
+et-xmlfile>=2.0.0
+numpy==2.1.3
+opencv-python>=4.10.0.84
+openpyxl>=3.1.5
+pyqtgraph>=0.13.7
+PySide6>=6.8.0.2
+pytest>=8.3.3
+pytest-qt>=4.4.0
+importlib-metadata>=8.5.0
+importlib>=1.0.4
+vidgear>=0.3.3
+serial>=0.0.97
 pyserial>=3.5
+pyopengl>=3.1.9
+pyopengl-accelerate>=3.1.9
 
-# Network Communication
-vidgear[core]>=0.3.0
-pyzmq>=25.0.0
+# Development dependencies (optional - uncomment if needed for development)
+# pytest>=8.3.3
+# pytest-cov>=6.0.0
+# pytest-mypy>=1.0.0
+# pytest-mock>=3.7.0
+# pre-commit>=4.2.0
+# ruff>=0.11.2
+# types-toml>=0.10.8.20240310
+# pyinstaller>=6.12.0
+# shiboken6>=6.8.0.2
 
-# Data Export and File Handling
-openpyxl>=3.1.0
-
-# Utility Libraries
-colorlog>=6.7.0
-requests>=2.31.0
-certifi>=2023.7.22
-charset-normalizer>=3.2.0
-idna>=3.4
-urllib3>=2.0.4
-
-# Date and Time Handling
-python-dateutil>=2.8.2
-
-# Mathematical and Scientific Computing
-scipy>=1.11.0
-
-# Progress Bars and CLI Tools
-tqdm>=4.65.0
-
-# Screen Capture (for video recording)
-mss>=9.0.0
-pyscreenshot>=3.1
-
-# Video Processing and Compression
-simplejpeg>=1.7.0
-yt-dlp>=2023.7.6
-
-# Build and Setup Tools
-setuptools>=68.0.0
-Cython>=3.0.0
-
-# Font and Text Rendering
-fonttools>=4.42.0
-
-# Parsing and Configuration
-pyparsing>=3.1.0
-packaging>=23.1
-
-# Color and Styling
-# colorama>=0.4.6
-
-# Graphics and Plotting Support
-# kiwisolver>=1.4.4
-# cycler>=0.11.0
-# contourpy>=1.1.0
-
-# Additional Utilities
-# six>=1.16.0
-# EasyProcess>=1.1
-# entrypoint2>=1.1
-
-# Optional: Development and Testing (uncomment if needed)
-# pytest>=7.4.0
-# flake8>=6.0.0
-# black>=23.7.0
-
-# Note: Some packages may have additional system dependencies on Windows:
-# - For video capture: Install Visual C++ Redistributable
-# - For serial communication: Ensure proper COM port drivers are installed
-# - For network features: Ensure Windows Firewall allows the application
+# Documentation dependencies (optional - uncomment if needed)
+# mkdocs>=1.6.1
+# mkdocs-material>=9.6.11
 
 # Installation Instructions:
-# 1. Install Python 3.8 or higher
+# 1. Install Python 3.11 or higher (but less than 3.14 as specified in pyproject.toml)
 # 2. Create a virtual environment: python -m venv froth_monitor_env
 # 3. Activate the environment: froth_monitor_env\Scripts\activate
-# 4. Install dependencies: pip install -r requirements_windows.txt
+# 4. Install dependencies: pip install -r requirements.txt
 # 5. Run the application: python -m froth_monitor
+
+# Note: This requirements.txt is synchronized with pyproject.toml
+# For development, consider using Poetry: poetry install
