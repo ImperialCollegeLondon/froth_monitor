@@ -579,6 +579,7 @@ class EventHandler:
                 self.frame_model.px2mm,
                 self.lidar_data_processor
             )
+            
         else:
             self.if_save = self.export.excel_results(
                 self.frame_model.roi_list, 

@@ -5,8 +5,7 @@ froth height data to calculate air recovery percentages in froth flotation syste
 It handles data buffering, averaging, and statistical analysis.
 """
 
-from typing import List, Dict, Optional, cast
-import time
+from typing import List, Dict
 from datetime import datetime
 import statistics
 from froth_monitor.logger_config import get_logger
