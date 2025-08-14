@@ -562,25 +562,15 @@ class Export(QFileDialog):
                 
             try:
                 max_len = max(
-                    len(lidar_data_processor.lidar_reading_history),
-                    len(lidar_data_processor.lidar_reading_history_av1s),
-                    len(lidar_data_processor.lidar_reading_history_av1s_only_v)
+                    len(lidar_data_processor.reading_history),
+                    len(lidar_data_processor.reading_history_av1s),
+                    len(lidar_data_processor.reading_history_av1s_only_v)
                 )
                 
                 for i in range(max_len):
-                    distance = lidar_data_processor.lidar_reading_history[i] \
-                        if i < len(lidar_data_processor.lidar_reading_history) else None
+                    distance = lidar_data_processor.reading_history[i] \
+                        if i < len(lidar_data_processor.reading_history) else None
 
-                    # Extract the average distance value from the nested list structure
-                    # avg_distance = None
-                    # if i < len(lidar_data_processor.lidar_reading_history_av1s):
-                    #     avg_data = lidar_data_processor.lidar_reading_history_av1s[i]
-                    #     if avg_data and len(avg_data) > 0 and len(avg_data[0]) > 1:
-                    #         avg_distance = avg_data[0][1]  # Extract the average_fh value
-
-                    # velocity = lidar_data_processor.lidar_reading_history_av1s_only_v[i] \
-                    #     if i < len(lidar_data_processor.lidar_reading_history_av1s_only_v) else None
-                    
                     ws.append([i, distance])
                     
             except Exception as e:

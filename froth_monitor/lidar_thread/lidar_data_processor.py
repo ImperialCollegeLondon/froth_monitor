@@ -40,16 +40,18 @@ class LidarDataProcessor:
         self.reading_history_av1s = []
         self.reading_history_av1s_only_v = []  # 1-second averaged readings
         
+        # Missing attributes that are used in _if_update method
+        self.timestamp_buffer = None
+        self.lidar_reading_buffer = []
+        self.current_lidar_reading = 0.0
+        self.lidar_reading_current_mark = 0.0
+        self.lidar_reading_last_mark = 0.0
+        
         # Statistics
         self.total_readings = 0
         self.min_distance = float('inf')
         self.max_distance = float('-inf')
         self.avg_distance = 0.0
-        
-        # GUI update timer
-        # self.gui_update_timer = QTimer()
-        # self.gui_update_timer.timeout.connect(self.update_gui)
-        # self.gui_update_timer.start(100)  # Update GUI every 100ms
         
         # Network mode flag - True when receiving LiDAR data via network thread
         self.network_mode = False
@@ -153,27 +155,6 @@ class LidarDataProcessor:
             
         except Exception as e:
             print(f"Error updating GUI with LiDAR data: {e}")
-
-    # # def _calculate_averages(self):
-    #     """
-    # #     Calculate running averages of LiDAR readings.
-    #     """
-    # #     try:
-    # #         if len(self.lidar_reading_buffer) > 0:
-                  # # Calculate current average
-    # #             current_average = sum(self.lidar_reading_buffer) / len(self.lidar_reading_buffer)
-                
-    # #             # Add to 1-second average history
-    # #             self.reading_history_av1s.append(current_average)
-                
-    # #             # Calculate velocity-related metrics if needed
-    # #             if len(self.reading_history_av1s) > 1:
-    # #                 velocity = (self.reading_history_av1s[-1] - 
-    # #                            self.reading_history_av1s[-2]) / self.update_interval
-    # #                 self.reading_history_av1s_only_v.append(velocity)
-
-        # # except Exception as e:
-        # #     print(f"Error calculating LiDAR averages: {e}")
 
     def get_current_reading(self) -> float:
         """

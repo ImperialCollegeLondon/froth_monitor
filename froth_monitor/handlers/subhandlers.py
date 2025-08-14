@@ -32,7 +32,6 @@ from froth_monitor.overlay_widget import OverlayWidget
 # Import the camera and network threads
 from froth_monitor.video_threads.camera_thread import CameraThread
 from froth_monitor.video_threads.network_thread import NetworkThread
-from froth_monitor.lidar_thread.lidar_thread import LidarThread
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 from froth_monitor.lidar_thread.lidar_control_dialog import LidarControlDialog
 from froth_monitor.air_recovery import AirRecoveryDataProcessor
@@ -970,7 +969,7 @@ class DataHandler:
 
         # Add data to the table
         for i, roi in enumerate(self.frame_model.roi_list):
-            if self.if_lidar and len(self.lidar_data_processor.lidar_reading_history_av1s) > 1:
+            if self.if_lidar and len(self.lidar_data_processor.reading_history_av1s) > 1:
                 # Start asynchronous matching - results will be handled by signal callbacks
                 self.start_matching_velo_n_lidar(i, roi, len(roi.delta_history)-2)
 
@@ -1647,116 +1646,14 @@ class AirRecoveryHandler:
 
 class LidarHandler:
     def __init__(self,
-                lidar_thread: LidarThread,
                 lidar_data_processor: LidarDataProcessor,
                 gui: MainGUIWindow,
                 velocity_plotter: DataHandler,
                 event_handler):
-        self.lidar_thread = lidar_thread
         self.gui = gui
         self.event_handler = event_handler
         self.lidar_data_processor = lidar_data_processor
         self.velocity_plotter = velocity_plotter
-
-    def start_lidar_capture(self, port: str = "COM3", baudrate: int = 115200):
-        """Start LiDAR data capture."""
-        try:
-            success = self.lidar_thread.start_lidar_capture(port, baudrate)
-            logger.info(f"""
-            Try to start LiDAR capture on port {port} at {baudrate} baud.
-            """)
-            if success:
-                logger.info(f"""
-                Starting LiDAR capture on port {port} at {baudrate} baud.
-                """)
-                self.initialize_lidar_mode()
-                return True
-            else:
-                QMessageBox.warning(
-                    self.gui,
-                    "LiDAR Error",
-                    f"Failed to start LiDAR capture on {port}. Please check the connection."
-                )
-                return False
-        except Exception as e:
-            QMessageBox.critical(
-                self.gui,
-                "LiDAR Error",
-                f"Error starting LiDAR: {str(e)}"
-            )
-            return False
-    
-    def stop_lidar_capture(self):
-        """Stop LiDAR data capture."""
-        try:
-            self.lidar_thread.stop_lidar_capture()
-            QMessageBox.information(
-                self.gui,
-                "LiDAR Stopped",
-                "LiDAR capture stopped successfully"
-            )
-        except Exception as e:
-            QMessageBox.warning(
-                self.gui,
-                "LiDAR Warning",
-                f"Error stopping LiDAR: {str(e)}"
-            )
-    
-    def pause_lidar_capture(self):
-        """Pause LiDAR data capture."""
-        self.lidar_thread.pause_lidar_capture()
-    
-    def resume_lidar_capture(self):
-        """Resume LiDAR data capture."""
-        self.lidar_thread.resume_lidar_capture()
-    
-    def set_lidar_offset(self, offset_mm: float):
-        """Set LiDAR distance offset."""
-        self.lidar_thread.set_distance_offset(offset_mm)
-    
-    def export_lidar_data(self, filename: str = cast(str, None)):
-        """Export LiDAR data to CSV file."""
-        if filename is cast(str, None):
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"lidar_data_{timestamp}.csv"
-        
-        try:
-            success = self.lidar_thread.export_data(filename)
-            if success:
-                QMessageBox.information(
-                    self.gui,
-                    "Export Successful",
-                    f"LiDAR data exported to {filename}"
-                )
-            else:
-                QMessageBox.warning(
-                    self.gui,
-                    "Export Failed",
-                    "Failed to export LiDAR data"
-                )
-            return success
-        except Exception as e:
-            QMessageBox.critical(
-                self.gui,
-                "Export Error",
-                f"Error exporting LiDAR data: {str(e)}"
-            )
-            return False
-    
-    def get_lidar_statistics(self) -> dict:
-        """Get LiDAR data statistics."""
-        return self.lidar_data_processor.get_statistics()
-    
-    def clear_lidar_data(self):
-        """Clear all LiDAR data."""
-        self.lidar_thread.clear_data()
-        self.lidar_data_processor.clear_data()
-        QMessageBox.information(
-            self.gui,
-            "Data Cleared",
-            "LiDAR data cleared successfully"
-        )
     
     def open_lidar_control(self):
         """Open the LiDAR control dialog."""
@@ -1771,9 +1668,12 @@ class LidarHandler:
             )
 
     def initialize_lidar_mode(self):
-        self.gui._trigger_lidar_mode()
         self.velocity_plotter.if_lidar = True
         self.event_handler.if_lidar = True
 
     def update_fh_plot(self, lidar_reading_history_av1s_only_v):
         self.velocity_plotter.update_fh_plot(lidar_reading_history_av1s_only_v)
+    
+    def get_lidar_statistics(self):
+        """Get LiDAR statistics from the data processor."""
+        return self.lidar_data_processor.get_statistics()

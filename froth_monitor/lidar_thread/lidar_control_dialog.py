@@ -40,7 +40,6 @@ class LidarControlDialog(QDialog):
         """
         super().__init__(parent)
         self.event_handler = event_handler
-        self.lidar_thread = event_handler.lidar_thread
         self.lidar_processor = event_handler.lidar_data_processor
         
         self.setWindowTitle("LiDAR Control")

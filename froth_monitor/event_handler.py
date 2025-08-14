@@ -31,13 +31,10 @@ from froth_monitor.gui_window import MainGUIWindow
 from froth_monitor.fm_model import FrameModel
 
 # Import the custom overlay widget
-from froth_monitor.lidar_thread import lidar_data_processor
 from froth_monitor.overlay_widget import OverlayWidget
 
 # Import the camera and network threads
-from froth_monitor.video_threads.camera_thread import CameraThread
 from froth_monitor.video_threads.network_thread import NetworkThread
-from froth_monitor.lidar_thread.lidar_thread import LidarThread
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 
 from froth_monitor.export import Export
@@ -226,9 +223,9 @@ class EventHandler:
         # Connect camera thread signals to frame processor
         if self.if_jetson:
 
-            self.video_thread.frame_available.connect(
-                self.frame_processor.process_new_frame
-            )
+            # self.video_thread.frame_available.connect(
+            #     self.frame_processor.process_new_frame
+            # )
             
             # Connect network thread connection status to automatic LiDAR control
             self.video_thread.connection_status_changed.connect(
@@ -236,18 +233,14 @@ class EventHandler:
             )
             
             # Connect network thread LiDAR data to LiDAR processor
-            self.video_thread.lidar_data_available.connect(
-                self.lidar_data_processor.process_lidar_data
-            )
-
-            # self.video_thread.sensor_data_available.connect(    # type: ignore
-            #     self.sensor_data_processor.process_sensor_data # type: ignore
+            # self.video_thread.lidar_data_available.connect(
+            #     self.lidar_data_processor.process_lidar_data
             # )
-            
-        else:
-            self.video_thread.frame_available.connect(
-                self.frame_processor.process_new_frame
+
+            self.video_thread.data_available.connect(
+                self.handle_jetson_data
             )
+            
 
         self.gui.confirm_arrow_button.clicked.connect(
             self.calibration_handler.confirm_arrow_n_ruler
@@ -278,15 +271,10 @@ class EventHandler:
         # Initialize the frame model for processing video frames
         self.frame_model = FrameModel()
         self.current_frame_number = 0
-
-        self.lidar_thread = LidarThread()
         
         # Initialize LiDAR data processor and connect signals
         self.lidar_data_processor = LidarDataProcessor(
             self.gui, self
-        )
-        self.lidar_thread.data_available.connect(
-            self.lidar_data_processor.process_lidar_data
         )
         
         # Initialize Air Recovery data processor
@@ -305,7 +293,7 @@ class EventHandler:
         # Initialize camera thread for event-driven frame capture
         self.video_thread = NetworkThread()
 
-        self.lidar_handler = LidarHandler(self.lidar_thread, self.lidar_data_processor,
+        self.lidar_handler = LidarHandler(self.lidar_data_processor,
                                         self.gui, self.data_handler, self)
                                         
         self.gui.lidar_configuration.clicked.connect(self.lidar_handler.open_lidar_control)
@@ -325,6 +313,13 @@ class EventHandler:
             self.frame_model, 
             video_thread=self.video_thread
         )
+
+    def handle_jetson_data(self, server_data, frame):
+        if frame is not None and frame.size > 0:
+            self.frame_processor.process_new_frame(frame)
+        if server_data:
+            self.lidar_data_processor.process_lidar_data(server_data)
+
 
     def open_algorithm_configuration(self):
         """
