@@ -512,15 +512,11 @@ class VideoHandler:
         event_handler,
         gui: MainGUIWindow,
         frame_model: FrameModel,
-        camera_thread: CameraThread,
-        network_thread: NetworkThread,
-        video_thread: NetworkThread | CameraThread
+        video_thread: NetworkThread
     ):
         self.gui = gui
         self.event_handler = event_handler
         self.frame_model = frame_model
-        self.camera_thread = camera_thread
-        self.network_thread = network_thread
         self.video_thread = video_thread
         
         # Add missing state variables
@@ -533,18 +529,13 @@ class VideoHandler:
         self.jetson_source_port = 5001
 
     def handle_video_import(self):
-        if self.gui.webcam_radio.isChecked():
-            self.load_camera_dialog()
-        elif self.gui.prerecorded_radio.isChecked():
-            self.import_local_video()
-        elif self.gui.jetson_radio.isChecked():
-            self.import_jetson_video()
+        self.import_jetson_video()
 
     def import_jetson_video(self):
         self.event_handler.if_jetson = True
 
         # Start network capture
-        if self.network_thread.start_network_capture(self.jetson_source_address, 
+        if self.video_thread.start_network_capture(self.jetson_source_address, 
                 self.jetson_source_port):
             self.playing = True
             self.event_handler.trigger_jetson_mode()
@@ -553,117 +544,6 @@ class VideoHandler:
             QMessageBox.critical(
                 self.gui, "Error", "Failed to start network capture."
             )
-
-    def import_local_video(self):
-        """
-        Open a file dialog to select a local video file and initialize video capture.
-        """
-        file_path, _ = QFileDialog.getOpenFileName(
-            self.gui, "Open Video File", "", "Video Files (*.mp4 *.avi *.mkv)"
-        )
-
-        if file_path:
-            # Store the video source for pause/resume functionality
-            self.last_video_source = file_path
-
-            if self.camera_thread.is_running:
-                self.camera_thread.reset()
-
-            # Start the camera thread with the selected video file
-            if self.camera_thread.start_capture(file_path):
-                # Get video properties
-                self.frame_width, self.frame_height = (
-                    self.camera_thread.get_frame_dimensions()
-                )
-
-                # Start playing the video
-                self.playing = True
-                self.event_handler.trigger_normal_mode()
-
-            else:
-                QMessageBox.critical(
-                    self.gui, "Error", "Could not open the video file!"
-                )
-                return
-
-    def load_camera_dialog(self):
-        """
-        Open a dialog to select and load an available camera.
-        """
-        available_cameras = []
-        for index in range(10):  # Check up to 10 camera indices
-            cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-            if cap.isOpened():
-                available_cameras.append(f"Camera {index}")
-                cap.release()
-
-        if not available_cameras:
-            QMessageBox.critical(self.gui, "Error", "No cameras detected!")
-            return
-
-        dialog = QDialog(self.gui)
-        dialog.setWindowTitle("Select Camera")
-        dialog.setMinimumWidth(300)
-
-        layout = QVBoxLayout(dialog)
-
-        # Camera selection dropdown
-        camera_combo = QComboBox(dialog)
-        camera_combo.addItems(available_cameras)
-        camera_combo.setStyleSheet(
-            "background-color: #4285f4; color: white; font-size: 14px; padding: 8px; \
-            border-radius: 4px;"
-        )
-        layout.addWidget(camera_combo)
-
-        # Confirm button
-        confirm_button = QPushButton("Load Camera", dialog)
-        confirm_button.clicked.connect(
-            lambda: self.load_selected_camera(camera_combo, dialog)
-        )
-        layout.addWidget(confirm_button)
-
-        # Show the dialog
-        dialog.exec()
-
-    def load_selected_camera(self, camera_combo, dialog):
-        """
-        Load the selected camera from the camera selection dialog.
-
-        Args:
-            camera_combo: QComboBox containing the camera selection.
-            dialog: QDialog containing the camera selection dialog.
-        """
-        selected_camera = camera_combo.currentText()
-        camera_index = int(selected_camera.split(" ")[1])
-
-        # Store the camera index for pause/resume functionality
-        self.last_video_source = camera_index
-
-        if self.camera_thread.is_running:
-            self.camera_thread.reset()
-
-        # Start the camera thread with the selected camera
-        if self.camera_thread.start_capture(camera_index):
-            # Get video properties
-            self.frame_width, self.frame_height = (
-                self.camera_thread.get_frame_dimensions()
-            )
-
-            # Start playing the video
-            self.playing = True
-
-            # Initialize the tool window and handlers
-            self.event_handler.trigger_normal_mode()
-
-            # Close the dialog
-            dialog.accept()
-
-        else:
-            QMessageBox.critical(
-                self.gui, "Error", "Could not open the selected camera!"
-            )
-            return
 
     def pause_play(self):
         """
@@ -1579,45 +1459,6 @@ class FrameProcessor:
         # Store the current frame for potential further processing
         self.current_frame = frame
 
-        # Convert frame to QImage and scale it
-        qt_image = self._convert_frame_to_qimage(frame)
-        scaled_image = self._scale_image_to_canvas(qt_image)
-
-        # Create a resized frame for processing
-        resized_frame = self._create_resized_frame(
-            frame, scaled_image.width(), scaled_image.height()
-        )
-
-        # Process the frame with the frame model
-
-        # Only allow to let frame pass in when the previous frame has been processed
-        # This is to prevent the overstacking of frames
-        self.video_thread.if_release = False
-        self._process_frame_with_model(resized_frame)
-        self.video_thread.if_release = True
-
-        # Display the frame on the canvas
-        pixmap = self._display_frame_on_canvas(scaled_image)
-
-        # Update the overlay position
-        self._update_overlay_position(pixmap)
-
-        # Record frame if recording is active
-        if self.event_handler.recording_active and self.video_recorder.is_active():
-            self.video_recorder.record_frame(frame)
-
-        # Update status bar
-        self._update_status_bar()
-
-    def process_new_frame_with_network_thread(self, frame):
-        if (
-            not self.event_handler.video_handler.playing
-        ):  # Access playing state from VideoHandler
-            return
-
-        # Store the current frame for potential further processing
-        self.current_frame = frame
-        
         # Convert frame to QImage and scale it
         qt_image = self._convert_frame_to_qimage(frame)
         scaled_image = self._scale_image_to_canvas(qt_image)

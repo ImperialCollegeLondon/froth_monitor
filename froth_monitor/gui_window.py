@@ -394,20 +394,22 @@ class MainGUIWindow(QMainWindow):
         source_layout.setSpacing(10)
 
         # Radio buttons for video source
-        self.webcam_radio = QRadioButton("Webcam")
-        self.webcam_radio.setStyleSheet(
-            "font-weight: normal; font-size: 12px; color: black"
-        )
-        self.prerecorded_radio = QRadioButton("Pre-recorded")
-        self.prerecorded_radio.setStyleSheet(
-            "font-weight: normal; font-size: 12px; color: black"
-        )
-        self.webcam_radio.setChecked(True)
+        # self.webcam_radio = QRadioButton("Webcam")
+        # self.webcam_radio.setStyleSheet(
+        #     "font-weight: normal; font-size: 12px; color: black"
+        # )
+        # self.prerecorded_radio = QRadioButton("Pre-recorded")
+        # self.prerecorded_radio.setStyleSheet(
+        #     "font-weight: normal; font-size: 12px; color: black"
+        # )
+        # self.webcam_radio.setChecked(True)
         self.jetson_radio = QRadioButton("Jetson")
         self.jetson_radio.setStyleSheet(
             "font-weight: normal; font-size: 12px; color: black"
         )
-        self.import_button = QPushButton("Import")
+        self.jetson_radio.setChecked(True)
+
+        self.import_button = QPushButton("Start")
         self.import_button.setStyleSheet(
             self.ENABLED_BUTTON_STYLE
         )
@@ -426,8 +428,8 @@ class MainGUIWindow(QMainWindow):
         config_layout.addWidget(self.algorithm_configuration)
         config_layout.addWidget(self.lidar_configuration)
         
-        source_layout.addWidget(self.webcam_radio)
-        source_layout.addWidget(self.prerecorded_radio)
+        # source_layout.addWidget(self.webcam_radio)
+        # source_layout.addWidget(self.prerecorded_radio)
         source_layout.addWidget(
             self.jetson_radio
         )  # Add this line to add the Jetson radio button to the layout

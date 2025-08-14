@@ -22,39 +22,52 @@ class LidarDataProcessor:
     analysis, and updates the GUI with current readings and historical data.
     """
 
-    def __init__(self, event_handler, lidar_thread):
+    def __init__(self, gui, event_handler):
         """
         Initialize the LiDAR data processor.
         
         Args:
-            event_handler: The main event handler instance
-            lidar_thread: The LidarThread instance providing data
+            event_handler: Reference to the main event handler
         """
+        self.gui = gui
         self.event_handler = event_handler
-        self.lidar_thread = lidar_thread
-        self.gui = self.event_handler.gui
+        
+        # Data storage
+        self.current_reading = None
+        self.current_timestamp = None
+        self.reading_history = []  # List of (timestamp, distance) tuples
+        self.reading_buffer = []   # Buffer for 1-second averaging
+        self.reading_history_av1s = []
+        self.reading_history_av1s_only_v = []  # 1-second averaged readings
+        
+        # Statistics
+        self.total_readings = 0
+        self.min_distance = float('inf')
+        self.max_distance = float('-inf')
+        self.avg_distance = 0.0
+        
+        # GUI update timer
+        # self.gui_update_timer = QTimer()
+        # self.gui_update_timer.timeout.connect(self.update_gui)
+        # self.gui_update_timer.start(100)  # Update GUI every 100ms
+        
+        # Network mode flag - True when receiving LiDAR data via network thread
+        self.network_mode = False
+        
+        logger.info("LiDAR data processor initialized")
 
-        # Current readings
-        self.current_lidar_reading = 0.0
-        self.current_timestamp: str = cast(str, None)
-
-        # Historical data storage
-        self.lidar_reading_history = []
-        self.lidar_reading_history_av1s = []  # 1-second averages
-        self.lidar_reading_history_av1s_only_v = []  # Velocity-only averages
-
-        # Data buffering
-        self.lidar_reading_buffer = []
-        self.timestamp_buffer = cast(str, None)
-
-        # Reference measurements
-        self.lidar_reading_last_mark = 0.0
-        self.lidar_reading_current_mark = 0.0
-
-        # Processing parameters
-        self.buffer_size = 10  # Number of readings to average
-        self.update_interval = 1.0  # Seconds between GUI updates
-        self.last_update_time = datetime.now()
+    def set_network_mode(self, enabled: bool):
+        """
+        Set whether LiDAR data is received via network thread or serial connection.
+        
+        Args:
+            enabled (bool): True for network mode, False for serial mode
+        """
+        self.network_mode = enabled
+        if enabled:
+            logger.info("LiDAR data processor switched to network mode")
+        else:
+            logger.info("LiDAR data processor switched to serial mode")
 
     def process_lidar_data(self, lidar_data: dict):
         """
@@ -72,16 +85,15 @@ class LidarDataProcessor:
 
         try:
             # Extract data from the LiDAR measurement
-            distance_mm = lidar_data.get('distance_mm', 0.0)
-            timestamp = lidar_data.get('timestamp', datetime.now())
-            formatted_timestamp = lidar_data.get('formatted_timestamp', '')
+            distance_mm = lidar_data.get('lidar_reading', 0.0)
+            timestamp = lidar_data.get('lidar_timestamp', datetime.now())
 
             # Update current readings
             self.current_lidar_reading = distance_mm
-            self.current_timestamp = formatted_timestamp
+            self.current_timestamp = timestamp
 
             # Add to historical data
-            self.lidar_reading_history.append(distance_mm)
+            self.reading_history.append(distance_mm)
 
             # Update GUI periodically
             current_time = datetime.now()
@@ -90,7 +102,7 @@ class LidarDataProcessor:
             
             if if_update:
                 self._update_gui()
-                self._calculate_averages()
+                # # self._calculate_averages()
                 self.last_update_time = current_time
 
         except Exception as e:
@@ -99,7 +111,7 @@ class LidarDataProcessor:
     def _if_update(self) -> bool:
 
         try:
-            timestamp_buffer = self.current_timestamp[:8]
+            timestamp_buffer = str(self.current_timestamp)[:8] if self.current_timestamp is not None else None
 
             if self.timestamp_buffer is None:
                 self.timestamp_buffer = timestamp_buffer
@@ -113,9 +125,9 @@ class LidarDataProcessor:
             else:
                 self.timestamp_buffer = timestamp_buffer
                 average_fh = sum(self.lidar_reading_buffer) / len(self.lidar_reading_buffer)
-                self.lidar_reading_history_av1s.append([[0, average_fh, \
+                self.reading_history_av1s.append([[0, average_fh, \
                     self.current_timestamp, time.time()]])
-                self.lidar_reading_history_av1s_only_v.append(average_fh)
+                self.reading_history_av1s_only_v.append(average_fh)
 
                 self.lidar_reading_buffer = []
 
@@ -137,31 +149,31 @@ class LidarDataProcessor:
 
             # Update any LiDAR-specific GUI elements if they exist
             # This can be extended based on GUI requirements
-            self.event_handler.lidar_handler.update_fh_plot(self.lidar_reading_history_av1s_only_v)
+            self.event_handler.lidar_handler.update_fh_plot(self.reading_history_av1s_only_v)
             
         except Exception as e:
             print(f"Error updating GUI with LiDAR data: {e}")
 
-    def _calculate_averages(self):
-        """
-        Calculate running averages of LiDAR readings.
-        """
-        try:
-            if len(self.lidar_reading_buffer) > 0:
-                # Calculate current average
-                current_average = sum(self.lidar_reading_buffer) / len(self.lidar_reading_buffer)
+    # # def _calculate_averages(self):
+    #     """
+    # #     Calculate running averages of LiDAR readings.
+    #     """
+    # #     try:
+    # #         if len(self.lidar_reading_buffer) > 0:
+                  # # Calculate current average
+    # #             current_average = sum(self.lidar_reading_buffer) / len(self.lidar_reading_buffer)
                 
-                # Add to 1-second average history
-                self.lidar_reading_history_av1s.append(current_average)
+    # #             # Add to 1-second average history
+    # #             self.reading_history_av1s.append(current_average)
                 
-                # Calculate velocity-related metrics if needed
-                if len(self.lidar_reading_history_av1s) > 1:
-                    velocity = (self.lidar_reading_history_av1s[-1] - 
-                               self.lidar_reading_history_av1s[-2]) / self.update_interval
-                    self.lidar_reading_history_av1s_only_v.append(velocity)
+    # #             # Calculate velocity-related metrics if needed
+    # #             if len(self.reading_history_av1s) > 1:
+    # #                 velocity = (self.reading_history_av1s[-1] - 
+    # #                            self.reading_history_av1s[-2]) / self.update_interval
+    # #                 self.reading_history_av1s_only_v.append(velocity)
 
-        except Exception as e:
-            print(f"Error calculating LiDAR averages: {e}")
+        # # except Exception as e:
+        # #     print(f"Error calculating LiDAR averages: {e}")
 
     def get_current_reading(self) -> float:
         """
@@ -190,7 +202,7 @@ class LidarDataProcessor:
         Returns:
             List[float]: List of all distance measurements
         """
-        return self.lidar_reading_history.copy()
+        return self.reading_history.copy()
 
     def get_velocity_history(self) -> List[float]:
         """
@@ -199,7 +211,7 @@ class LidarDataProcessor:
         Returns:
             List[float]: List of velocity measurements
         """
-        return self.lidar_reading_history_av1s_only_v.copy()
+        return self.reading_history_av1s_only_v.copy()
 
     def set_reference_mark(self):
         """
@@ -222,9 +234,9 @@ class LidarDataProcessor:
         """
         Clear all stored LiDAR data and reset buffers.
         """
-        self.lidar_reading_history.clear()
-        self.lidar_reading_history_av1s.clear()
-        self.lidar_reading_history_av1s_only_v.clear()
+        self.reading_history.clear()
+        self.reading_history_av1s.clear()
+        self.reading_history_av1s_only_v.clear()
         self.lidar_reading_buffer.clear()
         
         self.current_lidar_reading = 0.0
@@ -260,15 +272,15 @@ class LidarDataProcessor:
                 
                 # Write data
                 max_len = max(
-                    len(self.lidar_reading_history),
-                    len(self.lidar_reading_history_av1s),
-                    len(self.lidar_reading_history_av1s_only_v)
+                    len(self.reading_history),
+                    len(self.reading_history_av1s),
+                    len(self.reading_history_av1s_only_v)
                 )
                 
                 for i in range(max_len):
-                    distance = self.lidar_reading_history[i] if i < len(self.lidar_reading_history) else ''
-                    avg_distance = self.lidar_reading_history_av1s[i] if i < len(self.lidar_reading_history_av1s) else ''
-                    velocity = self.lidar_reading_history_av1s_only_v[i] if i < len(self.lidar_reading_history_av1s_only_v) else ''
+                    distance = self.reading_history[i] if i < len(self.reading_history) else ''
+                    avg_distance = self.reading_history_av1s[i] if i < len(self.reading_history_av1s) else ''
+                    velocity = self.reading_history_av1s_only_v[i] if i < len(self.reading_history_av1s_only_v) else ''
                     
                     writer.writerow([i, distance, avg_distance, velocity])
             
@@ -286,24 +298,24 @@ class LidarDataProcessor:
         Returns:
             dict: Dictionary containing statistical data
         """
-        if not self.lidar_reading_history:
+        if not self.reading_history:
             return cast(dict, None)
         
         import statistics
         
         try:
             stats = {
-                'count': len(self.lidar_reading_history),
+                'count': len(self.reading_history),
                 'current': self.current_lidar_reading,
-                'average': statistics.mean(self.lidar_reading_history),
-                'median': statistics.median(self.lidar_reading_history),
-                'min': min(self.lidar_reading_history),
-                'max': max(self.lidar_reading_history),
-                'range': max(self.lidar_reading_history) - min(self.lidar_reading_history)
+                'average': statistics.mean(self.reading_history),
+                'median': statistics.median(self.reading_history),
+                'min': min(self.reading_history),
+                'max': max(self.reading_history),
+                'range': max(self.reading_history) - min(self.reading_history)
             }
             
-            if len(self.lidar_reading_history) > 1:
-                stats['std_dev'] = statistics.stdev(self.lidar_reading_history)
+            if len(self.reading_history) > 1:
+                stats['std_dev'] = statistics.stdev(self.reading_history)
             else:
                 stats['std_dev'] = 0.0
                 

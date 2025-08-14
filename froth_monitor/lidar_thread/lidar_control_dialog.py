@@ -53,15 +53,7 @@ class LidarControlDialog(QDialog):
         self.update_timer.start(1000)  # Update every second
         
         self.setup_ui()
-        self.refresh_ports()  # Load full device names on startup
-        self.update_controls_state()
 
-    def setup_ui(self):
-        """
-        Set up the user interface.
-        """
-        self._create_stylesheets()
-        
     def _create_stylesheets(self):
         """
         Initialize stylesheets for UI elements to match main GUI.
@@ -144,39 +136,18 @@ class LidarControlDialog(QDialog):
             }
         """
 
+    def setup_ui(self):
+        """
+        Set up the user interface.
+        """
+        self._create_stylesheets()
+
         layout = QVBoxLayout(self)
         
         # Connection settings group
         connection_group = QGroupBox("Connection Settings")
         connection_layout = QGridLayout(connection_group)
-        
-        # Port selection
-        connection_layout.addWidget(QLabel("Serial Port:"), 0, 0)
-        self.port_combo = QComboBox()
-        self.port_combo.setEditable(True)
-        self.port_combo.setStyleSheet(self.COMBO_BOX_STYLE)
-            
-        # Add default ports with device names as user data
-        default_ports = ["COM3", "COM4", "COM5", "COM6", "COM7", "COM8"]
-        for port in default_ports:
-            self.port_combo.addItem(port, port)
-        connection_layout.addWidget(self.port_combo, 0, 1)
-        
-        # Refresh ports button
-        self.refresh_ports_btn = QPushButton("Refresh")
-        self.refresh_ports_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
-        self.refresh_ports_btn.clicked.connect(self.refresh_ports)
-        connection_layout.addWidget(self.refresh_ports_btn, 0, 2)
-        
-        # Baudrate
-        connection_layout.addWidget(QLabel("Baud Rate:"), 1, 0)
-        self.baudrate_spin = QSpinBox()
-        self.baudrate_spin.setRange(9600, 921600)
-        self.baudrate_spin.setValue(38400)
-        self.baudrate_spin.setSingleStep(9600)
-        self.baudrate_spin.setStyleSheet(self.INPUT_FIELD_STYLE)
-        connection_layout.addWidget(self.baudrate_spin, 1, 1)
-        
+
         # Distance offset
         connection_layout.addWidget(QLabel("Distance Offset (mm):"), 2, 0)
         self.offset_spin = QDoubleSpinBox()
@@ -188,31 +159,6 @@ class LidarControlDialog(QDialog):
         connection_layout.addWidget(self.offset_spin, 2, 1)
         
         layout.addWidget(connection_group)
-        
-        # Control buttons
-        control_layout = QHBoxLayout()
-        
-        self.start_btn = QPushButton("Start LiDAR")
-        self.start_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
-        self.start_btn.clicked.connect(self.start_lidar)
-        control_layout.addWidget(self.start_btn)
-        
-        self.stop_btn = QPushButton("Stop LiDAR")
-        self.stop_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
-        self.stop_btn.clicked.connect(self.stop_lidar)
-        control_layout.addWidget(self.stop_btn)
-        
-        self.pause_btn = QPushButton("Pause")
-        self.pause_btn.setStyleSheet(self.SECONDARY_BUTTON_STYLE)
-        self.pause_btn.clicked.connect(self.pause_lidar)
-        control_layout.addWidget(self.pause_btn)
-        
-        self.resume_btn = QPushButton("Resume")
-        self.resume_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE)
-        self.resume_btn.clicked.connect(self.resume_lidar)
-        control_layout.addWidget(self.resume_btn)
-        
-        layout.addLayout(control_layout)
         
         # Status display group
         status_group = QGroupBox("Status")
@@ -278,96 +224,6 @@ class LidarControlDialog(QDialog):
         
         layout.addLayout(close_layout)
 
-    def refresh_ports(self):
-        """
-        Refresh the list of available serial ports.
-        """
-        try:
-            import serial.tools.list_ports
-            
-            current_text = self.port_combo.currentText()
-            self.port_combo.clear()
-            
-            # Get available ports with full descriptions
-            ports = serial.tools.list_ports.comports()
-            
-            if ports:
-                for port in ports:
-                    # Use full description if available, otherwise fall back to device name
-                    if port.description and port.description != 'n/a':
-                        display_name = f"{port.description} ({port.device})"
-                    else:
-                        display_name = port.device
-                    
-                    # Store the actual device name as user data for connection
-                    self.port_combo.addItem(display_name, port.device)
-                
-                # Try to restore previous selection by checking both display text and device name
-                index = self.port_combo.findText(current_text)
-                if index < 0:
-                    # If display text doesn't match, try to find by device name
-                    for i in range(self.port_combo.count()):
-                        if self.port_combo.itemData(i) == current_text:
-                            index = i
-                            break
-                
-                if index >= 0:
-                    self.port_combo.setCurrentIndex(index)
-                
-                
-            else:
-                self.port_combo.addItem("No ports found")
-                
-        except ImportError:
-            QMessageBox.warning(
-                self,
-                "Warning",
-                "pyserial not installed. Cannot detect ports automatically."
-            )
-
-    def start_lidar(self):
-        """
-        Start LiDAR data capture.
-        """
-        # Get the actual device name from user data, fall back to display text if not available
-        port_data = self.port_combo.currentData()
-        if port_data:
-            port = port_data
-        else:
-            port = self.port_combo.currentText()
-        
-        baudrate = self.baudrate_spin.value()
-        
-        if not port or port == "No ports found":
-            QMessageBox.warning(self, "Warning", "Please select a valid serial port.")
-            return
-        
-        success = self.event_handler.start_lidar_capture(port, baudrate)
-
-        if success:
-            self.update_controls_state()
-
-    def stop_lidar(self):
-        """
-        Stop LiDAR data capture.
-        """
-        self.event_handler.stop_lidar_capture()
-        self.update_controls_state()
-
-    def pause_lidar(self):
-        """
-        Pause LiDAR data capture.
-        """
-        self.event_handler.pause_lidar_capture()
-        self.update_controls_state()
-
-    def resume_lidar(self):
-        """
-        Resume LiDAR data capture.
-        """
-        self.event_handler.resume_lidar_capture()
-        self.update_controls_state()
-
     def update_offset(self):
         """
         Update the distance offset.
@@ -404,49 +260,11 @@ class LidarControlDialog(QDialog):
         if reply == QMessageBox.StandardButton.Yes:
             self.event_handler.clear_lidar_data()
 
-    def update_controls_state(self):
-        """
-        Update the state of control buttons based on LiDAR status.
-        """
-        is_running = self.lidar_thread.is_running()
-        is_connected = self.lidar_thread.running
-        
-        # Update button states and styles
-        start_enabled = not is_connected
-        self.start_btn.setEnabled(start_enabled)
-        self.start_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE if start_enabled else self.SECONDARY_BUTTON_STYLE)
-        
-        stop_enabled = is_connected
-        self.stop_btn.setEnabled(stop_enabled)
-        self.stop_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE if stop_enabled else self.SECONDARY_BUTTON_STYLE)
-        
-        pause_enabled = is_running
-        self.pause_btn.setEnabled(pause_enabled)
-        self.pause_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE if pause_enabled else self.SECONDARY_BUTTON_STYLE)
-        
-        resume_enabled = is_connected and not is_running
-        self.resume_btn.setEnabled(resume_enabled)
-        self.resume_btn.setStyleSheet(self.PRIMARY_BUTTON_STYLE if resume_enabled else self.SECONDARY_BUTTON_STYLE)
-        
-        # Update status label
-        if is_running:
-            self.status_label.setText("Running")
-            self.status_label.setStyleSheet("color: green; font-weight: bold;")
-        elif is_connected:
-            self.status_label.setText("Paused")
-            self.status_label.setStyleSheet("color: orange; font-weight: bold;")
-        else:
-            self.status_label.setText("Disconnected")
-            self.status_label.setStyleSheet("color: red; font-weight: bold;")
-
     def update_display(self):
         """
         Update the real-time display with current LiDAR data.
         """
         try:
-            # Update controls state
-            self.update_controls_state()
-            
             # Update current reading
             current_reading = self.lidar_processor.get_current_reading()
             self.distance_label.setText(f"{current_reading:.1f} mm")

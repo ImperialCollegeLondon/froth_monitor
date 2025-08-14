@@ -95,6 +95,7 @@ class EventHandler:
         self.connect_signals()
         self.initialize_gui_guidance()
         self.update_guidance()
+        self.gui._trigger_jetson_mode()
 
     def initialize_gui_guidance(self):
         self.step_import = False
@@ -128,21 +129,8 @@ class EventHandler:
 
     def trigger_jetson_mode(self):
         self.if_jetson = True
-        self.camera_thread.reset()
-        self.video_thread = self.network_thread
-        self.video_handler.video_thread = self.video_thread
         self.initialze_tool_window_n_handlers()
-        self.gui._trigger_jetson_mode()
-
-    def trigger_normal_mode(self):
-        self.if_jetson = False
-        self.network_thread.reset()
-        self.video_thread = self.camera_thread
-        self.video_handler.video_thread = self.video_thread
-        self.initialze_tool_window_n_handlers()
-        
-        if not self.if_lidar:
-            self.gui._trigger_normal_mode()
+        self.update_guidance()
     
     def initialze_tool_window_n_handlers(self):
         if not self.video_handler.playing:  # Access playing state from VideoHandler
@@ -239,11 +227,22 @@ class EventHandler:
         if self.if_jetson:
 
             self.video_thread.frame_available.connect(
-                self.frame_processor.process_new_frame_with_network_thread
+                self.frame_processor.process_new_frame
             )
-            self.video_thread.sensor_data_available.connect(    # type: ignore
-                self.sensor_data_processor.process_sensor_data # type: ignore
+            
+            # Connect network thread connection status to automatic LiDAR control
+            self.video_thread.connection_status_changed.connect(
+                self.handle_network_connection_status
             )
+            
+            # Connect network thread LiDAR data to LiDAR processor
+            self.video_thread.lidar_data_available.connect(
+                self.lidar_data_processor.process_lidar_data
+            )
+
+            # self.video_thread.sensor_data_available.connect(    # type: ignore
+            #     self.sensor_data_processor.process_sensor_data # type: ignore
+            # )
             
         else:
             self.video_thread.frame_available.connect(
@@ -284,7 +283,7 @@ class EventHandler:
         
         # Initialize LiDAR data processor and connect signals
         self.lidar_data_processor = LidarDataProcessor(
-            self, self.lidar_thread
+            self.gui, self
         )
         self.lidar_thread.data_available.connect(
             self.lidar_data_processor.process_lidar_data
@@ -304,9 +303,7 @@ class EventHandler:
         self.video_rect = QRect()
 
         # Initialize camera thread for event-driven frame capture
-        self.camera_thread = CameraThread()
-        self.network_thread = NetworkThread()
-
+        self.video_thread = NetworkThread()
 
         self.lidar_handler = LidarHandler(self.lidar_thread, self.lidar_data_processor,
                                         self.gui, self.data_handler, self)
@@ -317,9 +314,6 @@ class EventHandler:
         self.air_recovery_handler = AirRecoveryHandler(self.air_recovery_data_processor, self.gui, self)
         self.gui.air_rec_configuration.clicked.connect(self.air_recovery_handler.open_air_recovery_control)
 
-        self.video_thread: NetworkThread | CameraThread = \
-            cast(NetworkThread | CameraThread, CameraThread())
-
         # Initialize video recorder
         self.video_recorder = VideoRecorder()
         self.recording_active = False
@@ -329,9 +323,7 @@ class EventHandler:
         self.video_handler = VideoHandler(
             self, self.gui, 
             self.frame_model, 
-            self.camera_thread, 
-            self.network_thread,
-            self.video_thread
+            video_thread=self.video_thread
         )
 
     def open_algorithm_configuration(self):
@@ -367,10 +359,6 @@ class EventHandler:
         self.overlay_widget.reset()
 
         # Initialize camera thread for event-driven frame capture
-        if hasattr(self, 'camera_thread') and self.camera_thread:
-            self.camera_thread.reset()
-        if hasattr(self, 'network_thread') and self.network_thread:
-            self.network_thread.reset()
         if hasattr(self, 'video_thread') and self.video_thread:
             self.video_thread.reset()
 
@@ -409,8 +397,6 @@ class EventHandler:
         self.video_handler = VideoHandler(
             self, self.gui, 
             self.frame_model, 
-            self.camera_thread, 
-            self.network_thread,
             self.video_thread
         )
 
@@ -453,6 +439,38 @@ class EventHandler:
         logger.info("Updating Guidance...")
         self.update_guidance()
 
+    def handle_network_connection_status(self, connected: bool, message: str):
+        """
+        Handle network thread connection status changes.
+        Automatically start/stop LiDAR based on network connection status.
+        
+        Args:
+            connected (bool): True if network is connected, False if disconnected
+            message (str): Connection status message
+        """
+        if connected:
+            # Network connected - automatically start LiDAR in network mode
+            logger.info(f"Network connected: {message}")
+            self.gui.statusBar().showMessage(f"Network connected: {message}")
+            
+            # Switch LiDAR to network mode (no separate serial connection needed)
+            self.lidar_data_processor.set_network_mode(True)
+            
+            # Initialize LiDAR mode in the GUI
+            self.lidar_handler.initialize_lidar_mode()
+            
+            logger.info("LiDAR automatically connected via network thread")
+            
+        else:
+            # Network disconnected - stop LiDAR
+            logger.info(f"Network disconnected: {message}")
+            self.gui.statusBar().showMessage(f"Network disconnected: {message}")
+            
+            # Switch LiDAR back to serial mode
+            self.lidar_data_processor.set_network_mode(False)
+            
+            logger.info("LiDAR disconnected due to network disconnection")
+
     def toggle_recording(self):
         """Start or stop video recording."""
         # Check if video is loaded
@@ -487,9 +505,7 @@ class EventHandler:
 
             # Get frame dimensions and FPS
             fps = 120.0
-            frame_width, frame_height = self.camera_thread.get_frame_dimensions()
-            if self.camera_thread.is_video_file:
-                fps = self.camera_thread.get_fps()
+            frame_width, frame_height = self.video_thread.get_frame_dimensions()
 
             # Start recording
             success = self.video_recorder.start_recording(
@@ -498,7 +514,7 @@ class EventHandler:
                 frame_width,
                 frame_height,
                 fps,
-                self.camera_thread.is_video_file,
+                is_video_file = False,
             )
 
             if success:
