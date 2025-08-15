@@ -77,7 +77,7 @@ class ROI:
         self.matcher = None
 
         # Initialize delta filter
-        self.delta_filter = DeltaFilter(window_size=35, outlier_threshold=2.0, max_history_size=1000)
+        # self.delta_filter = DeltaFilter(max_history_size=1000)
  
     def process_frame(self, frame: np.ndarray) -> tuple[bool, bool]:
         """
@@ -153,15 +153,16 @@ class ROI:
         # Convert from pixels to millimeters
         projection_mm = projection * self.mm2px
 
-        # Final validation and clamp extreme values
-        if not np.isfinite(projection_mm) or abs(projection_mm) > 1e6:
-            return 0.0
+        # # Final validation and clamp extreme values
+        # if not np.isfinite(projection_mm) or abs(projection_mm) > 1e6:
+        #     return 0.0
 
-        # Apply delta filtering to the projection_mm value
-        self.delta_only_history = self.delta_filter.filter(projection_mm, self.delta_only_history)
+        # # Apply delta filtering to the projection_mm value
+        # self.delta_only_history = self.delta_filter.filter(projection_mm, self.delta_only_history)
         
         # Return the filtered value (last element in the filtered history)
-        return self.delta_only_history[-1] if self.delta_only_history else 0.0
+        # return self.delta_only_history[-1] if self.delta_only_history else 0.0
+        return projection_mm
 
     def calculate_velocity(self, delta) -> bool:
         import numpy as np

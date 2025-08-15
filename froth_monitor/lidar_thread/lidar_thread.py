@@ -137,7 +137,7 @@ class LidarThread(QObject):
 
                         if distance_mm is not None:
                             # Apply offset
-                            distance_mm += self.distance_offset
+                            distance_mm = self.distance_offset - distance_mm
                             
                             # Create timestamp
                             timestamp = datetime.now().strftime("%H:%M:%S.%f")

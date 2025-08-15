@@ -1,337 +1,125 @@
-"""Delta Filter Module for Froth Monitor Application.
-
-This module provides the DeltaFilter class for applying various filtering
-techniques to delta/projection data, including noise reduction and outlier detection.
-Designed to integrate with the ROI module for improved delta data quality.
-
-Classes:
---------
-DeltaFilter
-    Manages and applies filtering techniques to delta/projection data streams.
-
-Example Usage:
---------------
-```python
-from delta_filter import DeltaFilter
-
-# Initialize the filter
-delta_filter = DeltaFilter(window_size=5, outlier_threshold=2.0)
-
-# Apply filtering to new delta data
-filtered_history = delta_filter.filter(new_delta, delta_history)
-```
-"""
+"""Simplified Delta Filter Module with Low-Pass Filtering Only."""
 
 import numpy as np
-from typing import List, Union, Optional
-# from scipy import signal
+from collections import deque
+from typing import List
 from froth_monitor.logger_config import get_logger
 
-# Initialize logger for this module
 logger = get_logger(__name__)
-
 
 class DeltaFilter:
     """
-    Delta Filter Class for Signal Processing.
+    Simplified Delta Filter with only low-pass filtering for real-time processing.
     
-    This class provides methods for filtering delta/projection data to reduce noise
-    and handle outliers. It's designed to integrate with the ROI module
-    for real-time delta data processing.
-    
-    Attributes:
-    ----------
-    window_size : int
-        Size of the moving window for noise filtering (default: 35)
-    outlier_threshold : float
-        Z-score threshold for outlier detection (default: 2.0)
-    max_history_size : int
-        Maximum size of delta history to maintain (default: 1000)
-    
-    Methods:
-    -------
-    noise_filter(delta_data: List[float]) -> List[float]
-        Apply noise reduction using moving average filter
-    outlier_filter(delta_data: List[float]) -> List[float]
-        Detect and handle outliers using Z-score method
-    filter(new_delta: float, delta_history: List[float]) -> List[float]
-        Main filtering method that orchestrates noise and outlier filtering
+    This implementation preserves true values while applying only low-pass
+    filtering to reduce high-frequency instrumental noise.
     """
     
-    def __init__(self, window_size: int = 35, outlier_threshold: float = 2.0, 
-                 max_history_size: int = 1000):
+    def __init__(self, max_history_size: int = 1000, lowpass_alpha: float = 0.1):
         """
-        Initialize the DeltaFilter with configurable parameters.
+        Initialize the simplified delta filter with low-pass filtering only.
         
         Parameters
         ----------
-        window_size : int, optional
-            Size of the moving window for noise filtering (default: 35)
-        outlier_threshold : float, optional
-            Z-score threshold for outlier detection (default: 2.0)
-        max_history_size : int, optional
-            Maximum size of delta history to maintain (default: 1000)
+        max_history_size : int
+            Maximum history size to maintain
+        lowpass_alpha : float
+            Low-pass filter coefficient (0 < alpha <= 1)
+            Higher values = less filtering, lower values = more filtering
         """
-        self.window_size = max(1, window_size)  # Ensure minimum window size of 1
-        self.outlier_threshold = max(0.1, outlier_threshold)  # Minimum threshold
-        self.max_history_size = max(10, max_history_size)  # Minimum history size
+        self.max_history_size = max(10, max_history_size)
+        self.lowpass_alpha = max(0.01, min(1.0, lowpass_alpha))
         
-        logger.info(f"DeltaFilter initialized with window_size={self.window_size}, "
-                   f"outlier_threshold={self.outlier_threshold}, "
-                   f"max_history_size={self.max_history_size}")
+        # Use deque for efficient append/pop operations
+        self.history = deque(maxlen=self.max_history_size)
+        
+        # Low-pass filter state
+        self._lowpass_output = 0.0
+        self._lowpass_initialized = False
+        
+        logger.info(f"Simplified DeltaFilter initialized with lowpass_alpha={self.lowpass_alpha}")
     
-    def _validate_and_sanitize_data(self, delta_data: List[float]) -> np.ndarray:
-        """
-        Validate and sanitize delta data.
-        
-        Parameters
-        ----------
-        delta_data : List[float]
-            Input delta data
-            
-        Returns
-        -------
-        np.ndarray
-            Sanitized delta data as numpy array
-        """
-        if not delta_data:
-            return np.array([])
-        
-        # Convert to numpy array and handle invalid values
-        data = np.array(delta_data, dtype=float)
-        
-        # Replace infinite values with NaN
-        data[np.isinf(data)] = np.nan
-        
-        # Replace extremely large values (> 1e6) with NaN
-        data[np.abs(data) > 1e6] = np.nan
-        
-        return data
+    def _validate_value(self, value: float) -> float:
+        """Validate and sanitize a single value."""
+        if not np.isfinite(value) or abs(value) > 1e6:
+            return 0.0
+        return float(value)
     
-    def noise_filter(self, delta_data: List[float]) -> List[float]:
+    def _apply_lowpass_filter(self, input_value: float) -> float:
         """
-        Apply noise reduction to delta data using moving average filter.
+        Apply exponential low-pass filter to reduce high-frequency noise.
         
-        This method implements a moving average filter to smooth delta data
-        and reduce high-frequency noise. The filter uses a configurable window
-        size and handles edge cases appropriately.
-        
-        Parameters
-        ----------
-        delta_data : List[float]
-            Input delta data to be filtered
-            
-        Returns
-        -------
-        List[float]
-            Noise-filtered delta data
+        This preserves the true signal while reducing instrumental noise.
         """
-        data = self._validate_and_sanitize_data(delta_data)
+        if not self._lowpass_initialized:
+            self._lowpass_output = input_value
+            self._lowpass_initialized = True
+            return input_value
         
-        if len(data) == 0:
-            return []
+        self._lowpass_output = (self.lowpass_alpha * input_value + 
+                               (1.0 - self.lowpass_alpha) * self._lowpass_output)
         
-        if len(data) < self.window_size:
-            # If data is shorter than window, use simple mean of available data
-            valid_data = data[~np.isnan(data)]
-            if len(valid_data) > 0:
-                filtered_value = np.mean(valid_data)
-                return [filtered_value if np.isfinite(filtered_value) else 0.0] * len(data)
-            else:
-                return [0.0] * len(data)
-        
-        # Apply moving average filter
-        filtered_data = []
-        
-        for i in range(len(data)):
-            # Define window boundaries
-            start_idx = max(0, i - self.window_size // 2)
-            end_idx = min(len(data), i + self.window_size // 2 + 1)
-            
-            # Extract window data and remove NaN values
-            window_data = data[start_idx:end_idx]
-            valid_window = window_data[~np.isnan(window_data)]
-            
-            if len(valid_window) > 0:
-                filtered_value = np.mean(valid_window)
-                # Validate the filtered value
-                if np.isfinite(filtered_value) and abs(filtered_value) < 1e6:
-                    filtered_data.append(float(filtered_value))
-                else:
-                    filtered_data.append(0.0)
-            else:
-                # If no valid data in window, use 0.0
-                filtered_data.append(0.0)
-        
-        logger.debug(f"Applied noise filter to {len(delta_data)} data points")
-        return filtered_data
-    
-    def outlier_filter(self, delta_data: List[float]) -> List[float]:
-        """
-        Detect and handle outliers in delta data using Z-score method.
-        
-        This method identifies outliers using the Z-score statistical method
-        and replaces them with the median of the remaining data. The Z-score
-        threshold is configurable.
-        
-        Parameters
-        ----------
-        delta_data : List[float]
-            Input delta data to be filtered
-            
-        Returns
-        -------
-        List[float]
-            Outlier-filtered delta data
-        """
-        data = self._validate_and_sanitize_data(delta_data)
-        
-        if len(data) == 0:
-            return []
-        
-        # Remove NaN values for statistical calculations
-        valid_data = data[~np.isnan(data)]
-        
-        if len(valid_data) < 3:
-            # Need at least 3 points for meaningful outlier detection
-            return [float(val) if np.isfinite(val) else 0.0 for val in data]
-        
-        # Calculate Z-scores
-        mean_val = np.mean(valid_data)
-        std_val = np.std(valid_data)
-        
-        if std_val == 0:
-            # If standard deviation is 0, no outliers can be detected
-            return [float(val) if np.isfinite(val) else 0.0 for val in data]
-        
-        # Calculate median for outlier replacement
-        median_val = np.median(valid_data)
-        
-        # Process each data point
-        filtered_data = []
-        outlier_count = 0
-        
-        for val in data:
-            if np.isnan(val):
-                filtered_data.append(0.0)
-            else:
-                z_score = abs((val - mean_val) / std_val)
-                
-                if z_score > self.outlier_threshold:
-                    # Replace outlier with median
-                    filtered_data.append(float(median_val))
-                    outlier_count += 1
-                else:
-                    # Keep original value
-                    filtered_data.append(float(val))
-        
-        if outlier_count > 0:
-            logger.debug(f"Detected and replaced {outlier_count} outliers out of {len(delta_data)} data points")
-        
-        return filtered_data
+        return self._lowpass_output
     
     def filter(self, new_delta: float, delta_history: List[float]) -> List[float]:
         """
-        Main filtering method that orchestrates noise and outlier filtering.
+        Simplified filtering with only low-pass filtering.
         
-        This method combines the new delta with the existing history,
-        applies both noise and outlier filtering, and returns the refined
-        delta history. It also manages the history size to prevent
-        unlimited growth.
+        Processing pipeline:
+        1. Input validation
+        2. Low-pass filtering for noise reduction only
         
         Parameters
         ----------
         new_delta : float
-            New delta value to be added to the history
+            New delta value to be added
         delta_history : List[float]
-            Existing delta history
+            Existing delta history (used for initialization only)
             
         Returns
         -------
         List[float]
-            Filtered and refined delta history
+            Updated filtered history
         """
-        # Validate new delta
-        if not np.isfinite(new_delta) or abs(new_delta) > 1e6:
-            logger.warning(f"Invalid new delta value: {new_delta}, replacing with 0.0")
-            new_delta = 0.0
+        # Initialize from history if this is the first call
+        if len(self.history) == 0 and delta_history:
+            for value in delta_history[-self.max_history_size:]:
+                validated_value = self._validate_value(value)
+                filtered_value = self._apply_lowpass_filter(validated_value)
+                self.history.append(filtered_value)
         
-        # Create updated history
-        updated_history = list(delta_history) + [float(new_delta)]
+        # Step 1: Validate new value
+        validated_delta = self._validate_value(new_delta)
         
-        # Limit history size to prevent memory issues
-        if len(updated_history) > self.max_history_size:
-            updated_history = updated_history[-self.max_history_size:]
-            logger.debug(f"Trimmed delta history to {self.max_history_size} elements")
+        # Step 2: Apply low-pass filter to reduce instrumental noise
+        filtered_value = self._apply_lowpass_filter(validated_delta)
         
-        # Apply outlier filtering first to remove extreme values
-        outlier_filtered = self.outlier_filter(updated_history)
+        # Add to history
+        self.history.append(filtered_value)
         
-        # Apply noise filtering to smooth the data
-        noise_filtered = self.noise_filter(outlier_filtered)
-        
-        logger.info(f"Applied complete filtering to delta history of length {len(updated_history)}")
-        return noise_filtered
+        return list(self.history)
     
-    def get_filter_stats(self, delta_data: List[float]) -> dict:
-        """
-        Get statistical information about the delta data.
-        
-        Parameters
-        ----------
-        delta_data : List[float]
-            Delta data to analyze
-            
-        Returns
-        -------
-        dict
-            Dictionary containing statistical measures
-        """
-        data = self._validate_and_sanitize_data(delta_data)
-        valid_data = data[~np.isnan(data)]
-        
-        if len(valid_data) == 0:
+    def get_current_stats(self) -> dict:
+        """Get current filter statistics."""
+        if len(self.history) == 0:
             return {
                 'count': 0,
-                'mean': 0.0,
-                'std': 0.0,
-                'median': 0.0,
-                'min': 0.0,
-                'max': 0.0
+                'lowpass_output': 0.0
             }
         
         return {
-            'count': len(valid_data),
-            'mean': float(np.mean(valid_data)),
-            'std': float(np.std(valid_data)),
-            'median': float(np.median(valid_data)),
-            'min': float(np.min(valid_data)),
-            'max': float(np.max(valid_data))
+            'count': len(self.history),
+            'lowpass_output': self._lowpass_output
         }
     
-    def update_parameters(self, window_size: Optional[int] = None, 
-                         outlier_threshold: Optional[float] = None,
-                         max_history_size: Optional[int] = None):
-        """
-        Update filter parameters dynamically.
-        
-        Parameters
-        ----------
-        window_size : int, optional
-            New window size for noise filtering
-        outlier_threshold : float, optional
-            New threshold for outlier detection
-        max_history_size : int, optional
-            New maximum history size
-        """
-        if window_size is not None:
-            self.window_size = max(1, window_size)
-            logger.info(f"Updated window_size to {self.window_size}")
-        
-        if outlier_threshold is not None:
-            self.outlier_threshold = max(0.1, outlier_threshold)
-            logger.info(f"Updated outlier_threshold to {self.outlier_threshold}")
-        
-        if max_history_size is not None:
-            self.max_history_size = max(10, max_history_size)
-            logger.info(f"Updated max_history_size to {self.max_history_size}")
+    def update_lowpass_alpha(self, new_alpha: float):
+        """Update the low-pass filter coefficient dynamically."""
+        old_alpha = self.lowpass_alpha
+        self.lowpass_alpha = max(0.01, min(1.0, new_alpha))
+        logger.info(f"Updated low-pass filter alpha from {old_alpha:.3f} to {self.lowpass_alpha:.3f}")
+    
+    def reset_lowpass_filter(self):
+        """Reset the low-pass filter state."""
+        self._lowpass_output = 0.0
+        self._lowpass_initialized = False
+        logger.info("Low-pass filter state reset")
