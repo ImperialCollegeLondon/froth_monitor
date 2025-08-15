@@ -40,6 +40,7 @@ from typing import cast
 from datetime import datetime
 from PySide6.QtCore import QRect
 from froth_monitor.processing.image_analysis import VideoAnalysis
+from froth_monitor.processing.delta_filter import DeltaFilter
 from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
@@ -54,6 +55,7 @@ class ROI:
         self.cross_position = None
 
         self.delta_history = []
+        self.delta_only_history = []
         # timestamp, delta_pixels, calibrated_delta, velocity, froth_height, air_recovery
 
         self.sum_history = []
@@ -73,6 +75,9 @@ class ROI:
 
         self.average_velocity_past_30s = cast(float, None)
         self.matcher = None
+        
+        # Initialize delta filter
+        self.delta_filter = DeltaFilter(window_size=35, outlier_threshold=2.0, max_history_size=1000)
         
     def process_frame(self, timestamp:str, frame: np.ndarray) -> tuple[bool, bool]:
         """
@@ -100,6 +105,7 @@ class ROI:
         self.delta_history.append(
             [self.timestamp, self.delta_pixels, self.calibrated_delta, None, None, None]
         )
+        # Note: delta_only_history is now managed by the delta_filter in calculate_real_delta
 
         return if_new_velo, if_new_average
 
@@ -152,7 +158,11 @@ class ROI:
         if not np.isfinite(projection_mm) or abs(projection_mm) > 1e6:
             return 0.0
 
-        return projection_mm
+        # Apply delta filtering to the projection_mm value
+        self.delta_only_history = self.delta_filter.filter(projection_mm, self.delta_only_history)
+        
+        # Return the filtered value (last element in the filtered history)
+        return self.delta_only_history[-1] if self.delta_only_history else 0.0
 
     def calculate_velocity(self, delta) -> bool:
         import numpy as np
@@ -169,7 +179,6 @@ class ROI:
             if not np.isfinite(self.current_velocity) or abs(self.current_velocity) > 1e6:
                 self.current_velocity = 0.0
             
-            logger.info("true")
             return False
 
         else:

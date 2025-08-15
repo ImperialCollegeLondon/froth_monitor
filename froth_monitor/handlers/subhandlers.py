@@ -1552,7 +1552,6 @@ class FrameProcessor:
             self.frame_model.process_frame(timestamp, resized_frame)
         )
         self.roi_handler.display_roi(roi_list)
-        logger.info(f"if update velo plot: {update_velo_plot}")
 
         # Update the velocity plot with the latest data
         if update_velo_plot:
