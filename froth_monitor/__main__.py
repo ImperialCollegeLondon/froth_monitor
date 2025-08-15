@@ -1,8 +1,8 @@
 """The entry point for the Bubble Analyser program."""
 
-from froth_monitor.event_handler import EventHandler
-from froth_monitor.gui_window import MainGUIWindow
-from froth_monitor.logger_config import get_logger
+from froth_monitor.handlers.event_handler import EventHandler
+from froth_monitor.handlers.gui_window import MainGUIWindow
+from froth_monitor.handlers.logger_config import get_logger
 
 # from .gui import MainGUI
 import sys
@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
 ### Air_rec Formula - unit of %
 ### Stick with cm for the first version
-### (overflow's velocity (mm/s | distance/time)) * (froth height(mm | distance)) * (perimeter of cell (input from user) (mm | distance)) / 
+### (overflow's velocity (mm/s | distance/time)) * (froth height(mm | distance)) * (perimeter of cell (input from user) (mm | distance)) /
 ### over
 ### (air flow into 1. (we can ask user to choose the unit, volume/time - m^3/hr (industrial scale), liters/min (lab scale), cm3/s)
 ###                2. Ask for Jg (cm/s), calculate airflow based on (Jg*Area of cell)

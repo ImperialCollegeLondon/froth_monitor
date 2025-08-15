@@ -4,7 +4,6 @@ TODO list:
 """
 
 import random
-import time
 import re
 from datetime import datetime
 # import serial

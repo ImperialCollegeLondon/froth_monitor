@@ -9,7 +9,7 @@ import time
 
 # ---- Debug video source ----
 # open any valid video stream(for e.g `test.mp4` file)
-stream = VideoGear(source="dummy_video.mp4").start() # type: ignore
+stream = VideoGear(source="dummy_video.mp4").start()  # type: ignore
 
 # ---- Jetson Network ----
 # RECEIVER_NETWORK_ADDRESS = "10.42.0.85"
@@ -40,7 +40,7 @@ def main():
         lidar_stream = (
             lidar_stream.generate_debug_data()
             if LIDAR_DEBUG
-            else lidar_stream.start_stream() # type: ignore
+            else lidar_stream.start_stream()  # type: ignore
         )
 
         # Main loop to capture and send video frames

@@ -5,7 +5,7 @@ This script shows how to use the centralized logging system
 and can be used to test that logging is working correctly.
 """
 
-from froth_monitor.logger_config import get_logger, setup_logging
+from froth_monitor.handlers.logger_config import get_logger, setup_logging
 import time
 
 # Initialize logger for this module

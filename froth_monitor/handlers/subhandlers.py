@@ -21,13 +21,13 @@ from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtGui import QIcon
 
 # Import MainGUIWindow at the beginning
-from froth_monitor.gui_window import MainGUIWindow
+from froth_monitor.handlers.gui_window import MainGUIWindow
 
 # Import FrameModel from fm_model module
-from froth_monitor.fm_model import FrameModel, ROI
+from froth_monitor.processing.fm_model import FrameModel, ROI
 
 # Import the custom overlay widget
-from froth_monitor.overlay_widget import OverlayWidget
+from froth_monitor.handlers.overlay_widget import OverlayWidget
 
 # Import the camera and network threads
 from froth_monitor.video_threads.camera_thread import CameraThread
@@ -36,12 +36,12 @@ from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 from froth_monitor.lidar_thread.lidar_control_dialog import LidarControlDialog
 from froth_monitor.air_recovery import AirRecoveryDataProcessor
 
-from froth_monitor.export import Export
+from froth_monitor.handlers.export import Export
 
 # Import the video recorder module
-from froth_monitor.video_recorder import VideoRecorder
+from froth_monitor.handlers.video_recorder import VideoRecorder
 # from froth_monitor.event_handler import EventHandler
-from froth_monitor.logger_config import get_logger
+from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
 logger = get_logger(__name__)
@@ -517,7 +517,7 @@ class VideoHandler:
         self.event_handler = event_handler
         self.frame_model = frame_model
         self.video_thread = video_thread
-        
+
         # Add missing state variables
         self.playing = False
         self.frame_width = 0
@@ -532,9 +532,14 @@ class VideoHandler:
 
     def import_jetson_video(self):
         self.event_handler.if_jetson = True
+        
+        # Connect the signal BEFORE starting network capture
+        self.video_thread.connection_status_changed.connect(
+            lambda connected, message: self.event_handler.handle_network_connection_status(connected, message)
+        )
 
         # Start network capture
-        if self.video_thread.start_network_capture(self.jetson_source_address, 
+        if self.video_thread.start_network_capture(self.jetson_source_address,
                 self.jetson_source_port):
             self.playing = True
             self.event_handler.trigger_jetson_mode()
@@ -567,7 +572,7 @@ class VideoHandler:
             self.gui.statusBar().showMessage("Video paused")
             # Change icon to play icon when paused
             self.gui.play_pause_button.setIcon(
-                QIcon(resource_path("froth_monitor/resources/play_icon.ico"))
+                QIcon(resource_path("froth_monitor/gui_resources/play_icon.ico"))
             )
         else:
             # If the thread is running but paused, just resume it
@@ -577,7 +582,7 @@ class VideoHandler:
                 self.gui.statusBar().showMessage("Video resumed")
                 # Change icon to pause icon when playing
                 self.gui.play_pause_button.setIcon(
-                    QIcon(resource_path("froth_monitor/resources/pause_icon.ico"))
+                    QIcon(resource_path("froth_monitor/gui_resources/pause_icon.ico"))
                 )
 
             # If the thread is not running, we need to restart it
@@ -835,7 +840,7 @@ class ROIHandler:
         self.gui.statusBar().showMessage("Last ROI deleted")
 
 class DataHandler:
-    def __init__(self, gui: MainGUIWindow, frame_model: FrameModel, 
+    def __init__(self, gui: MainGUIWindow, frame_model: FrameModel,
     lidar_data_processor: LidarDataProcessor, air_recovery_data_processor: AirRecoveryDataProcessor):
         self.gui = gui
         self.frame_model = frame_model
@@ -862,7 +867,7 @@ class DataHandler:
         30 elements, the oldest elements are removed to maintain the fixed window size.
         """
         import numpy as np
-        
+
         # Clear the plot widget
         self.gui.plot_widget.clear()
 
@@ -905,7 +910,7 @@ class DataHandler:
                 if roi.velo_only_history:
                     sanitized_history = sanitize_velocity_data(roi.velo_only_history)
                     all_velocities.extend(sanitized_history)
-            
+
             if all_velocities:
                 max_velocity = max(all_velocities)
 
@@ -967,6 +972,8 @@ class DataHandler:
         """Update the average velocity table with data from all ROIs."""
         # Clear the table
 
+        logger.info(f'update_velo_table...')
+
         # Add data to the table
         for i, roi in enumerate(self.frame_model.roi_list):
             if self.if_lidar and len(self.lidar_data_processor.reading_history_av1s) > 1:
@@ -975,7 +982,7 @@ class DataHandler:
 
     def update_arec_tablengraph(self):
         import numpy as np
-        
+
         table_list_data = []
 
         for i, roi in enumerate(self.frame_model.roi_list):
@@ -996,16 +1003,16 @@ class DataHandler:
 
         self.gui.velo_widget.setStyleSheet(
             """
-            background-color: #f0f0f0; 
+            background-color: #f0f0f0;
             font-size: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
             """
         )
-        
+
         # Update air recovery plot with data from all ROIs
         self._update_air_recovery_plot()
-    
+
     def _update_air_recovery_plot(self):
         """Update the air recovery plot with data from all ROIs.
 
@@ -1018,7 +1025,7 @@ class DataHandler:
         30 elements, the oldest elements are removed to maintain the fixed window size.
         """
         import numpy as np
-        
+
         # Clear the air recovery plot widget
         self.gui.ar_plot_widget.clear()
 
@@ -1073,7 +1080,7 @@ class DataHandler:
                     air_recovery_history = extract_air_recovery_history(roi)
                     sanitized_history = sanitize_air_recovery_data(air_recovery_history)
                     all_air_recoveries.extend(sanitized_history)
-            
+
             if all_air_recoveries:
                 max_air_recovery = max(all_air_recoveries)
 
@@ -1144,7 +1151,7 @@ class DataHandler:
         30 elements, the oldest elements are removed to maintain the fixed window size.
         """
         import numpy as np
-        
+
         # Clear the plot widget
         self.gui.froth_height_plot_widget.clear()
 
@@ -1232,7 +1239,7 @@ class DataHandler:
 
     def start_matching_velo_n_lidar(self, roi_number, roi, index):
         """Start asynchronous matching of velocity and lidar data.
-        
+
         Args:
             velo_data: Velocity data with timestamp
         """
@@ -1240,7 +1247,7 @@ class DataHandler:
             roi.matcher = VelocityLidarMatcher(self.lidar_data_processor)
             roi.matcher.match_found.connect(self._on_match_found)
             roi.matcher.match_failed.connect(self._on_match_failed)
-        
+
         logger.info(f"===Start matching frame and lidar for ROI {roi_number + 1}===")
         logger.info(f"Frame index {index}")
         roi.matcher.start_matching(roi, index)
@@ -1264,26 +1271,26 @@ class DataHandler:
     def _on_match_failed(self, roi, velo_data, index):
         """Handle failed match between velocity and lidar data."""
         logger.info(f"No matching lidar data found for velocity timestamp: {velo_data[1][:8]}")
-    
+
     def stop_matcher(self, roi):
         """Stop the velocity-lidar matcher if it exists."""
         if hasattr(roi, 'matcher'):
             roi.matcher.stop_matching()
-    
+
     def air_rec_calculation(self, roi, velocity, froth_height, timestamp) -> float:
         """
         Calculate air recovery using the air recovery data processor.
-        
+
         Args:
             velocity (float): Overflow velocity in mm/s
             froth_height (float): Froth height in mm
-            
+
         Returns:
             float: Air recovery percentage
         """
         try:
             # Get current timestamp
-            
+
             # Process data through air recovery processor
             if hasattr(self, 'air_recovery_data_processor'):
                 if self.air_recovery_data_processor is not None:
@@ -1295,23 +1302,23 @@ class DataHandler:
             else:
                 logger.warning("Air recovery data processor not available")
                 air_rec = 0.0
-                
+
             return air_rec
-            
+
         except Exception as e:
             logger.error(f"Error in air recovery calculation: {e}")
             return 0.0
-    
+
     def roi_sum_history_append(self, roi, timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm):
         roi.sum_history.append([timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm])
 
 class VelocityLidarMatcher(QObject):
     """Asynchronous matcher for velocity and lidar data based on timestamps."""
-    
+
     # Signals
     match_found = Signal(ROI, list, list, int)  # velo_data, lidar_data, frame index
     match_failed = Signal(ROI, list, int)  # velo_data
-    
+
     def __init__(self, lidar_data_processor):
         super().__init__()
         self.lidar_data_processor = lidar_data_processor
@@ -1325,7 +1332,7 @@ class VelocityLidarMatcher(QObject):
         self.start_time = cast(float, None)
         self.max_wait_time = 1.0  # 1 second maximum wait
         self.initial_lidar_count = 0
-        
+
     def start_matching(self, roi: ROI, index):
 
         """Start matching process for given velocity data."""
@@ -1339,7 +1346,7 @@ class VelocityLidarMatcher(QObject):
         self.start_time = cast(float, None)
 
         # Get current lidar data
-        lidar_history = self.lidar_data_processor.lidar_reading_history_av1s
+        lidar_history = self.lidar_data_processor.reading_history_av1s
 
         if not lidar_history:
             self.match_failed.emit(self.current_roi_number, velo_data)
@@ -1354,17 +1361,17 @@ class VelocityLidarMatcher(QObject):
         # Start timer for periodic checking
         self.start_time = time.time()
         self.matching_timer.start(100) # Check every 100ms
-        
+
     def _check_immediate_match(self, lidar_history):
         """Check for immediate match in current lidar data."""
         latest_lidar_data = lidar_history[-1]
         latest_lidar_timestamp = latest_lidar_data[0][2][:8]  # Extract HH:MM:SS
-        
+
         # Scenario 1: Exact match
         if self.target_timestamp == latest_lidar_timestamp:
             self.match_found.emit(self.roi, self.current_velo_data, latest_lidar_data, self.index)
             return True
-            
+
         # Scenario 2: Lidar timestamp is later - search backwards
         elif latest_lidar_timestamp > self.target_timestamp:
             for lidar_data in reversed(lidar_history):
@@ -1378,27 +1385,27 @@ class VelocityLidarMatcher(QObject):
             # No match found in history
             self.match_failed.emit(self.roi, self.current_velo_data, self.index)
             return True
-            
+
         # Scenario 3: Lidar timestamp is earlier - need to wait
         return False
-        
+
     def _check_for_match(self):
         """Periodic check for new lidar data during waiting period."""
         import time
-        
+
         # Check timeout
         if time.time() - self.start_time > self.max_wait_time:
             self.matching_timer.stop()
             self.match_failed.emit(self.roi, self.current_velo_data, self.index)
             return
-            
+
         # Check for new lidar data
-        current_lidar_history = self.lidar_data_processor.lidar_reading_history_av1s
+        current_lidar_history = self.lidar_data_processor.reading_history_av1s
         if len(current_lidar_history) > self.initial_lidar_count:
             # New data arrived
             new_latest_data = current_lidar_history[-1]
             new_latest_timestamp = new_latest_data[0][2][:8]
-            
+
             if new_latest_timestamp == self.target_timestamp:
                 self.matching_timer.stop()
                 self.match_found.emit(self.roi, self.current_velo_data, new_latest_data, self.index)
@@ -1406,14 +1413,14 @@ class VelocityLidarMatcher(QObject):
                 # Timestamp jumped past target
                 self.matching_timer.stop()
                 self.match_failed.emit(self.roi, self.current_velo_data, self.index)
-            
+
             # Update count for next iteration
             self.initial_lidar_count = len(current_lidar_history)
-    
+
     def stop_matching(self):
         """Stop the matching timer if it's running."""
         if self.matching_timer.isActive():
-            self.matching_timer.stop() 
+            self.matching_timer.stop()
 
 class FrameProcessor:
     def __init__(
@@ -1440,7 +1447,7 @@ class FrameProcessor:
         self.canvas_height = self.gui.video_canvas_label.height()
 
     # -----------------------------------Frame Processing-----------------------------------------------
-    def process_new_frame(self, frame):
+    def process_new_frame(self, timestamp:str, frame):
         """
         Process and display a new frame received from the camera thread.
 
@@ -1472,7 +1479,7 @@ class FrameProcessor:
         # Only allow to let frame pass in when the previous frame has been processed
         # This is to prevent the overstacking of frames
         self.video_thread.if_release = False
-        self._process_frame_with_model(resized_frame)
+        self._process_frame_with_model(timestamp, resized_frame)
         self.video_thread.if_release = True
 
         # Display the frame on the canvas
@@ -1534,7 +1541,7 @@ class FrameProcessor:
         """
         return cv2.resize(frame, (width, height))
 
-    def _process_frame_with_model(self, resized_frame):
+    def _process_frame_with_model(self, timestamp:str, resized_frame):
         """
         Process the frame with the frame model and display ROIs.
 
@@ -1542,14 +1549,15 @@ class FrameProcessor:
             resized_frame: The resized frame to process
         """
         self.current_frame_number, roi_list, update_velo_plot, update_average_velo = (
-            self.frame_model.process_frame(resized_frame)
+            self.frame_model.process_frame(timestamp, resized_frame)
         )
         self.roi_handler.display_roi(roi_list)
+        logger.info(f"if update velo plot: {update_velo_plot}")
 
         # Update the velocity plot with the latest data
         if update_velo_plot:
             self.velocity_plotter.update_velocity_plot()
-            self.velocity_plotter.update_velo_table()            
+            self.velocity_plotter.update_velo_table()
 
     def _display_frame_on_canvas(self, scaled_image):
         """
@@ -1596,7 +1604,7 @@ class FrameProcessor:
 
 class AirRecoveryHandler:
     """Handler for air recovery functionality."""
-    
+
     def __init__(self, air_recovery_data_processor, gui: MainGUIWindow, event_handler):
         self.air_recovery_data_processor = air_recovery_data_processor
 
@@ -1617,11 +1625,9 @@ class AirRecoveryHandler:
             self.gui.show_air_flow_control_panel(event = "normal_method")
             self.gui.main_flow_rate_spin.setValue(self.air_recovery_data_processor.air_flow_rate)
             self.gui.main_flow_unit_label.setText(self.air_recovery_data_processor.air_flow_unit)
-    
-        
 
     def apply_main_flow_changes(self):
-        
+
         if self.air_recovery_data_processor.use_jg_calculation:
             self.air_recovery_data_processor.jg_value = self.gui.main_jg_spin.value()
         else:
@@ -1654,7 +1660,7 @@ class LidarHandler:
         self.event_handler = event_handler
         self.lidar_data_processor = lidar_data_processor
         self.velocity_plotter = velocity_plotter
-    
+
     def open_lidar_control(self):
         """Open the LiDAR control dialog."""
         try:
@@ -1673,7 +1679,7 @@ class LidarHandler:
 
     def update_fh_plot(self, lidar_reading_history_av1s_only_v):
         self.velocity_plotter.update_fh_plot(lidar_reading_history_av1s_only_v)
-    
+
     def get_lidar_statistics(self):
         """Get LiDAR statistics from the data processor."""
         return self.lidar_data_processor.get_statistics()

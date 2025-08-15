@@ -45,7 +45,7 @@ from PySide6.QtGui import QFont
 from datetime import datetime
 from openpyxl import Workbook
 from typing import cast
-from froth_monitor.logger_config import get_logger
+from froth_monitor.handlers.logger_config import get_logger
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 
 # Initialize logger for this module

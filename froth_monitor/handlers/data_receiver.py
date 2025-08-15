@@ -1,7 +1,7 @@
 import sys
-from froth_monitor.api.network import VideoReceiver
-from froth_monitor.api.network import discover_and_connect
-from froth_monitor.api.commands import CommandList
+from froth_monitor.api_jetson.network import VideoReceiver
+from froth_monitor.api_jetson.network import discover_and_connect
+from froth_monitor.api_jetson.commands import CommandList
 from typing import cast
 import cv2
 

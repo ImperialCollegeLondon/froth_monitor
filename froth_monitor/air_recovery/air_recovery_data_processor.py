@@ -8,15 +8,16 @@ It handles data buffering, averaging, and statistical analysis.
 from typing import List, Dict
 from datetime import datetime
 import statistics
-from froth_monitor.logger_config import get_logger
+from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
 logger = get_logger(__name__)
 
+
 class AirRecoveryDataProcessor:
     """
     Processes velocity and froth height data to calculate air recovery percentages.
-    
+
     This class handles air recovery calculations based on the formula:
     Air Recovery (%) = (velocity × froth_height × cell_perimeter) / air_flow_rate
     """
@@ -24,7 +25,7 @@ class AirRecoveryDataProcessor:
     def __init__(self, event_handler):
         """
         Initialize the air recovery data processor.
-        
+
         Args:
             event_handler: The main event handler instance
         """
@@ -44,7 +45,7 @@ class AirRecoveryDataProcessor:
         self.use_jg_calculation = False
         self.jg_value = 1.0  # cm/s, superficial gas velocity
         self.cell_area = 1000000.0  # mm², default value
-        
+
         # Configuration state tracking
         self.is_configured = False
         self.configuration_locked = False
@@ -58,16 +59,15 @@ class AirRecoveryDataProcessor:
         # Data buffering for averaging
         self.data_buffer = []  # Buffer for (velocity, froth_height, timestamp) tuples
         self.buffer_size = 10  # Number of readings to average
-        
+
         # Statistics
         self.statistics_cache = {}
         self.last_stats_update = datetime.now()
         self.stats_update_interval = 1.0  # seconds
 
-    def process_air_recovery_data(self, 
-    velocity: float, 
-    froth_height: float, 
-    timestamp: str) -> tuple[str, float, float, float, str, float] | None:
+    def process_air_recovery_data(
+        self, velocity: float, froth_height: float, timestamp: str
+    ) -> tuple[str, float, float, float, str, float] | None:
         """
         Process new velocity and froth height data to calculate air recovery.
 
@@ -99,24 +99,34 @@ class AirRecoveryDataProcessor:
 
             # Update statistics periodically
             current_time = datetime.now()
-            if (current_time - self.last_stats_update).total_seconds() > self.stats_update_interval:
+            if (
+                current_time - self.last_stats_update
+            ).total_seconds() > self.stats_update_interval:
                 self._update_statistics()
                 self.last_stats_update = current_time
 
             # Update GUI if available
             self._update_gui()
 
-            logger.debug(f"Air recovery calculated: {air_recovery:.2f}% (V={velocity:.1f}, FH={froth_height:.1f})")
-            
+            logger.debug(
+                f"Air recovery calculated: {air_recovery:.2f}% (V={velocity:.1f}, FH={froth_height:.1f})"
+            )
+
             if self.use_jg_calculation:
-                current_air_flow = f'{self.jg_value} cm/s'
+                current_air_flow = f"{self.jg_value} cm/s"
             else:
-                current_air_flow = f'{self.air_flow_rate} {self.air_flow_unit}'
-            
+                current_air_flow = f"{self.air_flow_rate} {self.air_flow_unit}"
+
             current_air_flow_in_mm = self._get_air_flow_in_mm3_per_s()
 
-            return timestamp, velocity, froth_height, \
-                air_recovery, current_air_flow, current_air_flow_in_mm
+            return (
+                timestamp,
+                velocity,
+                froth_height,
+                air_recovery,
+                current_air_flow,
+                current_air_flow_in_mm,
+            )
 
         except Exception as e:
             logger.error(f"Error processing air recovery data: {e}")
@@ -124,32 +134,34 @@ class AirRecoveryDataProcessor:
     def _calculate_air_recovery(self, velocity: float, froth_height: float) -> float:
         """
         Calculate air recovery percentage using the flotation formula.
-        
+
         Formula: Air Recovery (%) = (velocity × froth_height × cell_perimeter) / air_flow_rate
-        
+
         Args:
             velocity (float): Overflow velocity in mm/s
             froth_height (float): Froth height in mm
-            
+
         Returns:
             float: Air recovery percentage
         """
         try:
             # Get air flow rate in consistent units
             air_flow_mm3_per_s = self._get_air_flow_in_mm3_per_s()
-            
+
             if air_flow_mm3_per_s <= 0:
-                logger.warning("Air flow rate is zero or negative, cannot calculate air recovery")
+                logger.warning(
+                    "Air flow rate is zero or negative, cannot calculate air recovery"
+                )
                 return 0.0
 
             # Calculate numerator: velocity (mm/s) × froth_height (mm) × perimeter (mm)
             numerator = velocity * froth_height * self.cell_perimeter
-            
+
             # Calculate air recovery percentage
             air_recovery = (numerator / air_flow_mm3_per_s) * 100
-            
+
             return max(0.0, air_recovery)  # Ensure non-negative result
-            
+
         except Exception as e:
             logger.error(f"Error calculating air recovery: {e}")
             return 0.0
@@ -157,7 +169,7 @@ class AirRecoveryDataProcessor:
     def _get_air_flow_in_mm3_per_s(self) -> float:
         """
         Convert air flow rate to mm³/s for consistent calculations.
-        
+
         Returns:
             float: Air flow rate in mm³/s
         """
@@ -191,20 +203,23 @@ class AirRecoveryDataProcessor:
                 return
 
             self.statistics_cache = {
-                'count': len(self.air_recovery_history),
-                'current': self.current_air_recovery,
-                'average': statistics.mean(self.air_recovery_history),
-                'median': statistics.median(self.air_recovery_history),
-                'min': min(self.air_recovery_history),
-                'max': max(self.air_recovery_history),
-                'range': max(self.air_recovery_history) - min(self.air_recovery_history)
+                "count": len(self.air_recovery_history),
+                "current": self.current_air_recovery,
+                "average": statistics.mean(self.air_recovery_history),
+                "median": statistics.median(self.air_recovery_history),
+                "min": min(self.air_recovery_history),
+                "max": max(self.air_recovery_history),
+                "range": max(self.air_recovery_history)
+                - min(self.air_recovery_history),
             }
-            
+
             if len(self.air_recovery_history) > 1:
-                self.statistics_cache['std_dev'] = statistics.stdev(self.air_recovery_history)
+                self.statistics_cache["std_dev"] = statistics.stdev(
+                    self.air_recovery_history
+                )
             else:
-                self.statistics_cache['std_dev'] = 0.0
-                
+                self.statistics_cache["std_dev"] = 0.0
+
         except Exception as e:
             logger.error(f"Error updating air recovery statistics: {e}")
             self.statistics_cache = {}
@@ -215,10 +230,10 @@ class AirRecoveryDataProcessor:
         """
         try:
             # Update status bar with current reading
-            if hasattr(self.gui, 'statusBar'):
+            if hasattr(self.gui, "statusBar"):
                 status_text = f"Air Recovery: {self.current_air_recovery:.1f}% | V: {self.current_velocity:.1f} mm/s | FH: {self.current_froth_height:.1f} mm"
                 # Note: This might interfere with other status updates, consider a dedicated display area
-                
+
         except Exception as e:
             logger.error(f"Error updating GUI with air recovery data: {e}")
 
@@ -242,8 +257,10 @@ class AirRecoveryDataProcessor:
         self.cell_area = max(0.0, cell_area)
         self.use_jg_calculation = True
         self.is_configured = True
-        logger.info(f"Jg parameters set: Jg={self.jg_value} cm/s, Area={self.cell_area} mm²")
-        
+        logger.info(
+            f"Jg parameters set: Jg={self.jg_value} cm/s, Area={self.cell_area} mm²"
+        )
+
     def lock_configuration(self):
         """Lock the current configuration to prevent changes."""
         if self.is_configured:
@@ -251,11 +268,11 @@ class AirRecoveryDataProcessor:
             logger.info("Air flow rate locked")
         else:
             logger.warning("Cannot lock configuration - not yet configured")
-            
+
     def is_configuration_locked(self) -> bool:
         """Check if configuration is locked."""
         return self.configuration_locked
-        
+
     def reset_configuration(self):
         """Reset configuration state and unlock settings."""
         self.is_configured = False
@@ -291,14 +308,14 @@ class AirRecoveryDataProcessor:
     def get_configuration(self) -> Dict:
         """Get current configuration parameters."""
         return {
-            'cell_perimeter': self.cell_perimeter,
-            'air_flow_rate': self.air_flow_rate,
-            'air_flow_unit': self.air_flow_unit,
-            'use_jg_calculation': self.use_jg_calculation,
-            'jg_value': self.jg_value,
-            'cell_area': self.cell_area,
-            'is_configured': self.is_configured,
-            'configuration_locked': self.configuration_locked
+            "cell_perimeter": self.cell_perimeter,
+            "air_flow_rate": self.air_flow_rate,
+            "air_flow_unit": self.air_flow_unit,
+            "use_jg_calculation": self.use_jg_calculation,
+            "jg_value": self.jg_value,
+            "cell_area": self.cell_area,
+            "is_configured": self.is_configured,
+            "configuration_locked": self.configuration_locked,
         }
 
     # Data management methods
@@ -309,68 +326,94 @@ class AirRecoveryDataProcessor:
         self.froth_height_history.clear()
         self.timestamp_history.clear()
         self.data_buffer.clear()
-        
+
         self.current_velocity = 0.0
         self.current_froth_height = 0.0
         self.current_air_recovery = 0.0
         self.current_timestamp = ""
-        
+
         self.statistics_cache = {}
-        
+
         logger.info("Air recovery data processor cleared")
 
     def export_data(self, filename: str) -> bool:
         """
         Export air recovery data to a CSV file.
-        
+
         Args:
             filename (str): Path to the output file
-            
+
         Returns:
             bool: True if export was successful, False otherwise
         """
         try:
             import csv
-            
-            with open(filename, 'w', newline='') as csvfile:
+
+            with open(filename, "w", newline="") as csvfile:
                 writer = csv.writer(csvfile)
-                
+
                 # Write headers
-                writer.writerow([
-                    'index', 
-                    'timestamp',
-                    'velocity_mm_per_s', 
-                    'froth_height_mm', 
-                    'air_recovery_percent',
-                    'cell_perimeter_mm',
-                    'air_flow_rate',
-                    'air_flow_unit'
-                ])
-                
+                writer.writerow(
+                    [
+                        "index",
+                        "timestamp",
+                        "velocity_mm_per_s",
+                        "froth_height_mm",
+                        "air_recovery_percent",
+                        "cell_perimeter_mm",
+                        "air_flow_rate",
+                        "air_flow_unit",
+                    ]
+                )
+
                 # Write configuration as comment rows
                 config = self.get_configuration()
-                writer.writerow(['# Configuration:'])
+                writer.writerow(["# Configuration:"])
                 for key, value in config.items():
-                    writer.writerow([f'# {key}', value])
-                writer.writerow(['# Data:'])
-                
+                    writer.writerow([f"# {key}", value])
+                writer.writerow(["# Data:"])
+
                 # Write data
                 max_len = len(self.air_recovery_history)
-                
+
                 for i in range(max_len):
-                    timestamp = self.timestamp_history[i] if i < len(self.timestamp_history) else ''
-                    velocity = self.velocity_history[i] if i < len(self.velocity_history) else ''
-                    froth_height = self.froth_height_history[i] if i < len(self.froth_height_history) else ''
-                    air_recovery = self.air_recovery_history[i] if i < len(self.air_recovery_history) else ''
-                    
-                    writer.writerow([
-                        i, timestamp, velocity, froth_height, air_recovery,
-                        self.cell_perimeter, self.air_flow_rate, self.air_flow_unit
-                    ])
-            
+                    timestamp = (
+                        self.timestamp_history[i]
+                        if i < len(self.timestamp_history)
+                        else ""
+                    )
+                    velocity = (
+                        self.velocity_history[i]
+                        if i < len(self.velocity_history)
+                        else ""
+                    )
+                    froth_height = (
+                        self.froth_height_history[i]
+                        if i < len(self.froth_height_history)
+                        else ""
+                    )
+                    air_recovery = (
+                        self.air_recovery_history[i]
+                        if i < len(self.air_recovery_history)
+                        else ""
+                    )
+
+                    writer.writerow(
+                        [
+                            i,
+                            timestamp,
+                            velocity,
+                            froth_height,
+                            air_recovery,
+                            self.cell_perimeter,
+                            self.air_flow_rate,
+                            self.air_flow_unit,
+                        ]
+                    )
+
             logger.info(f"Air recovery data exported to {filename}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to export air recovery data: {e}")
             return False

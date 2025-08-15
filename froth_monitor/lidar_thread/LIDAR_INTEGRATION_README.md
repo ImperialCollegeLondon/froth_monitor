@@ -26,6 +26,7 @@ The LiDAR integration consists of several key components:
 ## Features
 
 ### LiDAR Thread (`LidarThread`)
+
 - Serial communication with LiDAR devices
 - Real-time data parsing ("D=X.XXXm" format)
 - Distance offset calibration
@@ -34,12 +35,14 @@ The LiDAR integration consists of several key components:
 - Thread-safe operation
 
 ### Data Processor (`LidarDataProcessor`)
+
 - Real-time data averaging
 - Statistical analysis (min, max, average, std dev)
 - Data buffering with configurable size
 - Integration with GUI updates
 
 ### Control Dialog (`LidarControlDialog`)
+
 - Start/stop data capture
 - Serial port configuration
 - Real-time data display
@@ -81,17 +84,22 @@ self.lidar_thread.data_available.connect(
 ### 1. Hardware Setup
 
 #### Physical LiDAR Device
+
 1. Connect your LiDAR device to a serial port (USB-to-Serial adapter if needed)
 2. Note the COM port number (e.g., COM3, COM4)
 3. Ensure the device outputs data in "D=X.XXXm" format
 
 #### Simulated LiDAR (for testing)
+
 1. Set up virtual serial ports (see `setup_virtual_ports.md`)
 2. Run the dummy LiDAR simulator:
+
    ```bash
    python dummy_lidar.py COM3
    ```
+
    Or use the batch file:
+
    ```bash
    run_dummy_lidar.bat
    ```
@@ -99,47 +107,60 @@ self.lidar_thread.data_available.connect(
 ### 2. Software Integration
 
 #### In Main Application
+
 1. The LiDAR functionality is automatically available in the `EventHandler`
 2. Access through the LiDAR control dialog:
+
    ```python
    event_handler.open_lidar_control()
    ```
 
 #### Standalone Testing
+
 1. Run the test application:
+
    ```bash
    python test_lidar_integration.py
    ```
+
 2. This provides a simple interface to test all LiDAR functionality
 
 ### 3. Configuration
 
 #### Serial Port Settings
+
 - **Port**: COM port where LiDAR is connected (e.g., COM3)
 - **Baud Rate**: Communication speed (default: 115200)
 - **Timeout**: Read timeout in seconds (default: 1.0)
 
 #### Distance Settings
+
 - **Offset**: Distance offset in millimeters for calibration
 - **Buffer Size**: Number of readings to keep in memory (default: 1000)
 
 ### 4. Data Format
 
 #### Input Format
+
 The LiDAR device should output data in the format:
+
 ```
 D=1.234m
 ```
+
 Where `1.234` is the distance in meters.
 
 #### Output Data
+
 Processed data includes:
+
 - **Timestamp**: When the reading was taken
 - **Distance (mm)**: Distance in millimeters
 - **Inverted Distance**: 1000 - distance (for certain applications)
 - **Formatted Time**: Human-readable timestamp
 
 #### CSV Export Format
+
 ```csv
 Timestamp,Distance_mm,Inverted_Distance_mm,Formatted_Time
 1704067200.123,1234.0,766.0,2024-01-01 12:00:00.123

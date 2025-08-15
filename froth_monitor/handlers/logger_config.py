@@ -7,7 +7,6 @@ and console output with proper formatting.
 
 import logging
 import logging.handlers
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional

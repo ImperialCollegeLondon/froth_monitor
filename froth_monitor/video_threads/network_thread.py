@@ -5,18 +5,18 @@ video frames and sensor data from a remote source over the network using DataRec
 (high-level abstraction) instead of low-level VideoReceiver.
 """
 
-import cv2
 import threading
 import time
 import numpy as np
 from PySide6.QtCore import QObject, Signal
-from froth_monitor.data_receiver import DataReceiver
-from froth_monitor.api.commands import CommandList, CommandType, CommandPriority
+from froth_monitor.handlers.data_receiver import DataReceiver
+from froth_monitor.api_jetson.commands import CommandPriority
 
-from froth_monitor.logger_config import get_logger
+from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
 logger = get_logger(__name__)
+
 
 class NetworkThread(QObject):
     """
@@ -40,15 +40,15 @@ class NetworkThread(QObject):
     # Signals to emit when new data is available
     frame_available = Signal(np.ndarray)
     sensor_data_available = Signal(dict)  # For LIDAR and other sensor data
-    lidar_data_available = Signal(dict)   # Dedicated LiDAR signal
+    lidar_data_available = Signal(dict)  # Dedicated LiDAR signal
     data_available = Signal(
         dict, np.ndarray
     )  # Combined signal for both frame and sensor data
-    
+
     # Signals for communication status
     connection_status_changed = Signal(bool, str)  # connected, status_message
-    command_sent = Signal(dict)           # Signal when command is sent successfully
-    command_send_failed = Signal(str)     # Signal when command sending fails
+    command_sent = Signal(dict)  # Signal when command is sent successfully
+    command_send_failed = Signal(str)  # Signal when command sending fails
 
     def __init__(self):
         """
@@ -66,11 +66,13 @@ class NetworkThread(QObject):
         self.max_buffer = 5  # Allow 5 frames in buffer
         self.buffer_lock = threading.Lock()
         self.if_release = True
-        
+
         # Connection status
         self.is_connected = False
 
-    def start_network_capture(self, address="0.0.0.0", port=5001, request_timeout=3600, verbose_level=1):
+    def start_network_capture(
+        self, address="0.0.0.0", port=5001, request_timeout=3600, verbose_level=1
+    ):
         """
         Start receiving frames and sensor data from the specified network source using DataReceiver.
 
@@ -95,10 +97,10 @@ class NetworkThread(QObject):
         try:
             # Initialize DataReceiver (high-level abstraction)
             self.data_receiver = DataReceiver(
-                addr=address, 
-                port=port, 
-                request_timeout=request_timeout, 
-                verbose_level=verbose_level
+                addr=address,
+                port=port,
+                request_timeout=request_timeout,
+                verbose_level=verbose_level,
             )
 
             # Check if connection was successful
@@ -106,7 +108,7 @@ class NetworkThread(QObject):
                 self.is_connected = True
                 connection_msg = f"Connected to Jetson at {self.data_receiver.jetson_ip}:{self.data_receiver.agreed_port}"
                 self.connection_status_changed.emit(True, connection_msg)
-                
+
                 # Start receiver thread
                 self.running = True
                 self.thread_ = threading.Thread(target=self._receiver_loop)
@@ -117,7 +119,9 @@ class NetworkThread(QObject):
                 return True
             else:
                 self.is_connected = False
-                self.connection_status_changed.emit(False, "Failed to connect to Jetson")
+                self.connection_status_changed.emit(
+                    False, "Failed to connect to Jetson"
+                )
                 logger.info("Failed to connect to Jetson")
                 return False
 
@@ -130,23 +134,23 @@ class NetworkThread(QObject):
     def get_connection_status(self):
         """
         Get the current connection status.
-        
+
         Returns:
             bool: True if connected, False otherwise
         """
         return self.is_connected
-    
+
     def get_jetson_info(self):
         """
         Get information about the connected Jetson.
-        
+
         Returns:
             tuple: (jetson_ip, agreed_port) or (None, None) if not connected
         """
         if self.data_receiver:
             return (self.data_receiver.jetson_ip, self.data_receiver.agreed_port)
         return (None, None)
-    
+
     def stop_capture(self):
         """
         Stop receiving data and release resources.
@@ -177,7 +181,7 @@ class NetworkThread(QObject):
             for data in self.data_receiver.get_data():
                 if not self.running:
                     break
-                
+
                 # If paused, just continue the loop without emitting signals
                 if self.paused:
                     time.sleep(0.1)
@@ -188,7 +192,7 @@ class NetworkThread(QObject):
                 server_data = {
                     "camera_timestamp": data.get("camera_timestamp"),
                     "lidar_reading": data.get("lidar_reading"),
-                    "lidar_timestamp": data.get("lidar_timestamp")
+                    "lidar_timestamp": data.get("lidar_timestamp"),
                 }
 
                 # Emit signals with the received data
@@ -198,15 +202,18 @@ class NetworkThread(QObject):
 
                     if server_data and any(server_data.values()):
                         self.sensor_data_available.emit(server_data)
-                        
+
                         # Emit dedicated LiDAR signal if LiDAR data is present
-                        if server_data.get("lidar_reading") is not None or server_data.get("lidar_timestamp") is not None:
+                        if (
+                            server_data.get("lidar_reading") is not None
+                            or server_data.get("lidar_timestamp") is not None
+                        ):
                             lidar_data = {
                                 "lidar_reading": server_data.get("lidar_reading"),
-                                "lidar_timestamp": server_data.get("lidar_timestamp")
+                                "lidar_timestamp": server_data.get("lidar_timestamp"),
                             }
                             self.lidar_data_available.emit(lidar_data)
-                    
+
                     # Combined signal for convenience
                     self.data_available.emit(server_data, frame)
 
@@ -279,21 +286,21 @@ class NetworkThread(QObject):
     # =================================================================
     # COMMAND SENDING METHODS (using DataReceiver)
     # =================================================================
-    
+
     def send_legacy_data(self, data):
         """
         Send legacy data to Jetson (backward compatibility).
-        
+
         Args:
             data (dict): JSON-serializable dictionary to send
-            
+
         Returns:
             bool: True if data was sent successfully, False otherwise
         """
         if not self.data_receiver:
             self.command_send_failed.emit("Not connected to Jetson")
             return False
-            
+
         try:
             self.data_receiver.send_jeston_data(data)
             self.command_sent.emit(data)
@@ -301,21 +308,21 @@ class NetworkThread(QObject):
         except Exception as e:
             self.command_send_failed.emit(str(e))
             return False
-    
+
     def send_command(self, command):
         """
         Send a structured command to Jetson.
-        
+
         Args:
             command: Command object to send
-            
+
         Returns:
             bool: True if command was sent successfully, False otherwise
         """
         if not self.data_receiver:
             self.command_send_failed.emit("Not connected to Jetson")
             return False
-            
+
         try:
             self.data_receiver.send_command(command)
             self.command_sent.emit(command.to_dict())
@@ -323,21 +330,21 @@ class NetworkThread(QObject):
         except Exception as e:
             self.command_send_failed.emit(str(e))
             return False
-    
+
     def send_commands(self, commands):
         """
         Send multiple structured commands to Jetson.
-        
+
         Args:
             commands: List of Command objects to send
-            
+
         Returns:
             bool: True if all commands were sent successfully, False otherwise
         """
         if not self.data_receiver:
             self.command_send_failed.emit("Not connected to Jetson")
             return False
-            
+
         try:
             self.data_receiver.send_commands(commands)
             for command in commands:
@@ -346,43 +353,47 @@ class NetworkThread(QObject):
         except Exception as e:
             self.command_send_failed.emit(str(e))
             return False
-    
+
     def get_command_list(self):
         """
         Get the command list instance for creating structured commands.
-        
+
         Returns:
             CommandList: The command list instance, or None if not connected
         """
         if self.data_receiver:
             return self.data_receiver.get_command_list()
         return None
-    
+
     # =================================================================
     # CONVENIENCE COMMAND METHODS
     # =================================================================
-    
+
     def send_roi_command(self, x, y, width, height, priority=CommandPriority.NORMAL):
         """
         Send ROI (Region of Interest) command to Jetson.
-        
+
         Args:
             x (int): X coordinate of ROI
-            y (int): Y coordinate of ROI  
+            y (int): Y coordinate of ROI
             width (int): Width of ROI
             height (int): Height of ROI
             priority: Command priority
         """
         cmd_list = self.get_command_list()
         if cmd_list:
-            command = cmd_list.create_roi_command(x, y, width, height, priority=priority)
+            command = cmd_list.create_roi_command(
+                x, y, width, height, priority=priority
+            )
             return self.send_command(command)
         return False
-    
-    def send_camera_adjustment_command(self, brightness=None, contrast=None, priority=CommandPriority.NORMAL):
+
+    def send_camera_adjustment_command(
+        self, brightness=None, contrast=None, priority=CommandPriority.NORMAL
+    ):
         """
         Send camera adjustment command to Jetson.
-        
+
         Args:
             brightness (float): Brightness value (0.0-1.0)
             contrast (float): Contrast value (0.0-2.0)
@@ -395,11 +406,13 @@ class NetworkThread(QObject):
             )
             return self.send_command(command)
         return False
-    
-    def send_lidar_calibration_command(self, offset, sampling_rate=None, priority=CommandPriority.NORMAL):
+
+    def send_lidar_calibration_command(
+        self, offset, sampling_rate=None, priority=CommandPriority.NORMAL
+    ):
         """
         Send LiDAR calibration command to Jetson.
-        
+
         Args:
             offset (float): LiDAR offset value
             sampling_rate (int): Sampling rate
@@ -412,11 +425,13 @@ class NetworkThread(QObject):
             )
             return self.send_command(command)
         return False
-    
-    def send_algorithm_config_command(self, algorithm_name, config_params, priority=CommandPriority.NORMAL):
+
+    def send_algorithm_config_command(
+        self, algorithm_name, config_params, priority=CommandPriority.NORMAL
+    ):
         """
         Send algorithm configuration command to Jetson.
-        
+
         Args:
             algorithm_name (str): Name of the algorithm
             config_params (dict): Configuration parameters
@@ -429,11 +444,11 @@ class NetworkThread(QObject):
             )
             return self.send_command(command)
         return False
-    
+
     def send_system_status_command(self, priority=CommandPriority.NORMAL):
         """
         Send system status request command to Jetson.
-        
+
         Args:
             priority: Command priority
         """
@@ -442,11 +457,13 @@ class NetworkThread(QObject):
             command = cmd_list.create_system_status_command(priority=priority)
             return self.send_command(command)
         return False
-    
-    def send_heartbeat_command(self, client_id="network_thread", priority=CommandPriority.LOW):
+
+    def send_heartbeat_command(
+        self, client_id="network_thread", priority=CommandPriority.LOW
+    ):
         """
         Send heartbeat command to Jetson.
-        
+
         Args:
             client_id (str): Client identifier
             priority: Command priority
