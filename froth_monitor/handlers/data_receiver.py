@@ -32,30 +32,55 @@ class DataReceiver():
 
     def get_data(self):
         server_data = cast(dict, None)
+        consecutive_failures = 0
+        max_consecutive_failures = 10
 
         while True:
-            if (self.has_pending_data()):
-                frame, server_data = self.receiver.recv(self.jetson_data)
-                # clear the jetson_data after sending
-                self.clear_pending_data()
-            else:
-                frame, server_data = self.receiver.recv()
-            if frame is None:
-                break
+            try:
+                if (self.has_pending_data()):
+                    frame, server_data = self.receiver.recv(self.jetson_data)
+                    # clear the jetson_data after sending
+                    self.clear_pending_data()
+                else:
+                    frame, server_data = self.receiver.recv()
+                    
+                # Check if we got valid data
+                if frame is None and server_data is None:
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_consecutive_failures:
+                        if self.verbose_level >= 1:
+                            print(f"[DataReceiver] Too many consecutive failures ({consecutive_failures}), stopping...")
+                        break
+                    continue
+                else:
+                    # Reset failure count on successful receive
+                    consecutive_failures = 0
+                    
+                if frame is None:
+                    continue
 
-            # convert frame from RGB to BGR
-            if frame is not None:
-                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) # type: ignore
-            
-            # package the data in a dictionary
-            data = {
-                "frame": frame,
-                "camera_timestamp": server_data.get("camera_timestamp"), # type: ignore
-                "lidar_reading": server_data.get("lidar_reading"), # type: ignore
-                "lidar_timestamp": server_data.get("lidar_timestamp") # type: ignore
-            }
+                # convert frame from RGB to BGR
+                if frame is not None:
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) # type: ignore
+                
+                # package the data in a dictionary
+                data = {
+                    "frame": frame,
+                    "camera_timestamp": server_data.get("camera_timestamp") if server_data else None,
+                    "lidar_reading": server_data.get("lidar_reading") if server_data else None,
+                    "lidar_timestamp": server_data.get("lidar_timestamp") if server_data else None
+                }
 
-            yield data
+                yield data
+                
+            except Exception as e:
+                consecutive_failures += 1
+                if self.verbose_level >= 1:
+                    print(f"[DataReceiver] Error in get_data: {e}")
+                if consecutive_failures >= max_consecutive_failures:
+                    if self.verbose_level >= 1:
+                        print(f"[DataReceiver] Too many consecutive errors, stopping...")
+                    break
 
     def send_jeston_data(self, data):
         """
