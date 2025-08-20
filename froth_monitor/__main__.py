@@ -53,3 +53,10 @@ if __name__ == "__main__":
 ### User-defined air-flow
 
 ### Port of LIDAR choosing - more intuitive
+
+
+### Start recording -> Video Recording
+### Realtime writing csv data? -> in case of crash
+### User define starting/pause time for writing data
+### maybe we dont need the current save button
+### check froth tracker
