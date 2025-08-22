@@ -174,10 +174,18 @@ class NetworkThread(QObject):
         Main receiver loop that runs in a separate thread.
         Uses DataReceiver.get_data() generator similar to testbench.
         """
+        consecutive_none_frames = 0
+        max_consecutive_none_frames = 59999990  # Allow up to 50 consecutive None frames before warning
+        initial_connection_grace_period = 100  # Extra tolerance during initial connection
+        total_frames_received = 0
+        
         try:
             # Use DataReceiver's generator approach like testbench
             if self.data_receiver is None:
                 raise RuntimeError("Data receiver not initialized")
+                
+            logger.info("Starting network receiver loop")
+            
             for data in self.data_receiver.get_data():
                 if not self.running:
                     break
@@ -187,8 +195,38 @@ class NetworkThread(QObject):
                     time.sleep(0.1)
                     continue
 
-                # Extract data components
-                frame = data["frame"]
+                # Handle None or invalid data gracefully
+                if data is None:
+                    consecutive_none_frames += 1
+                    if consecutive_none_frames > max_consecutive_none_frames:
+                        # During initial connection, be more tolerant
+                        threshold = initial_connection_grace_period if total_frames_received < 10 else max_consecutive_none_frames
+                        if consecutive_none_frames > threshold:
+                            logger.warning(f"Received {consecutive_none_frames} consecutive None data packets")
+                            # Don't break the loop, just continue - Jetson might recover
+                    continue
+
+                # Extract data components with additional validation
+                frame = data.get("frame") if isinstance(data, dict) else None
+                
+                # Handle None frame (common during Jetson startup)
+                if frame is None:
+                    consecutive_none_frames += 1
+                    # During initial connection, this is expected behavior
+                    if total_frames_received < 10:
+                        logger.debug(f"Received None frame during initial connection (frame #{total_frames_received})")
+                    elif consecutive_none_frames > max_consecutive_none_frames:
+                        logger.warning(f"Received {consecutive_none_frames} consecutive None frames")
+                    continue
+                
+                # Reset consecutive None counter on successful frame
+                if consecutive_none_frames > 0:
+                    logger.info(f"Connection recovered after {consecutive_none_frames} None frames")
+                    consecutive_none_frames = 0
+                
+                total_frames_received += 1
+                
+                # Extract server data safely
                 server_data = {
                     "camera_timestamp": data.get("camera_timestamp"),
                     "lidar_reading": data.get("lidar_reading"),
@@ -197,8 +235,13 @@ class NetworkThread(QObject):
 
                 # Emit signals with the received data
                 if self.if_release:
+                    # Only emit frame signal if we have a valid frame
                     if frame is not None:
                         self.frame_available.emit(frame)
+                        
+                        # Log successful frame reception (only for first few frames)
+                        if total_frames_received <= 5:
+                            logger.info(f"Successfully received frame #{total_frames_received}")
 
                     if server_data and any(server_data.values()):
                         self.sensor_data_available.emit(server_data)
@@ -214,14 +257,17 @@ class NetworkThread(QObject):
                             }
                             self.lidar_data_available.emit(lidar_data)
 
-                    # Combined signal for convenience
-                    self.data_available.emit(server_data, frame)
+                    # Combined signal for convenience (only emit if we have valid frame)
+                    if frame is not None:
+                        self.data_available.emit(server_data, frame)
 
         except Exception as e:
+            logger.error(f"Error in network receiver loop: {e}")
             print(f"Error in network receiver loop: {e}")
             self.command_send_failed.emit(str(e))
         finally:
             # Clean up when loop exits
+            logger.info(f"Network receiver loop ended. Total frames received: {total_frames_received}")
             if self.data_receiver:
                 self.data_receiver.close()
                 self.is_connected = False
