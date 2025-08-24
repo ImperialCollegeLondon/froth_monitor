@@ -41,6 +41,7 @@ from froth_monitor.lidar_thread.lidar_thread import LidarThread
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 
 from froth_monitor.export import Export
+from froth_monitor.realtime_export import RealtimeExporter
 
 # Import the video recorder module
 from froth_monitor.video_recorder import VideoRecorder
@@ -87,15 +88,12 @@ class EventHandler:
         self.if_save = False
         self.if_record = False
 
-        # If using jetson import or not
-        self.if_jetson = False
-        self.if_lidar = False
-
         # Connect GUI signals to handler methods
         self.connect_signals()
         self.initialize_gui_guidance()
         self.update_guidance()
 
+    # ============= Step 3: GUI guidance =============
     def initialize_gui_guidance(self):
         self.step_import = False
         self.step_algo_config = False
@@ -120,40 +118,94 @@ class EventHandler:
                     self.gui._update_guidance("step_3")
                     
         # if export setting finished
-        if self.export.finish_save_setting == True:
+        if self.exporter.finish_save_setting == True:
             self.gui._update_guidance("finish_export_setting")
 
-            if self.export.record_video == True:
+            if self.exporter.record_video == True:
                 self.gui._update_guidance("enable_recording")
 
+    # ============= Different mode trigger ==============
     def trigger_jetson_mode(self):
-        self.if_jetson = True
         self.camera_thread.reset()
         self.video_thread = self.network_thread
-        self.video_handler.video_thread = self.video_thread
+        self.video_handler.update_video_thread(self.video_thread)
         self.initialze_tool_window_n_handlers()
         self.gui._trigger_jetson_mode()
 
     def trigger_normal_mode(self):
-        self.if_jetson = False
         self.network_thread.reset()
         self.video_thread = self.camera_thread
-        self.video_handler.video_thread = self.video_thread
+        self.video_handler.update_video_thread(self.video_thread)
         self.initialze_tool_window_n_handlers()
         
-        if not self.if_lidar:
+        if not self.lidar_data_processor.if_lidar:
             self.gui._trigger_normal_mode()
-    
-    def initialze_tool_window_n_handlers(self):
-        if not self.video_handler.playing:  # Access playing state from VideoHandler
-            return
 
-        self.overlay_handler.initialize_tool_window()
-        self.overlay_widget = self.overlay_handler.overlay_widget
+    # ============= Step 1: Initialize handlders ==============
+    def handlers_initial_before_overlay_creation(self):
+        self.canvas_width = self.gui.video_canvas_label.width()
+        self.canvas_height = self.gui.video_canvas_label.height()
 
-        self.handlers_initial_after_overlay_creation()
-        self.update_guidance()
+        # Initialize the frame model for processing video frames
+        self.frame_model = FrameModel()
+        self.current_frame_number = 0
 
+        self.lidar_thread = LidarThread()
+        
+        # Initialize LiDAR data processor and connect signals
+        self.lidar_data_processor = LidarDataProcessor(
+            self, self.lidar_thread
+        )
+        self.lidar_thread.data_available.connect(
+            self.lidar_data_processor.process_lidar_data
+        )
+        
+        # Initialize Air Recovery data processor
+        from froth_monitor.air_recovery import AirRecoveryDataProcessor
+        self.air_recovery_data_processor = AirRecoveryDataProcessor(self)
+
+        self.data_handler = DataHandler(self.gui, self.frame_model, self.lidar_data_processor, self.air_recovery_data_processor)
+
+        self.exporter = RealtimeExporter(self.gui)
+        self.exporter.setting_finished.connect(self.finish_export_setting)
+
+        # Overlay related attributes
+        self.overlay_active = False
+        self.video_rect = QRect()
+
+        # Initialize camera thread for event-driven frame capture
+        self.camera_thread = CameraThread()
+        self.network_thread = NetworkThread()
+
+        self.lidar_handler = LidarHandler(self.lidar_thread, self.lidar_data_processor,
+                                        self.gui, self)
+                                        
+        self.gui.lidar_configuration.clicked.connect(self.lidar_handler.open_lidar_control)
+        
+        # Initialize Air Recovery handler
+        self.air_recovery_handler = AirRecoveryHandler(self.air_recovery_data_processor, self.gui, self)
+        self.gui.air_rec_configuration.clicked.connect(self.air_recovery_handler.open_air_recovery_control)
+
+        self.video_thread: NetworkThread | CameraThread = \
+            cast(NetworkThread | CameraThread, CameraThread())
+
+        # Initialize video recorder
+        self.video_recorder = VideoRecorder()
+        self.recording_active = False
+
+        # Initialize handlers
+        self.overlay_handler = OverlayHandler(self.gui, self)
+        self.video_handler = VideoHandler(
+            self.gui, 
+            self.frame_model, 
+            self.camera_thread, 
+            self.network_thread,
+            self.video_thread
+        )
+        self.video_handler.trigger_jetson.connect(self.trigger_jetson_mode)
+        self.video_handler.trigger_normal.connect(self.trigger_normal_mode)
+
+    # ============= Step 2: Connect GUI signals to the buttons =============
     def connect_signals(self):
         """Connect GUI signals to their respective handler methods."""
 
@@ -162,15 +214,26 @@ class EventHandler:
         self.gui.export_button.clicked.connect(self.export_settings)
 
         # # Connect buttons directly using the gui reference
-        self.gui.play_pause_button.clicked.connect(self.video_handler.pause_play)
+        self.gui.play_pause_button.clicked.connect(self.video_handler._pause_play)
 
         self.gui.algorithm_configuration.clicked.connect(
             self.open_algorithm_configuration
         )
 
-        self.gui.save_button.clicked.connect(self.save_data)
+        # self.gui.save_button.clicked.connect(self.save_data)
         self.gui.record_button.clicked.connect(self.toggle_recording)
         self.gui.simple_reset_button.clicked.connect(self.reset_mission)
+
+    def initialze_tool_window_n_handlers(self):
+        if not self.video_handler.playing:  # Access playing state from VideoHandler
+            logger.info("Video is not playing, cannot initialize tool window.")
+            return
+
+        self.overlay_handler.initialize_tool_window()
+        self.overlay_widget = self.overlay_handler.overlay_widget
+
+        self.handlers_initial_after_overlay_creation()
+        self.update_guidance()
 
     def disconnect_signals(self):
         # Connect menu actions directly
@@ -178,13 +241,13 @@ class EventHandler:
         self.gui.export_button.clicked.disconnect(self.export_settings)
 
         # # Connect buttons directly using the gui reference
-        self.gui.play_pause_button.clicked.disconnect(self.video_handler.pause_play)
+        self.gui.play_pause_button.clicked.disconnect(self.video_handler._pause_play)
 
         self.gui.algorithm_configuration.clicked.disconnect(
             self.open_algorithm_configuration
         )
 
-        self.gui.save_button.clicked.disconnect(self.save_data)
+        # self.gui.save_button.clicked.disconnect(self.save_data)
         self.gui.record_button.clicked.disconnect(self.toggle_recording)
         self.gui.simple_reset_button.clicked.disconnect(self.reset_mission)
 
@@ -236,7 +299,7 @@ class EventHandler:
         )
 
         # Connect camera thread signals to frame processor
-        if self.if_jetson:
+        if self.video_handler.if_jetson:
 
             self.video_thread.frame_available.connect(
                 self.frame_processor.process_new_frame_with_network_thread
@@ -272,67 +335,10 @@ class EventHandler:
         )  # Connect to the signal emitted by OverlayWidget
         self.gui.delete_roi_button.clicked.connect(self.roi_handler.delete_last_roi)
 
-    def handlers_initial_before_overlay_creation(self):
-        self.canvas_width = self.gui.video_canvas_label.width()
-        self.canvas_height = self.gui.video_canvas_label.height()
+    def finish_export_setting(self):
+        self.frame_model.load_exporter(self.exporter)
 
-        # Initialize the frame model for processing video frames
-        self.frame_model = FrameModel()
-        self.current_frame_number = 0
-
-        self.lidar_thread = LidarThread()
-        
-        # Initialize LiDAR data processor and connect signals
-        self.lidar_data_processor = LidarDataProcessor(
-            self, self.lidar_thread
-        )
-        self.lidar_thread.data_available.connect(
-            self.lidar_data_processor.process_lidar_data
-        )
-        
-        # Initialize Air Recovery data processor
-        from froth_monitor.air_recovery import AirRecoveryDataProcessor
-        self.air_recovery_data_processor = AirRecoveryDataProcessor(self)
-
-        self.data_handler = DataHandler(self.gui, self.frame_model, self.lidar_data_processor, self.air_recovery_data_processor)
-
-        self.export = Export(self.gui)
-        self.export.setting_finished.connect(self.update_guidance)
-
-        # Overlay related attributes
-        self.overlay_active = False
-        self.video_rect = QRect()
-
-        # Initialize camera thread for event-driven frame capture
-        self.camera_thread = CameraThread()
-        self.network_thread = NetworkThread()
-
-
-        self.lidar_handler = LidarHandler(self.lidar_thread, self.lidar_data_processor,
-                                        self.gui, self.data_handler, self)
-                                        
-        self.gui.lidar_configuration.clicked.connect(self.lidar_handler.open_lidar_control)
-        
-        # Initialize Air Recovery handler
-        self.air_recovery_handler = AirRecoveryHandler(self.air_recovery_data_processor, self.gui, self)
-        self.gui.air_rec_configuration.clicked.connect(self.air_recovery_handler.open_air_recovery_control)
-
-        self.video_thread: NetworkThread | CameraThread = \
-            cast(NetworkThread | CameraThread, CameraThread())
-
-        # Initialize video recorder
-        self.video_recorder = VideoRecorder()
-        self.recording_active = False
-
-        # Initialize handlers
-        self.overlay_handler = OverlayHandler(self.gui, self)
-        self.video_handler = VideoHandler(
-            self, self.gui, 
-            self.frame_model, 
-            self.camera_thread, 
-            self.network_thread,
-            self.video_thread
-        )
+        self.update_guidance()
 
     def open_algorithm_configuration(self):
         """
@@ -351,7 +357,7 @@ class EventHandler:
                 "Video was PAUSED by user,\
                 \nit is going to be CONTINUED now for algoritm configuration.",
             )
-            self.video_handler.pause_play()  # Use VideoHandler's pause_play metho
+            self.video_handler._pause_play()  # Use VideoHandler's pause_play metho
 
         dialog = AlgorithmConfigurationHandler(
             self.gui, self.video_thread, self.frame_model
@@ -384,7 +390,7 @@ class EventHandler:
 
             if success:
                 self.recording_active = False
-                self.gui.record_button.setText("  Start Recording")
+                self.gui.record_button.setText("  Video Recording")
                 self.gui.record_button.setStyleSheet(
                     "QPushButton {\
                         background-color: red; color: white; font-size: 15px; \
@@ -407,12 +413,14 @@ class EventHandler:
         # Reset video handler
         # self.video_handler = cast(VideoHandler, None)
         self.video_handler = VideoHandler(
-            self, self.gui, 
+            self.gui, 
             self.frame_model, 
             self.camera_thread, 
             self.network_thread,
             self.video_thread
         )
+        self.video_handler.trigger_jetson.connect(self.trigger_jetson_mode)
+        self.video_handler.trigger_normal.connect(self.trigger_normal_mode)
 
     def reset_mission(self):
         """Reset the application for a new mission."""
@@ -464,7 +472,7 @@ class EventHandler:
             )
             return
 
-        if not self.export.finish_save_setting:
+        if not self.exporter.finish_save_setting:
             QMessageBox.warning(
                 self.gui,
                 "Export Error",
@@ -475,15 +483,15 @@ class EventHandler:
         if not self.recording_active:
             # Start recording
             # Get video directory and filename from export settings
-            video_directory = self.export.video_directory
-            video_filename = self.export.video_filename
+            video_directory = self.exporter.video_directory
+            video_filename = self.exporter.video_filename
 
             # If no directory is set, use a default directory
             if not video_directory:
                 video_directory = os.path.join(
                     os.path.expanduser("~"), "Videos", "FrothMonitor"
                 )
-                self.export.video_directory = video_directory
+                self.exporter.video_directory = video_directory
 
             # Get frame dimensions and FPS
             fps = 120.0
@@ -528,7 +536,7 @@ class EventHandler:
 
             if success:
                 self.recording_active = False
-                self.gui.record_button.setText("  Start Recording")
+                self.gui.record_button.setText("  Video Recording")
                 self.gui.record_button.setStyleSheet(
                     "QPushButton {\
                         background-color: red; color: white; font-size: 15px; \
@@ -555,7 +563,7 @@ class EventHandler:
         # Placeholder for export settings
         # QMessageBox.information(self.gui, "Info", "Export settings will be implemented.")
 
-        self.export.export_setting_window()
+        self.exporter.export_setting_window()
 
     def check_if_import(self) -> bool:
         """Check if a video file is being imported."""
@@ -569,25 +577,6 @@ class EventHandler:
             return False
         else:
             return True
-
-    def save_data(self):
-        """Save the current analysis data."""
-        if self.lidar_data_processor.get_statistics() is not cast(dict, None):
-            self.if_save = self.export.excel_results(
-                self.frame_model.roi_list, 
-                self.frame_model.degree, 
-                self.frame_model.px2mm,
-                self.lidar_data_processor
-            )
-            
-        else:
-            self.if_save = self.export.excel_results(
-                self.frame_model.roi_list, 
-                self.frame_model.degree, 
-                self.frame_model.px2mm,
-                lidar_data_processor=cast(LidarDataProcessor, None)
-            )
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

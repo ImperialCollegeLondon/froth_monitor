@@ -581,7 +581,7 @@ class MainGUIWindow(QMainWindow):
 
     def _add_reset_buttons(self, layout: QVBoxLayout) -> None:
         """Add responsive reset buttons."""
-        self.record_button = QPushButton("  Start Recording")
+        self.record_button = QPushButton("  Video Recording")
         self.record_button.setIcon(
             QIcon(self.resource_path("froth_monitor/resources/camera_icon.ico"))
         )

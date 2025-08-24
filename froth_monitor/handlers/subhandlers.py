@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QRect, QObject, Signal, QTimer
+from PySide6.QtCore import Qt, QRect, QObject, Signal, QTimer, QThread
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtGui import QIcon
 
@@ -506,18 +506,20 @@ class AlgorithmConfigurationHandler:
 
         self.dialog.close()
 
-class VideoHandler:
+class VideoHandler(QObject):
+
+    trigger_jetson = Signal()
+    trigger_normal = Signal()
     def __init__(
         self,
-        event_handler,
         gui: MainGUIWindow,
         frame_model: FrameModel,
         camera_thread: CameraThread,
         network_thread: NetworkThread,
         video_thread: NetworkThread | CameraThread
     ):
+        super().__init__()
         self.gui = gui
-        self.event_handler = event_handler
         self.frame_model = frame_model
         self.camera_thread = camera_thread
         self.network_thread = network_thread
@@ -525,6 +527,7 @@ class VideoHandler:
         
         # Add missing state variables
         self.playing = False
+        self.if_jetson = False
         self.frame_width = 0
         self.frame_height = 0
         self.last_video_source = None
@@ -534,27 +537,27 @@ class VideoHandler:
 
     def handle_video_import(self):
         if self.gui.webcam_radio.isChecked():
-            self.load_camera_dialog()
+            self._load_camera_dialog()
         elif self.gui.prerecorded_radio.isChecked():
-            self.import_local_video()
+            self._import_local_video()
         elif self.gui.jetson_radio.isChecked():
-            self.import_jetson_video()
+            self._import_jetson_video()
 
-    def import_jetson_video(self):
-        self.event_handler.if_jetson = True
+    def _import_jetson_video(self):
 
         # Start network capture
         if self.network_thread.start_network_capture(self.jetson_source_address, 
                 self.jetson_source_port):
             self.playing = True
-            self.event_handler.trigger_jetson_mode()
+            self.if_jetson = True
+            self.trigger_jetson.emit()
 
         else:
             QMessageBox.critical(
                 self.gui, "Error", "Failed to start network capture."
             )
 
-    def import_local_video(self):
+    def _import_local_video(self):
         """
         Open a file dialog to select a local video file and initialize video capture.
         """
@@ -578,7 +581,8 @@ class VideoHandler:
 
                 # Start playing the video
                 self.playing = True
-                self.event_handler.trigger_normal_mode()
+                self.if_jetson = False
+                self.trigger_normal.emit()
 
             else:
                 QMessageBox.critical(
@@ -586,7 +590,7 @@ class VideoHandler:
                 )
                 return
 
-    def load_camera_dialog(self):
+    def _load_camera_dialog(self):
         """
         Open a dialog to select and load an available camera.
         """
@@ -619,14 +623,17 @@ class VideoHandler:
         # Confirm button
         confirm_button = QPushButton("Load Camera", dialog)
         confirm_button.clicked.connect(
-            lambda: self.load_selected_camera(camera_combo, dialog)
+            lambda: self._load_selected_camera(camera_combo, dialog)
         )
         layout.addWidget(confirm_button)
 
         # Show the dialog
         dialog.exec()
 
-    def load_selected_camera(self, camera_combo, dialog):
+    def update_video_thread(self, video_thread: NetworkThread | CameraThread):
+        self.video_thread = video_thread
+
+    def _load_selected_camera(self, camera_combo, dialog):
         """
         Load the selected camera from the camera selection dialog.
 
@@ -654,7 +661,7 @@ class VideoHandler:
             self.playing = True
 
             # Initialize the tool window and handlers
-            self.event_handler.trigger_normal_mode()
+            self.trigger_normal.emit()
 
             # Close the dialog
             dialog.accept()
@@ -665,7 +672,7 @@ class VideoHandler:
             )
             return
 
-    def pause_play(self):
+    def _pause_play(self):
         """
         Toggle between playing and pausing the video.
         """
@@ -703,7 +710,7 @@ class VideoHandler:
 
             # If the thread is not running, we need to restart it
             elif hasattr(self, "last_video_source"):
-                if self.event_handler.if_jetson:
+                if self.if_jetson:
                     self.video_thread.start_network_capture( # type: ignore
                         self.jetson_source_address, self.jetson_source_port
                     )
@@ -961,7 +968,10 @@ class DataHandler:
         self.gui = gui
         self.frame_model = frame_model
         self.plot_widget = self.gui.plot_widget
+
         self.lidar_data_processor = lidar_data_processor
+        self.lidar_data_processor.display_data_available.connect(self.update_fh_plot)
+
         self.air_recovery_data_processor = air_recovery_data_processor
 
         self.if_lidar = False
@@ -1084,7 +1094,7 @@ class DataHandler:
         # Update the plot
         self.gui.plot_widget.update()
 
-    def update_velo_table(self):
+    def update_velocity_table(self):
         """Update the average velocity table with data from all ROIs."""
         # Clear the table
 
@@ -1093,7 +1103,6 @@ class DataHandler:
             if self.if_lidar and len(self.lidar_data_processor.lidar_reading_history_av1s) > 1:
                 # Start asynchronous matching - results will be handled by signal callbacks
                 self.start_matching_velo_n_lidar(i, roi, len(roi.delta_history)-2)
-
     def update_arec_tablengraph(self):
         import numpy as np
         
@@ -1357,7 +1366,8 @@ class DataHandler:
         Args:
             velo_data: Velocity data with timestamp
         """
-        if not hasattr(self, 'matcher'):
+
+        if not hasattr(roi, 'matcher'):
             roi.matcher = VelocityLidarMatcher(self.lidar_data_processor)
             roi.matcher.match_found.connect(self._on_match_found)
             roi.matcher.match_failed.connect(self._on_match_failed)
@@ -1376,7 +1386,6 @@ class DataHandler:
         froth_height = lidar_data[0][1]
         velocity = velo_data[0]
         timestamp = velo_data[1]
-        roi.delta_history[index][4] = froth_height
         air_rec = self.air_rec_calculation(roi, velocity, froth_height, timestamp)
         logger.info(f"Air Recovery{air_rec}")
 
@@ -1413,6 +1422,8 @@ class DataHandler:
 
                     self.roi_sum_history_append(roi, timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm)
                 air_rec = self.air_recovery_data_processor.get_current_air_recovery()
+            
+
             else:
                 logger.warning("Air recovery data processor not available")
                 air_rec = 0.0
@@ -1423,8 +1434,9 @@ class DataHandler:
             logger.error(f"Error in air recovery calculation: {e}")
             return 0.0
     
-    def roi_sum_history_append(self, roi, timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm):
-        roi.sum_history.append([timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm])
+    def roi_sum_history_append(self, roi, timestamp, velocity, froth_height, air_rec, \
+        current_air_flow, current_air_flow_in_mm):
+        roi.update_sum_history.append([timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm])
 
 class VelocityLidarMatcher(QObject):
     """Asynchronous matcher for velocity and lidar data based on timestamps."""
@@ -1709,7 +1721,7 @@ class FrameProcessor:
         # Update the velocity plot with the latest data
         if update_velo_plot:
             self.velocity_plotter.update_velocity_plot()
-            self.velocity_plotter.update_velo_table()            
+            self.velocity_plotter.update_velocity_table()            
 
     def _display_frame_on_canvas(self, scaled_image):
         """
@@ -1779,7 +1791,6 @@ class AirRecoveryHandler:
             self.gui.main_flow_unit_label.setText(self.air_recovery_data_processor.air_flow_unit)
     
         
-
     def apply_main_flow_changes(self):
         
         if self.air_recovery_data_processor.use_jg_calculation:
@@ -1809,13 +1820,12 @@ class LidarHandler:
                 lidar_thread: LidarThread,
                 lidar_data_processor: LidarDataProcessor,
                 gui: MainGUIWindow,
-                velocity_plotter: DataHandler,
                 event_handler):
+
         self.lidar_thread = lidar_thread
         self.gui = gui
         self.event_handler = event_handler
         self.lidar_data_processor = lidar_data_processor
-        self.velocity_plotter = velocity_plotter
 
     def start_lidar_capture(self, port: str = "COM3", baudrate: int = 115200):
         """Start LiDAR data capture."""
@@ -1931,8 +1941,7 @@ class LidarHandler:
 
     def initialize_lidar_mode(self):
         self.gui._trigger_lidar_mode()
-        self.velocity_plotter.if_lidar = True
-        self.event_handler.if_lidar = True
+        self.lidar_data_processor.if_lidar = True
 
-    def update_fh_plot(self, lidar_reading_history_av1s_only_v):
-        self.velocity_plotter.update_fh_plot(lidar_reading_history_av1s_only_v)
+    # def update_fh_plot(self, lidar_reading_history_av1s_only_v):
+    #     self.velocity_plotter.update_fh_plot(lidar_reading_history_av1s_only_v)

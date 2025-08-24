@@ -42,6 +42,7 @@ from PySide6.QtCore import QRect
 from froth_monitor.image_analysis import VideoAnalysis
 from froth_monitor.logger_config import get_logger
 from froth_monitor.delta_filter import DeltaFilter
+from froth_monitor.realtime_export import RealtimeExporter
 
 # Initialize logger for this module
 logger = get_logger(__name__)
@@ -55,8 +56,7 @@ class ROI:
         self.cross_position = None
 
         self.delta_history = []
-        self.delta_only_history = []
-        # timestamp, delta_pixels, calibrated_delta, velocity, froth_height, air_recovery
+        # timestamp, delta_pixels, calibrated_delta
 
         self.sum_history = []
         # timestamp, velocity, froth_height, air_recovery, air flow rate, crcted air flrt
@@ -103,7 +103,7 @@ class ROI:
         if_new_velo = self.calculate_velocity(self.calibrated_delta)
         if_new_average = self.calculate_average_velocity()
         self.delta_history.append(
-            [self.timestamp, self.delta_pixels, self.calibrated_delta, None, None, None]
+            [self.timestamp, self.delta_pixels, self.calibrated_delta]
         )
 
         return if_new_velo, if_new_average
@@ -153,15 +153,7 @@ class ROI:
         # Convert from pixels to millimeters
         projection_mm = projection * self.mm2px
 
-        # # Final validation and clamp extreme values
-        # if not np.isfinite(projection_mm) or abs(projection_mm) > 1e6:
-        #     return 0.0
 
-        # # Apply delta filtering to the projection_mm value
-        # self.delta_only_history = self.delta_filter.filter(projection_mm, self.delta_only_history)
-        
-        # Return the filtered value (last element in the filtered history)
-        # return self.delta_only_history[-1] if self.delta_only_history else 0.0
         return projection_mm
 
     def calculate_velocity(self, delta) -> bool:
@@ -182,8 +174,6 @@ class ROI:
         else:
             self.timestamp_buffer = timestamp_buffer
 
-            if len(self.delta_history) > 1:
-                self.delta_history[-1][3] = self.current_velocity
 
             # Validate before appending to history
             velocity_to_append = self.current_velocity
@@ -226,6 +216,8 @@ class ROI:
         elif algorithm == "Lucas-kanade":
             self.analysis.lk_params = params
 
+    def update_sum_history(self, list):
+        self.sum_history.append(list)
 
 class FrameModel:
     """
@@ -239,8 +231,6 @@ class FrameModel:
     ----------
     frame_count : int
         Counter for the number of frames processed.
-    frame_history : list
-        Stores information about processed frames.
     last_processed_time : datetime
         Timestamp of the last processed frame.
 
@@ -252,8 +242,6 @@ class FrameModel:
         Processes a video frame and returns its sequence number and the processed frame.
     get_frame_count() -> int
         Returns the total number of frames processed.
-    get_frame_history() -> list
-        Returns the history of processed frames.
     get_current_time() -> str
         Returns the current timestamp in the format "dd/mm/yyyy HH:MM:SS.sss".
     """
@@ -263,7 +251,8 @@ class FrameModel:
         Initialize the FrameModel with default values.
         """
         self.frame_count = 0
-        self.frame_history = []
+
+        self.exporter: RealtimeExporter = cast(RealtimeExporter, None)
 
         self.roi_list = []
         self.last_processed_time = None
@@ -287,7 +276,6 @@ class FrameModel:
             poly_n=int(7),
             poly_sigma=1.5,
         )
-
 
     def confirm_algorithm_n_params(self, algorithm: str, params: dict) -> None:
         """
@@ -338,17 +326,14 @@ class FrameModel:
         current_time = self.get_current_time()
         self.last_processed_time = current_time
 
-        # Store frame information in history
-        self.frame_history.append(
-            {"frame_number": self.frame_count, "timestamp": current_time}
-        )
-
         if_new_velo = 0
         if_new_average = 0
         update_velo_plot = False
         update_average_velo = False
+
         # Process each ROI in the roi_list
-        for roi in self.roi_list:
+        for roi_id, roi in enumerate(self.roi_list):
+
             # Get the ROI coordinates
             x1 = roi.coordinate[0]
             y1 = roi.coordinate[1]
@@ -366,12 +351,17 @@ class FrameModel:
                     if_new_velo += 1
                 if _new_average == True:
                     if_new_average += 1
+            
+            if self.exporter is not None:
+                if len(roi.delta_history)>1:
+                    self.exporter.write_roi_movement_data(roi_id, roi.delta_history[-1])
+                
 
         if if_new_velo > 0:
             update_velo_plot = True
         if if_new_average > 0:
             update_average_velo = True
-
+        
         # print("time to process a frame: ", time.time() - time_1, "s")
         return self.frame_count, self.roi_list, update_velo_plot, update_average_velo
 
@@ -394,17 +384,6 @@ class FrameModel:
             The number of frames processed.
         """
         return self.frame_count
-
-    def get_frame_history(self) -> list:
-        """
-        Return the history of processed frames.
-
-        Returns
-        -------
-        list
-            A list of dictionaries containing information about each processed frame.
-        """
-        return self.frame_history
 
     def get_current_time(self) -> str:
         """
@@ -441,6 +420,10 @@ class FrameModel:
     def add_roi(self, roi):
         new_roi = ROI(roi, self.px2mm, self.degree)
         new_roi.get_algorithm_n_params(self.current_algorithm, self.of_params)
+        
+        if self.exporter is not None:
+            self.exporter.create_roi_sheets(len(self.roi_list))
+
         self.roi_list.append(new_roi)
 
     def delete_last_roi(self):
@@ -455,12 +438,22 @@ class FrameModel:
         if not self.roi_list:
             return False
 
+        if self.exporter is not None:
+            self.exporter.delete_roi_sheets(len(self.roi_list))
+
         # Remove the last ROI from the list
         self.roi_list.pop()
 
+
         return True
+
+    def load_exporter(self, exporter: RealtimeExporter):
+        self.exporter = exporter
+        
+        if len(self.roi_list) > 0 :
+            self.exporter.initialize_roi_sheets(self.roi_list)
 
     def reset(self):
         self.frame_count = 0
-        self.frame_history = []
+
         self.roi_list = []

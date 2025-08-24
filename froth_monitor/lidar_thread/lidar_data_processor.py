@@ -9,18 +9,20 @@ from typing import cast, List
 import time
 from datetime import datetime
 from PySide6.QtWidgets import QMessageBox
+from PySide6.QtCore import QObject, Signal
 from froth_monitor.logger_config import get_logger
 
 # Initialize logger for this module
 logger = get_logger(__name__)
 
-class LidarDataProcessor:
+class LidarDataProcessor(QObject):
     """
     Processes LiDAR sensor data and integrates it with the froth monitoring system.
     
     This class handles LiDAR data received from the LidarThread, processes it for
     analysis, and updates the GUI with current readings and historical data.
     """
+    display_data_available = Signal(List)
 
     def __init__(self, event_handler, lidar_thread):
         """
@@ -30,6 +32,7 @@ class LidarDataProcessor:
             event_handler: The main event handler instance
             lidar_thread: The LidarThread instance providing data
         """
+        self.if_lidar = False
         self.event_handler = event_handler
         self.lidar_thread = lidar_thread
         self.gui = self.event_handler.gui
@@ -39,8 +42,8 @@ class LidarDataProcessor:
         self.current_timestamp: str = cast(str, None)
 
         # Historical data storage
-        self.lidar_reading_history = []
-        self.lidar_reading_history_av1s = []  # 1-second averages
+        self.lidar_reading_history = [] # full raw history
+        self.lidar_reading_history_av1s = []  # 1-second averages & timestamp
         self.lidar_reading_history_av1s_only_v = []  # Velocity-only averages
 
         # Data buffering
@@ -114,7 +117,7 @@ class LidarDataProcessor:
                 self.timestamp_buffer = timestamp_buffer
                 average_fh = sum(self.lidar_reading_buffer) / len(self.lidar_reading_buffer)
                 self.lidar_reading_history_av1s.append([[0, average_fh, \
-                    self.current_timestamp, time.time()]])
+                    self.current_timestamp]])
                 self.lidar_reading_history_av1s_only_v.append(average_fh)
 
                 self.lidar_reading_buffer = []
@@ -137,8 +140,9 @@ class LidarDataProcessor:
 
             # Update any LiDAR-specific GUI elements if they exist
             # This can be extended based on GUI requirements
-            self.event_handler.lidar_handler.update_fh_plot(self.lidar_reading_history_av1s_only_v)
-            
+            # self.event_handler.lidar_handler.update_fh_plot(self.lidar_reading_history_av1s_only_v)
+            self.display_data_available.emit(self.lidar_reading_history_av1s_only_v)
+
         except Exception as e:
             print(f"Error updating GUI with LiDAR data: {e}")
 
