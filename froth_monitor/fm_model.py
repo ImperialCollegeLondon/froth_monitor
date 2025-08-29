@@ -51,6 +51,7 @@ class ROI:
     def __init__(self, roi_coordinate: QRect, px2mm, degree) -> None:
         self.coordinate = roi_coordinate
         self.analysis = VideoAnalysis(0, 0)
+        self.id = 0
 
         self.delta_pixels = (cast(float, None), cast(float, None))
         self.cross_position = None
@@ -78,7 +79,10 @@ class ROI:
 
         # Initialize delta filter
         # self.delta_filter = DeltaFilter(max_history_size=1000)
- 
+    
+    def update_id(self, id: int):
+        self.id = id
+
     def process_frame(self, frame: np.ndarray) -> tuple[bool, bool]:
         """
         Process a cropped frame using the VideoAnalysis.analyze function and store the results.
@@ -333,6 +337,8 @@ class FrameModel:
 
         # Process each ROI in the roi_list
         for roi_id, roi in enumerate(self.roi_list):
+            
+            roi.id = roi_id + 1
 
             # Get the ROI coordinates
             x1 = roi.coordinate[0]
@@ -354,7 +360,7 @@ class FrameModel:
             
             if self.exporter is not None:
                 if len(roi.delta_history)>1:
-                    self.exporter.write_roi_movement_data(roi_id, roi.delta_history[-1])
+                    self.exporter.write_roi_movement_data(roi.id, roi.delta_history[-1])
                 
 
         if if_new_velo > 0:
@@ -420,11 +426,10 @@ class FrameModel:
     def add_roi(self, roi):
         new_roi = ROI(roi, self.px2mm, self.degree)
         new_roi.get_algorithm_n_params(self.current_algorithm, self.of_params)
-        
+        self.roi_list.append(new_roi)
+
         if self.exporter is not None:
             self.exporter.create_roi_sheets(len(self.roi_list))
-
-        self.roi_list.append(new_roi)
 
     def delete_last_roi(self):
         """
@@ -443,7 +448,6 @@ class FrameModel:
 
         # Remove the last ROI from the list
         self.roi_list.pop()
-
 
         return True
 

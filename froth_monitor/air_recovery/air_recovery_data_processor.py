@@ -67,7 +67,7 @@ class AirRecoveryDataProcessor:
     def process_air_recovery_data(self, 
     velocity: float, 
     froth_height: float, 
-    timestamp: str) -> tuple[str, float, float, float, str, float] | None:
+    timestamp: str) -> tuple[str, float, float, float, float, float] | None:
         """
         Process new velocity and froth height data to calculate air recovery.
 
@@ -108,15 +108,16 @@ class AirRecoveryDataProcessor:
 
             logger.debug(f"Air recovery calculated: {air_recovery:.2f}% (V={velocity:.1f}, FH={froth_height:.1f})")
             
-            if self.use_jg_calculation:
-                current_air_flow = f'{self.jg_value} cm/s'
-            else:
-                current_air_flow = f'{self.air_flow_rate} {self.air_flow_unit}'
+            # if self.use_jg_calculation:
+            #     current_air_flow = f'{self.jg_value} cm/s'
+            # else:
+            #     current_air_flow = f'{self.air_flow_rate} {self.air_flow_unit}'
             
-            current_air_flow_in_mm = self._get_air_flow_in_mm3_per_s()
+
+            current_air_flow_in_litre = self._get_air_flow_in_litre_per_min()
 
             return timestamp, velocity, froth_height, \
-                air_recovery, current_air_flow, current_air_flow_in_mm
+                air_recovery, self.jg_value, current_air_flow_in_litre
 
         except Exception as e:
             logger.error(f"Error processing air recovery data: {e}")
@@ -177,6 +178,35 @@ class AirRecoveryDataProcessor:
             elif self.air_flow_unit == "cm3/s":
                 # cm³/s to mm³/s: × 1000
                 return self.air_flow_rate * 1000
+            else:
+                logger.error(f"Unknown air flow unit: {self.air_flow_unit}")
+                return 1.0  # Fallback to prevent division by zero
+        
+    def _get_air_flow_in_litre_per_min(self) -> float:
+        """
+        Convert air flow rate to L/min for display and reporting purposes.
+        
+        Returns:
+            float: Air flow rate in L/min
+        """
+        if self.use_jg_calculation:
+            # Calculate from Jg (superficial gas velocity) and cell area
+            # Jg is in cm/s, cell_area is in mm²
+            # Convert: cm/s × mm² = (mm/s × 0.1) × mm² = mm³/s × 0.1
+            # Then convert mm³/s to L/min: × 60 / 1e6
+            air_flow_mm3_per_s = self.jg_value * 10 * self.cell_area
+            return air_flow_mm3_per_s * 60 / 1e6
+        else:
+            # Convert from user-specified units
+            if self.air_flow_unit == "m3/hr":
+                # m³/hr to L/min: × 1000 / 60
+                return self.air_flow_rate * 1000 / 60
+            elif self.air_flow_unit == "L/min":
+                # Already in L/min
+                return self.air_flow_rate
+            elif self.air_flow_unit == "cm3/s":
+                # cm³/s to L/min: × 60 / 1000
+                return self.air_flow_rate * 60 / 1000
             else:
                 logger.error(f"Unknown air flow unit: {self.air_flow_unit}")
                 return 1.0  # Fallback to prevent division by zero

@@ -136,6 +136,7 @@ class LidarThread(QObject):
                         distance_mm = self._parse_lidar_data(line)
 
                         if distance_mm is not None:
+                            distance_raw = distance_mm
                             # Apply offset
                             distance_mm = self.distance_offset - distance_mm
                             
@@ -149,9 +150,9 @@ class LidarThread(QObject):
                             # Prepare data dictionary
                             lidar_data = {
                                 'timestamp': timestamp,
-                                'distance_mm': distance_mm,
+                                'calibrated_reading(mm)': distance_mm,
+                                'raw_reading(mm)': distance_raw,
                                 'distance_mm_inverted': -distance_mm,  # For compatibility
-                                'formatted_timestamp': timestamp
                             }
                             
                             # Emit signal with new data

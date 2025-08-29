@@ -337,6 +337,9 @@ class EventHandler:
 
     def finish_export_setting(self):
         self.frame_model.load_exporter(self.exporter)
+        self.data_handler.load_exporter(self.exporter)
+        self.calibration_handler.load_exporter(self.exporter)
+        self.lidar_data_processor.load_exporter(self.exporter)
 
         self.update_guidance()
 

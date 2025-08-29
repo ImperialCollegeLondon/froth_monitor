@@ -79,7 +79,7 @@ class RealtimeExporter(QFileDialog):
                 "queue": "calibration_queue"
             },
             "lidar_data": {
-                "headers": ["reading_index", "timestamp", "distance_mm"],
+                "headers": ["timestamp", "raw_reading(mm)", "calibrated_reading(mm)"],
                 "queue": "lidar_queue"
             }
         }
@@ -645,14 +645,13 @@ class RealtimeExporter(QFileDialog):
 
         for id, roi in enumerate(roi_list):
 
-            self.create_roi_sheets(id)
+            self.create_roi_sheets(roi.id)
             for data in roi.delta_history:
-
-                self.write_roi_movement_data(id, data)
-
+                self.write_roi_movement_data(roi.id, data)
+            for data in roi.sum_history:
+                self.write_roi_summary_data(roi.id, data)
 
     # ============ PUBLIC API FUNCTIONS ============
-    
     def write_calibration_data(self, arrow_direction: float, px2mm: float):
         """
         Write calibration data to calibration_data sheet
@@ -667,14 +666,14 @@ class RealtimeExporter(QFileDialog):
         except queue.Full:
             logger.warning("Calibration queue full, dropping data point")
     
-    def write_lidar_data(self, reading_index: int, timestamp: str, distance_mm: float):
+    def write_lidar_data(self, timestamp: str, raw_reading: float, calibrated_reading: float):
         """
         Write LIDAR data to lidar_data sheet
         """
         if not self.is_running:
             return
             
-        data_row = [reading_index, timestamp, distance_mm]
+        data_row = [timestamp, raw_reading, calibrated_reading]
         
         try:
             self.lidar_queue.put_nowait(data_row)
@@ -708,19 +707,16 @@ class RealtimeExporter(QFileDialog):
             except queue.Full:
                 logger.warning(f"ROI {roi_id} movement queue full, dropping data point")
     
-    def write_roi_summary_data(self, roi_id: int, timestamp: str, velocity: float, 
-                              froth_height: float, air_recovery: float, 
-                              air_flow_rate: float, air_flow_rate_mm3: float):
+    def write_roi_summary_data(self, roi_id: int, sum_data_list: list):
         """
         Write ROI summary data to ROI summary sheet
         """
         if not self.is_running or roi_id not in self.active_rois:
             return
-            
-        data_row = [
-            timestamp, velocity, froth_height, air_recovery, 
-            air_flow_rate, air_flow_rate_mm3
-        ]
+        
+        # list format
+        # timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm
+        data_row = sum_data_list
         
         queue_name = f"roi_{roi_id}_summary"
         if queue_name in self.roi_queues:

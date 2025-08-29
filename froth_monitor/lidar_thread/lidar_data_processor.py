@@ -6,11 +6,11 @@ It handles data buffering, averaging, and GUI updates.
 """
 
 from typing import cast, List
-import time
 from datetime import datetime
-from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import QObject, Signal
 from froth_monitor.logger_config import get_logger
+from froth_monitor.realtime_export import RealtimeExporter
+
 
 # Initialize logger for this module
 logger = get_logger(__name__)
@@ -22,7 +22,7 @@ class LidarDataProcessor(QObject):
     This class handles LiDAR data received from the LidarThread, processes it for
     analysis, and updates the GUI with current readings and historical data.
     """
-    display_data_available = Signal(List)
+    display_data_available = Signal(list)
 
     def __init__(self, event_handler, lidar_thread):
         """
@@ -32,6 +32,7 @@ class LidarDataProcessor(QObject):
             event_handler: The main event handler instance
             lidar_thread: The LidarThread instance providing data
         """
+        super().__init__() 
         self.if_lidar = False
         self.event_handler = event_handler
         self.lidar_thread = lidar_thread
@@ -59,6 +60,9 @@ class LidarDataProcessor(QObject):
         self.update_interval = 1.0  # Seconds between GUI updates
         self.last_update_time = datetime.now()
 
+        # Exporter
+        self.exporter = cast(RealtimeExporter, None)
+
     def process_lidar_data(self, lidar_data: dict):
         """
         Process new LiDAR data received from the LidarThread.
@@ -75,16 +79,16 @@ class LidarDataProcessor(QObject):
 
         try:
             # Extract data from the LiDAR measurement
-            distance_mm = lidar_data.get('distance_mm', 0.0)
+            distance_mm = lidar_data.get('calibrated_reading(mm)', 0.0)
             timestamp = lidar_data.get('timestamp', datetime.now())
-            formatted_timestamp = lidar_data.get('formatted_timestamp', '')
+            raw_reading = lidar_data.get('raw_reading(mm)', 0.0)
 
             # Update current readings
             self.current_lidar_reading = distance_mm
-            self.current_timestamp = formatted_timestamp
+            self.current_timestamp = timestamp
 
             # Add to historical data
-            self.lidar_reading_history.append(distance_mm)
+            self.lidar_reading_history.append([timestamp, raw_reading, distance_mm])
 
             # Update GUI periodically
             current_time = datetime.now()
@@ -95,6 +99,7 @@ class LidarDataProcessor(QObject):
                 self._update_gui()
                 self._calculate_averages()
                 self.last_update_time = current_time
+                self.write_data_to_exporter(timestamp, raw_reading, distance_mm)
 
         except Exception as e:
             print(f"Error processing LiDAR data: {e}")
@@ -316,3 +321,13 @@ class LidarDataProcessor(QObject):
         except Exception as e:
             print(f"Error calculating LiDAR statistics: {e}")
             return cast(dict, None)
+
+    def load_exporter(self, exporter: RealtimeExporter):
+        self.exporter = exporter
+        if len(self.lidar_reading_history) > 0:
+            for data in self.lidar_reading_history:
+                self.exporter.write_lidar_data(data[0], data[1], data[2])
+    
+    def write_data_to_exporter(self, timestamp, raw_reading, calibrated_reading):
+        if self.exporter is not None:
+            self.exporter.write_lidar_data(timestamp, raw_reading, calibrated_reading)

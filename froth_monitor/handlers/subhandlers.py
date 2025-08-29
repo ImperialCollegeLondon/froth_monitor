@@ -36,8 +36,7 @@ from froth_monitor.lidar_thread.lidar_thread import LidarThread
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 from froth_monitor.lidar_thread.lidar_control_dialog import LidarControlDialog
 from froth_monitor.air_recovery import AirRecoveryDataProcessor
-
-from froth_monitor.export import Export
+from froth_monitor.realtime_export import RealtimeExporter
 
 # Import the video recorder module
 from froth_monitor.video_recorder import VideoRecorder
@@ -733,6 +732,7 @@ class CalibrationHandler(QObject):
         self.frame_model = frame_model
         self.overlay_widget = overlay_widget
         self.confirm_calibration = False
+        self.exporter = cast(RealtimeExporter, None)
 
     # ------------------------------------Ruler Drawing------------------------------------------------
     def start_ruler_calibration(self):
@@ -812,6 +812,7 @@ class CalibrationHandler(QObject):
             "Info",
             "Overflow direction (arrow) and calibration (ruler) confirmed.",
         )
+        self.write_data_to_exporter(arrow_direction, px_distance)
 
     def start_arrow_drawing(self):
         """Start the arrow drawing mode."""
@@ -852,6 +853,17 @@ class CalibrationHandler(QObject):
 
         # Update the status bar
         self.gui.statusBar().showMessage(f"arrow angle: {degree:.1f} degrees")
+
+    # -----------------------------------Exporter Setting----------------------------------------------
+    def load_exporter(self, exporter: RealtimeExporter):
+        self.exporter = exporter
+
+        if self.confirm_calibration == True:
+            self.exporter.write_calibration_data(self.frame_model.degree, self.frame_model.px2mm)
+
+    def write_data_to_exporter(self, degree, px2mm):
+        if self.exporter is not None:
+            self.exporter.write_calibration_data(degree, px2mm)
 
 class OverlayHandler:
     def __init__(self, gui, event_handler) -> None:
@@ -980,6 +992,8 @@ class DataHandler:
         self.table_list_data = []
         self.frame_lidar_hist = []
 
+        self.exporter: RealtimeExporter = cast(RealtimeExporter, None)
+
     # ------------------------------------Plotting Functions------------------------------------------
     def update_velocity_plot(self):
         """Update the velocity plot with data from all ROIs.
@@ -1098,20 +1112,26 @@ class DataHandler:
         """Update the average velocity table with data from all ROIs."""
         # Clear the table
 
+        logger.info("Updating velocity table")
+
         # Add data to the table
         for i, roi in enumerate(self.frame_model.roi_list):
-            if self.if_lidar and len(self.lidar_data_processor.lidar_reading_history_av1s) > 1:
+            if self.lidar_data_processor.if_lidar and len(self.lidar_data_processor.lidar_reading_history_av1s) > 1:
                 # Start asynchronous matching - results will be handled by signal callbacks
                 self.start_matching_velo_n_lidar(i, roi, len(roi.delta_history)-2)
-    def update_arec_tablengraph(self):
-        import numpy as np
-        
+
+    def update_arec_graph(self):
         table_list_data = []
 
+        if len(self.frame_model.roi_list) == 0:
+            return
+
         for i, roi in enumerate(self.frame_model.roi_list):
+            if len(roi.sum_history) == 0:
+                continue
+
             timestamp = roi.sum_history[len(roi.sum_history)-1][0][:8]
             list_data_a = roi.sum_history[len(roi.sum_history)-1][1:4]
-            logger.info(f'selected summary history of the roi: {list_data_a}')
             # timestamp, velocity, froth_height, air_recovery, air flow rate, crcted air flrt
             table_list_data.append([timestamp] + list_data_a)
 
@@ -1367,7 +1387,7 @@ class DataHandler:
             velo_data: Velocity data with timestamp
         """
 
-        if not hasattr(roi, 'matcher'):
+        if not hasattr(self, 'matcher'):
             roi.matcher = VelocityLidarMatcher(self.lidar_data_processor)
             roi.matcher.match_found.connect(self._on_match_found)
             roi.matcher.match_failed.connect(self._on_match_failed)
@@ -1389,7 +1409,7 @@ class DataHandler:
         air_rec = self.air_rec_calculation(roi, velocity, froth_height, timestamp)
         logger.info(f"Air Recovery{air_rec}")
 
-        self.update_arec_tablengraph()
+        self.update_arec_graph()
 
     def _on_match_failed(self, roi, velo_data, index):
         """Handle failed match between velocity and lidar data."""
@@ -1436,7 +1456,14 @@ class DataHandler:
     
     def roi_sum_history_append(self, roi, timestamp, velocity, froth_height, air_rec, \
         current_air_flow, current_air_flow_in_mm):
-        roi.update_sum_history.append([timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm])
+        append_list = [timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm]
+        roi.update_sum_history(append_list)
+
+        if self.exporter is not None:
+            self.exporter.write_roi_summary_data(roi.id, append_list)
+
+    def load_exporter(self, exporter: RealtimeExporter):
+        self.exporter = exporter
 
 class VelocityLidarMatcher(QObject):
     """Asynchronous matcher for velocity and lidar data based on timestamps."""
@@ -1790,7 +1817,6 @@ class AirRecoveryHandler:
             self.gui.main_flow_rate_spin.setValue(self.air_recovery_data_processor.air_flow_rate)
             self.gui.main_flow_unit_label.setText(self.air_recovery_data_processor.air_flow_unit)
     
-        
     def apply_main_flow_changes(self):
         
         if self.air_recovery_data_processor.use_jg_calculation:
