@@ -320,7 +320,7 @@ class EventHandler:
         lidar_reading = server_data.get("lidar_reading")
 
         if frame is not None and frame.size > 0:
-            self.frame_processor.process_new_frame(frame)
+            self.frame_processor.process_new_frame(timestamp, frame)
         if server_data:
             self.lidar_data_processor.process_lidar_data(timestamp, lidar_reading)
 

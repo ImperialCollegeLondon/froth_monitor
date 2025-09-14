@@ -83,7 +83,7 @@ class ROI:
     def update_id(self, id: int):
         self.id = id
 
-    def process_frame(self, frame: np.ndarray) -> tuple[bool, bool]:
+    def process_frame(self, timestamp:str, frame: np.ndarray) -> tuple[bool, bool]:
         """
         Process a cropped frame using the VideoAnalysis.analyze function and store the results.
 
@@ -101,7 +101,7 @@ class ROI:
         self.calibrated_delta = self.calculate_real_delta(self.delta_pixels)
 
         # Update timestamp
-        self.timestamp = datetime.now().strftime("%H:%M:%S.%f")
+        self.timestamp = timestamp
 
         # self.timestamp = time.strftime("%H:%M:%S.%f", time.localtime())
         if_new_velo = self.calculate_velocity(self.calibrated_delta)
@@ -302,7 +302,7 @@ class FrameModel:
         logger.info(f"Algorithm set as: {self.current_algorithm}, Parameters: {params}")
         self.algo_roi.get_algorithm_n_params(self.current_algorithm, params)
 
-    def process_frame(self, frame: np.ndarray) -> tuple[int, list[ROI], bool, bool]:
+    def process_frame(self, timestamp: str,frame: np.ndarray) -> tuple[int, list[ROI], bool, bool]:
         """
         Process a video frame, increment the frame counter, and return the frame number
         along with the processed frame. For each ROI in the roi_list, crop the frame
@@ -352,7 +352,7 @@ class FrameModel:
                 cropped_frame = frame[y1 : y1 + y2, x1 : x1 + x2]
 
                 # Pass the cropped frame to the ROI's process_frame method
-                _new_velo, _new_average = roi.process_frame(cropped_frame)
+                _new_velo, _new_average = roi.process_frame(timestamp, cropped_frame)
                 if _new_velo == True:
                     if_new_velo += 1
                 if _new_average == True:
@@ -377,7 +377,7 @@ class FrameModel:
         self.algo_roi.get_algorithm_n_params(self.current_algorithm, self.of_params)
 
     def process_frame_for_algo_config(self, frame: np.ndarray) -> tuple[float, float]:
-        self.algo_roi.process_frame(frame)
+        self.algo_roi.process_frame("N/A", frame)
         return self.algo_roi.delta_pixels
 
     def get_frame_count(self) -> int:
