@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QFont
 from froth_monitor.handlers.logger_config import get_logger
+from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 
 # Initialize logger for this module
 logger = get_logger(__name__)
@@ -37,7 +38,7 @@ class LidarControlDialog(QDialog):
     - Exporting data
     """
 
-    def __init__(self, event_handler, parent=None):
+    def __init__(self, lidar_data_processor: LidarDataProcessor, parent=None):
         """
         Initialize the LiDAR control dialog.
 
@@ -46,8 +47,7 @@ class LidarControlDialog(QDialog):
             parent: Parent widget
         """
         super().__init__(parent)
-        self.event_handler = event_handler
-        self.lidar_processor = event_handler.lidar_data_processor
+        self.lidar_data_processor: LidarDataProcessor = lidar_data_processor
 
         self.setWindowTitle("LiDAR Control")
         self.setModal(False)
@@ -234,7 +234,7 @@ class LidarControlDialog(QDialog):
         Update the distance offset.
         """
         offset = self.offset_spin.value()
-        self.event_handler.set_lidar_offset(offset)
+        self.lidar_data_processor.set_lidar_offset(offset)
 
     def export_data(self):
         """
@@ -248,7 +248,7 @@ class LidarControlDialog(QDialog):
         )
 
         if filename:
-            self.event_handler.export_lidar_data(filename)
+            self.lidar_data_processor.export_processed_data(filename)
 
     def clear_data(self):
         """
@@ -263,7 +263,7 @@ class LidarControlDialog(QDialog):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            self.event_handler.clear_lidar_data()
+            self.lidar_data_processor.clear_data()
 
     def update_display(self):
         """
@@ -271,22 +271,22 @@ class LidarControlDialog(QDialog):
         """
         try:
             # Update current reading
-            current_reading = self.lidar_processor.get_current_reading()
+            current_reading = self.lidar_data_processor.get_current_reading()
             self.distance_label.setText(f"{current_reading:.1f} mm")
 
             # Update data count
-            history = self.lidar_processor.get_reading_history()
+            history = self.lidar_data_processor.get_reading_history()
             self.count_label.setText(str(len(history)))
 
             # Update statistics
-            stats = self.event_handler.get_lidar_statistics()
+            stats = self.lidar_data_processor.get_statistics()
             if stats:
-                stats_text = f"""Average: {stats.get("average", 0):.1f} mm
-Median: {stats.get("median", 0):.1f} mm
-Min: {stats.get("min", 0):.1f} mm
-Max: {stats.get("max", 0):.1f} mm
-Range: {stats.get("range", 0):.1f} mm
-Std Dev: {stats.get("std_dev", 0):.1f} mm"""
+                stats_text = f"""Average: {stats.get("average", 0):.1f} mm\
+                                Median: {stats.get("median", 0):.1f} mm\
+                                Min: {stats.get("min", 0):.1f} mm\
+                                Max: {stats.get("max", 0):.1f} mm\
+                                Range: {stats.get("range", 0):.1f} mm\
+                                Std Dev: {stats.get("std_dev", 0):.1f} mm"""
                 self.stats_text.setText(stats_text)
             else:
                 self.stats_text.setText("No data available")

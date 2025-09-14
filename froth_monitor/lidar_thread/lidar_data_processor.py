@@ -8,19 +8,22 @@ It handles data buffering, averaging, and GUI updates.
 from typing import cast, List
 import time
 from datetime import datetime
+from PySide6.QtCore import QObject, Signal
 from froth_monitor.handlers.logger_config import get_logger
+from froth_monitor.handlers.realtime_export import RealtimeExporter
 
 # Initialize logger for this module
 logger = get_logger(__name__)
 
 
-class LidarDataProcessor:
+class LidarDataProcessor(QObject):
     """
     Processes LiDAR sensor data and integrates it with the froth monitoring system.
 
     This class handles LiDAR data received from the LidarThread, processes it for
     analysis, and updates the GUI with current readings and historical data.
     """
+    display_data_available = Signal(list)
 
     def __init__(self, gui, event_handler):
         """
@@ -29,10 +32,13 @@ class LidarDataProcessor:
         Args:
             event_handler: Reference to the main event handler
         """
+        super().__init__()
+        self.if_lidar = False
         self.gui = gui
         self.event_handler = event_handler
 
         # Data storage
+        self.offset = 0.0
         self.current_reading = None
         self.current_timestamp = None
         self.reading_history = []  # List of (timestamp, distance) tuples
@@ -43,7 +49,8 @@ class LidarDataProcessor:
         # Missing attributes that are used in _if_update method
         self.timestamp_buffer = None
         self.lidar_reading_buffer = []
-        self.current_lidar_reading = 0.0
+        self.current_lidar_reading_raw = 0.0
+        self.current_lidar_reading_calibrated = 0.0
         self.lidar_reading_current_mark = 0.0
         self.lidar_reading_last_mark = 0.0
 
@@ -55,7 +62,7 @@ class LidarDataProcessor:
 
         # Network mode flag - True when receiving LiDAR data via network thread
         self.network_mode = False
-
+        self.exporter = cast(RealtimeExporter, None)
         logger.info("LiDAR data processor initialized")
 
     def set_network_mode(self, enabled: bool):
@@ -91,11 +98,17 @@ class LidarDataProcessor:
             # timestamp = lidar_data.get("lidar_timestamp", datetime.now())
 
             # Update current readings
-            self.current_lidar_reading = lidar_reading
+            if lidar_reading is None:
+                return
+
+            self.current_lidar_reading_raw = lidar_reading
+            self.current_lidar_reading_calibrated = self.offset - lidar_reading
             self.current_timestamp = timestamp
 
             # Add to historical data
-            self.reading_history.append(lidar_reading)
+            self.reading_history.append([timestamp, \
+                self.current_lidar_reading_raw, \
+                    self.current_lidar_reading_calibrated])
 
             # Update GUI periodically
             current_time = datetime.now()
@@ -106,9 +119,12 @@ class LidarDataProcessor:
                 self._update_gui()
                 # # self._calculate_averages()
                 self.last_update_time = current_time
+                self.write_data_to_exporter(timestamp, 
+                    self.current_lidar_reading_raw, 
+                    self.current_lidar_reading_calibrated)
 
         except Exception as e:
-            print(f"Error processing LiDAR data: {e}")
+            logger.error(f"Error processing LiDAR data: {e}")
 
     def _if_update(self) -> bool:
         try:
@@ -120,11 +136,11 @@ class LidarDataProcessor:
 
             if self.timestamp_buffer is None:
                 self.timestamp_buffer = timestamp_buffer
-                self.lidar_reading_buffer.append(self.current_lidar_reading)
+                self.lidar_reading_buffer.append(self.current_lidar_reading_calibrated)
                 return False
 
             if timestamp_buffer == self.timestamp_buffer:
-                self.lidar_reading_buffer.append(self.current_lidar_reading)
+                self.lidar_reading_buffer.append(self.current_lidar_reading_calibrated)
                 return False
 
             else:
@@ -152,14 +168,11 @@ class LidarDataProcessor:
         try:
             # Update status bar with current reading
             if hasattr(self.gui, "statusBar"):
-                status_text = f"LiDAR: {self.current_lidar_reading:.1f} mm | Time: {self.current_timestamp}"
+                status_text = f"LiDAR: {self.current_lidar_reading_calibrated:.1f} mm | Time: {self.current_timestamp}"
                 self.gui.statusBar().showMessage(status_text)
 
-            # Update any LiDAR-specific GUI elements if they exist
-            # This can be extended based on GUI requirements
-            self.event_handler.lidar_handler.update_fh_plot(
-                self.reading_history_av1s_only_v
-            )
+            self.display_data_available.emit(self.reading_history_av1s_only_v)
+
 
         except Exception as e:
             print(f"Error updating GUI with LiDAR data: {e}")
@@ -171,7 +184,7 @@ class LidarDataProcessor:
         Returns:
             float: Current distance in millimeters
         """
-        return self.current_lidar_reading
+        return self.current_lidar_reading_calibrated
 
     def get_average_reading(self) -> float:
         """
@@ -207,7 +220,7 @@ class LidarDataProcessor:
         Set the current reading as a reference mark for comparison.
         """
         self.lidar_reading_last_mark = self.lidar_reading_current_mark
-        self.lidar_reading_current_mark = self.current_lidar_reading
+        self.lidar_reading_current_mark = self.current_lidar_reading_calibrated
         print(f"LiDAR reference mark set: {self.lidar_reading_current_mark:.1f} mm")
 
     def get_distance_from_mark(self) -> float:
@@ -217,7 +230,7 @@ class LidarDataProcessor:
         Returns:
             float: Distance change in millimeters
         """
-        return self.current_lidar_reading - self.lidar_reading_current_mark
+        return self.current_lidar_reading_calibrated - self.lidar_reading_current_mark
 
     def clear_data(self):
         """
@@ -228,7 +241,8 @@ class LidarDataProcessor:
         self.reading_history_av1s_only_v.clear()
         self.lidar_reading_buffer.clear()
 
-        self.current_lidar_reading = 0.0
+        self.current_lidar_reading_raw = 0.0
+        self.current_lidar_reading_calibrated = 0.0
         self.current_timestamp = ""
         self.lidar_reading_last_mark = 0.0
         self.lidar_reading_current_mark = 0.0
@@ -307,7 +321,7 @@ class LidarDataProcessor:
         try:
             stats = {
                 "count": len(self.reading_history),
-                "current": self.current_lidar_reading,
+                "current": self.current_lidar_reading_calibrated,
                 "average": statistics.mean(self.reading_history),
                 "median": statistics.median(self.reading_history),
                 "min": min(self.reading_history),
@@ -325,3 +339,17 @@ class LidarDataProcessor:
         except Exception as e:
             print(f"Error calculating LiDAR statistics: {e}")
             return cast(dict, None)
+
+    def set_lidar_offset(self, offset: float) -> None:
+        self.offset = offset
+        print(f"LiDAR offset set to: {offset}")
+
+    def load_exporter(self, exporter: RealtimeExporter):
+        self.exporter = exporter
+        if len(self.reading_history) > 0:
+            for data in self.reading_history:
+                self.exporter.write_lidar_data(data[0], data[1], data[2])
+    
+    def write_data_to_exporter(self, timestamp, raw_reading, calibrated_reading):
+        if self.exporter is not None:
+            self.exporter.write_lidar_data(timestamp, raw_reading, calibrated_reading)

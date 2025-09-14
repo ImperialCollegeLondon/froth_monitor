@@ -42,6 +42,7 @@ from PySide6.QtCore import QRect
 from froth_monitor.processing.image_analysis import VideoAnalysis
 from froth_monitor.processing.delta_filter import DeltaFilter
 from froth_monitor.handlers.logger_config import get_logger
+from froth_monitor.handlers.realtime_export import RealtimeExporter
 
 # Initialize logger for this module
 logger = get_logger(__name__)
@@ -50,13 +51,13 @@ class ROI:
     def __init__(self, roi_coordinate: QRect, px2mm, degree) -> None:
         self.coordinate = roi_coordinate
         self.analysis = VideoAnalysis(0, 0)
+        self.id = 0
 
         self.delta_pixels = (cast(float, None), cast(float, None))
         self.cross_position = None
 
         self.delta_history = []
-        self.delta_only_history = []
-        # timestamp, delta_pixels, calibrated_delta, velocity, froth_height, air_recovery
+        # timestamp, delta_pixels, calibrated_delta
 
         self.sum_history = []
         # timestamp, velocity, froth_height, air_recovery, air flow rate, crcted air flrt
@@ -75,11 +76,14 @@ class ROI:
 
         self.average_velocity_past_30s = cast(float, None)
         self.matcher = None
-        
+
         # Initialize delta filter
-        self.delta_filter = DeltaFilter(window_size=35, outlier_threshold=2.0, max_history_size=1000)
-        
-    def process_frame(self, timestamp:str, frame: np.ndarray) -> tuple[bool, bool]:
+        # self.delta_filter = DeltaFilter(max_history_size=1000)
+    
+    def update_id(self, id: int):
+        self.id = id
+
+    def process_frame(self, frame: np.ndarray) -> tuple[bool, bool]:
         """
         Process a cropped frame using the VideoAnalysis.analyze function and store the results.
 
@@ -97,15 +101,14 @@ class ROI:
         self.calibrated_delta = self.calculate_real_delta(self.delta_pixels)
 
         # Update timestamp
-        self.timestamp = timestamp
+        self.timestamp = datetime.now().strftime("%H:%M:%S.%f")
 
         # self.timestamp = time.strftime("%H:%M:%S.%f", time.localtime())
         if_new_velo = self.calculate_velocity(self.calibrated_delta)
         if_new_average = self.calculate_average_velocity()
         self.delta_history.append(
-            [self.timestamp, self.delta_pixels, self.calibrated_delta, None, None, None]
+            [self.timestamp, self.delta_pixels, self.calibrated_delta]
         )
-        # Note: delta_only_history is now managed by the delta_filter in calculate_real_delta
 
         return if_new_velo, if_new_average
 
@@ -154,15 +157,8 @@ class ROI:
         # Convert from pixels to millimeters
         projection_mm = projection * self.mm2px
 
-        # Final validation and clamp extreme values
-        if not np.isfinite(projection_mm) or abs(projection_mm) > 1e6:
-            return 0.0
 
-        # Apply delta filtering to the projection_mm value
-        self.delta_only_history = self.delta_filter.filter(projection_mm, self.delta_only_history)
-        
-        # Return the filtered value (last element in the filtered history)
-        return self.delta_only_history[-1] if self.delta_only_history else 0.0
+        return projection_mm
 
     def calculate_velocity(self, delta) -> bool:
         import numpy as np
@@ -172,20 +168,16 @@ class ROI:
             delta = 0.0
         
         timestamp_buffer = self.timestamp[:8]
-
         if timestamp_buffer == self.timestamp_buffer:
             self.current_velocity += delta
             # Validate accumulated velocity
             if not np.isfinite(self.current_velocity) or abs(self.current_velocity) > 1e6:
                 self.current_velocity = 0.0
-            
             return False
 
         else:
             self.timestamp_buffer = timestamp_buffer
 
-            if len(self.delta_history) > 1:
-                self.delta_history[-1][3] = self.current_velocity
 
             # Validate before appending to history
             velocity_to_append = self.current_velocity
@@ -195,7 +187,6 @@ class ROI:
             self.velo_only_history.append(velocity_to_append)
             self.velo_history_with_time.append([velocity_to_append, self.timestamp, time.time()])
             self.current_velocity = delta
-
             return True
 
     def calculate_average_velocity(self) -> bool:
@@ -229,6 +220,8 @@ class ROI:
         elif algorithm == "Lucas-kanade":
             self.analysis.lk_params = params
 
+    def update_sum_history(self, list):
+        self.sum_history.append(list)
 
 class FrameModel:
     """
@@ -242,8 +235,6 @@ class FrameModel:
     ----------
     frame_count : int
         Counter for the number of frames processed.
-    frame_history : list
-        Stores information about processed frames.
     last_processed_time : datetime
         Timestamp of the last processed frame.
 
@@ -255,8 +246,6 @@ class FrameModel:
         Processes a video frame and returns its sequence number and the processed frame.
     get_frame_count() -> int
         Returns the total number of frames processed.
-    get_frame_history() -> list
-        Returns the history of processed frames.
     get_current_time() -> str
         Returns the current timestamp in the format "dd/mm/yyyy HH:MM:SS.sss".
     """
@@ -266,7 +255,8 @@ class FrameModel:
         Initialize the FrameModel with default values.
         """
         self.frame_count = 0
-        self.frame_history = []
+
+        self.exporter: RealtimeExporter = cast(RealtimeExporter, None)
 
         self.roi_list = []
         self.last_processed_time = None
@@ -291,7 +281,6 @@ class FrameModel:
             poly_sigma=1.5,
         )
 
-
     def confirm_algorithm_n_params(self, algorithm: str, params: dict) -> None:
         """
         Confirm the algorithm and parameters for optical flow.
@@ -313,7 +302,7 @@ class FrameModel:
         logger.info(f"Algorithm set as: {self.current_algorithm}, Parameters: {params}")
         self.algo_roi.get_algorithm_n_params(self.current_algorithm, params)
 
-    def process_frame(self, timestamp: str, frame: np.ndarray) -> tuple[int, list[ROI], bool, bool]:
+    def process_frame(self, frame: np.ndarray) -> tuple[int, list[ROI], bool, bool]:
         """
         Process a video frame, increment the frame counter, and return the frame number
         along with the processed frame. For each ROI in the roi_list, crop the frame
@@ -338,19 +327,19 @@ class FrameModel:
         self.frame_count += 1
 
         # Record the current time
-        self.last_processed_time = timestamp
-
-        # Store frame information in history
-        self.frame_history.append(
-            {"frame_number": self.frame_count, "timestamp": timestamp}
-        )
+        current_time = self.get_current_time()
+        self.last_processed_time = current_time
 
         if_new_velo = 0
         if_new_average = 0
         update_velo_plot = False
         update_average_velo = False
+
         # Process each ROI in the roi_list
-        for roi in self.roi_list:
+        for roi_id, roi in enumerate(self.roi_list):
+            
+            roi.id = roi_id + 1
+
             # Get the ROI coordinates
             x1 = roi.coordinate[0]
             y1 = roi.coordinate[1]
@@ -363,18 +352,22 @@ class FrameModel:
                 cropped_frame = frame[y1 : y1 + y2, x1 : x1 + x2]
 
                 # Pass the cropped frame to the ROI's process_frame method
-                _new_velo, _new_average = roi.process_frame(timestamp, cropped_frame)
-
+                _new_velo, _new_average = roi.process_frame(cropped_frame)
                 if _new_velo == True:
                     if_new_velo += 1
                 if _new_average == True:
                     if_new_average += 1
+            
+            if self.exporter is not None:
+                if len(roi.delta_history)>1:
+                    self.exporter.write_roi_movement_data(roi.id, roi.delta_history[-1])
+                
 
         if if_new_velo > 0:
             update_velo_plot = True
         if if_new_average > 0:
             update_average_velo = True
-
+        
         # print("time to process a frame: ", time.time() - time_1, "s")
         return self.frame_count, self.roi_list, update_velo_plot, update_average_velo
 
@@ -384,7 +377,7 @@ class FrameModel:
         self.algo_roi.get_algorithm_n_params(self.current_algorithm, self.of_params)
 
     def process_frame_for_algo_config(self, frame: np.ndarray) -> tuple[float, float]:
-        self.algo_roi.process_frame(timestamp = " ", frame = frame)
+        self.algo_roi.process_frame(frame)
         return self.algo_roi.delta_pixels
 
     def get_frame_count(self) -> int:
@@ -397,17 +390,6 @@ class FrameModel:
             The number of frames processed.
         """
         return self.frame_count
-
-    def get_frame_history(self) -> list:
-        """
-        Return the history of processed frames.
-
-        Returns
-        -------
-        list
-            A list of dictionaries containing information about each processed frame.
-        """
-        return self.frame_history
 
     def get_current_time(self) -> str:
         """
@@ -446,6 +428,9 @@ class FrameModel:
         new_roi.get_algorithm_n_params(self.current_algorithm, self.of_params)
         self.roi_list.append(new_roi)
 
+        if self.exporter is not None:
+            self.exporter.create_roi_sheets(len(self.roi_list))
+
     def delete_last_roi(self):
         """
         Delete the last ROI from the roi_list and release its memory.
@@ -458,12 +443,21 @@ class FrameModel:
         if not self.roi_list:
             return False
 
+        if self.exporter is not None:
+            self.exporter.delete_roi_sheets(len(self.roi_list))
+
         # Remove the last ROI from the list
         self.roi_list.pop()
 
         return True
 
+    def load_exporter(self, exporter: RealtimeExporter):
+        self.exporter = exporter
+        
+        if len(self.roi_list) > 0 :
+            self.exporter.initialize_roi_sheets(self.roi_list)
+
     def reset(self):
         self.frame_count = 0
-        self.frame_history = []
+
         self.roi_list = []

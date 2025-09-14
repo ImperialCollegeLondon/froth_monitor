@@ -7,6 +7,7 @@ video frames and sensor data from a remote source over the network using DataRec
 
 import threading
 import time
+import cv2
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 from froth_monitor.handlers.data_receiver import DataReceiver
@@ -237,6 +238,7 @@ class NetworkThread(QObject):
                 if self.if_release:
                     # Only emit frame signal if we have a valid frame
                     if frame is not None:
+                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         self.frame_available.emit(frame)
                         
                         # Log successful frame reception (only for first few frames)
