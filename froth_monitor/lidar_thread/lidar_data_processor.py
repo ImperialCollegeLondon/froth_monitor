@@ -45,6 +45,7 @@ class LidarDataProcessor(QObject):
         self.reading_buffer = []  # Buffer for 1-second averaging
         self.reading_history_av1s = []
         self.reading_history_av1s_only_v = []  # 1-second averaged readings
+        self.reading_history_for_display = []
 
         # Missing attributes that are used in _if_update method
         self.timestamp_buffer = None
@@ -152,6 +153,7 @@ class LidarDataProcessor(QObject):
                     [[0, average_fh, self.current_timestamp, time.time()]]
                 )
                 self.reading_history_av1s_only_v.append(average_fh)
+                self.reading_history_for_display.append(average_fh)
 
                 self.lidar_reading_buffer = []
 
@@ -171,8 +173,7 @@ class LidarDataProcessor(QObject):
                 status_text = f"LiDAR: {self.current_lidar_reading_calibrated:.1f} mm | Time: {self.current_timestamp}"
                 self.gui.statusBar().showMessage(status_text)
 
-            self.display_data_available.emit(self.reading_history_av1s_only_v)
-
+            self.display_data_available.emit(self.reading_history_for_display)
 
         except Exception as e:
             print(f"Error updating GUI with LiDAR data: {e}")
@@ -353,3 +354,6 @@ class LidarDataProcessor(QObject):
     def write_data_to_exporter(self, timestamp, raw_reading, calibrated_reading):
         if self.exporter is not None:
             self.exporter.write_lidar_data(timestamp, raw_reading, calibrated_reading)
+    
+    def clear_display_history(self):
+        self.reading_history_for_display = []

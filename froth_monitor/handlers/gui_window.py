@@ -388,7 +388,7 @@ class MainGUIWindow(QMainWindow):
         Returns:
             QGroupBox: The video source group box with radio buttons.
         """
-        source_group = QGroupBox("Video Source")
+        source_group = QGroupBox("Main Control")
         source_group.setStyleSheet("font-weight: bold; font-size: 15px; color: black")
         source_layout = QVBoxLayout(source_group)
         source_layout.setSpacing(10)
@@ -403,11 +403,11 @@ class MainGUIWindow(QMainWindow):
         #     "font-weight: normal; font-size: 12px; color: black"
         # )
         # self.webcam_radio.setChecked(True)
-        self.jetson_radio = QRadioButton("Jetson")
-        self.jetson_radio.setStyleSheet(
-            "font-weight: normal; font-size: 12px; color: black"
-        )
-        self.jetson_radio.setChecked(True)
+        # self.jetson_radio = QRadioButton("Jetson")
+        # self.jetson_radio.setStyleSheet(
+        #     "font-weight: normal; font-size: 12px; color: black"
+        # )
+        # self.jetson_radio.setChecked(True)
 
         self.import_button = QPushButton("Start")
         self.import_button.setStyleSheet(
@@ -430,9 +430,9 @@ class MainGUIWindow(QMainWindow):
         
         # source_layout.addWidget(self.webcam_radio)
         # source_layout.addWidget(self.prerecorded_radio)
-        source_layout.addWidget(
-            self.jetson_radio
-        )  # Add this line to add the Jetson radio button to the layout
+        # source_layout.addWidget(
+        #     self.jetson_radio
+        # )  # Add this line to add the Jetson radio button to the layout
         source_layout.addWidget(self.import_button)
 
         return source_group
@@ -862,12 +862,12 @@ class MainGUIWindow(QMainWindow):
         )
         # self.calibration_button.setFixedWidth(100)
 
-        self.save_button = QPushButton("Save")
-        self.save_button.setStyleSheet(
-            self.ENABLED_BUTTON_STYLE
-        )
+        # self.save_button = QPushButton("")
+        # self.save_button.setStyleSheet(
+        #     self.ENABLED_BUTTON_STYLE
+        # )
         export_layout.addWidget(self.export_button)
-        export_layout.addWidget(self.save_button)
+        # export_layout.addWidget(self.save_button)
 
         return export_group
 
@@ -953,7 +953,13 @@ class MainGUIWindow(QMainWindow):
         )
         self.play_pause_button.setToolTip("Play/Pause Video")
 
+        self.refresh_graph_button = QPushButton("Refresh Graphs")
+        self.refresh_graph_button.setStyleSheet(
+            self.DISABLED_BUTTON_STYLE
+        )
+
         media_controls_layout.addWidget(self.play_pause_button)
+        media_controls_layout.addWidget(self.refresh_graph_button)
         media_controls_layout.addStretch()
         layout.addWidget(media_controls_container)
 
@@ -1009,10 +1015,10 @@ class MainGUIWindow(QMainWindow):
             )
             self.simple_reset_button.setDisabled(True)
 
-            self.save_button.setStyleSheet(
-                self.DISABLED_BUTTON_STYLE
-            )
-            self.save_button.setDisabled(True)
+            # self.save_button.setStyleSheet(
+            #     self.DISABLED_BUTTON_STYLE
+            # )
+            # self.save_button.setDisabled(True)
 
         if event == "step_2":
             self.algorithm_configuration.setStyleSheet(
@@ -1039,7 +1045,12 @@ class MainGUIWindow(QMainWindow):
                 self.ENABLED_BUTTON_STYLE
             )
             self.simple_reset_button.setDisabled(False)
-            
+
+            self.refresh_graph_button.setStyleSheet(
+                self.ENABLED_BUTTON_STYLE
+            )
+            self.refresh_graph_button.setDisabled(False)
+
         if event == "step_3":
             self.statusBar().showMessage("Step 3: ROI drawing")
             print("ROI drawing enabled")
@@ -1048,11 +1059,11 @@ class MainGUIWindow(QMainWindow):
             )
             self.roi_group.setDisabled(False)
 
-        if event == "finish_export_setting":
-            self.save_button.setStyleSheet(
-                self.ENABLED_BUTTON_STYLE
-            )
-            self.save_button.setDisabled(False)
+        # if event == "finish_export_setting":
+        #     self.save_button.setStyleSheet(
+        #         self.ENABLED_BUTTON_STYLE
+        #     )
+        #     self.save_button.setDisabled(False)
 
         if event == "enable_recording":
             self.record_button.setStyleSheet(

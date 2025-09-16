@@ -61,7 +61,8 @@ class ROI:
 
         self.sum_history = []
         # timestamp, velocity, froth_height, air_recovery, air flow rate, crcted air flrt
-        
+        self.sum_history_for_display = []
+
         self.arrow_dir = 0.0
         self.px2mm = px2mm
         self.mm2px = 1 / px2mm
@@ -72,7 +73,10 @@ class ROI:
         self.timestamp_buffer = self.timestamp
         self.current_velocity = 0.0
         self.velo_only_history = []
+        self.velo_only_history_for_display = []
+
         self.velo_history_with_time = []
+        
 
         self.average_velocity_past_30s = cast(float, None)
         self.matcher = None
@@ -185,6 +189,7 @@ class ROI:
                 velocity_to_append = 0.0
             
             self.velo_only_history.append(velocity_to_append)
+            self.velo_only_history_for_display.append(velocity_to_append)
             self.velo_history_with_time.append([velocity_to_append, self.timestamp, time.time()])
             self.current_velocity = delta
             return True
@@ -222,6 +227,11 @@ class ROI:
 
     def update_sum_history(self, list):
         self.sum_history.append(list)
+        self.sum_history_for_display.append(list)
+
+    def clear_display_history(self):
+        self.sum_history_for_display = []
+        self.velo_only_history_for_display = []
 
 class FrameModel:
     """

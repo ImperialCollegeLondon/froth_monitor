@@ -197,6 +197,7 @@ class EventHandler:
         # self.gui.save_button.clicked.connect(self.save_data)
         self.gui.record_button.clicked.connect(self.toggle_recording)
         self.gui.simple_reset_button.clicked.connect(self.reset_mission)
+        self.gui.refresh_graph_button.clicked.connect(self.data_handler.clear_display_history)
 
     def initialze_tool_window_n_handlers(self):
         if not self.video_handler.playing:  # Access playing state from VideoHandler
