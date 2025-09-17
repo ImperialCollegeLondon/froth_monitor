@@ -1,8 +1,8 @@
 """The entry point for the Bubble Analyser program."""
 
-from froth_monitor.event_handler import EventHandler
-from froth_monitor.gui_window import MainGUIWindow
-from froth_monitor.logger_config import get_logger
+from froth_monitor.handlers.event_handler import EventHandler
+from froth_monitor.handlers.gui_window import MainGUIWindow
+from froth_monitor.handlers.logger_config import get_logger
 
 # from .gui import MainGUI
 import sys

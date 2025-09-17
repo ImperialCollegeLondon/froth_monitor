@@ -12,9 +12,9 @@ from PySide6.QtCore import QTimer
 # Add the parent directory to the path to import froth_monitor modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from froth_monitor.lidar_thread import LidarThread
-from froth_monitor.lidar_data_processor import LidarDataProcessor
-from froth_monitor.lidar_control_dialog import LidarControlDialog
+from froth_monitor.lidar_thread.lidar_thread import LidarThread
+from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
+from froth_monitor.lidar_thread.lidar_control_dialog import LidarControlDialog
 
 
 class MockEventHandler:

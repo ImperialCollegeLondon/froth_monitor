@@ -8,7 +8,7 @@ It handles data buffering, averaging, and statistical analysis.
 from typing import List, Dict
 from datetime import datetime
 import statistics
-from froth_monitor.logger_config import get_logger
+from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
 logger = get_logger(__name__)

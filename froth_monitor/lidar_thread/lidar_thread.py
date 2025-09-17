@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Optional
 import numpy as np
 from PySide6.QtCore import QObject, Signal
-from froth_monitor.logger_config import get_logger
+from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
 logger = get_logger(__name__)

@@ -3,7 +3,7 @@
 import numpy as np
 from collections import deque
 from typing import List
-from froth_monitor.logger_config import get_logger
+from froth_monitor.handlers.logger_config import get_logger
 
 logger = get_logger(__name__)
 
