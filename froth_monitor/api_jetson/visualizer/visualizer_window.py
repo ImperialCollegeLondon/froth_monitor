@@ -4,7 +4,7 @@ from collections import deque
 from datetime import datetime
 
 import numpy as np
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore, QtGui
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 
