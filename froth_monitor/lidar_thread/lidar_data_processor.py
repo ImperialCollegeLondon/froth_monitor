@@ -7,7 +7,7 @@ It handles data buffering, averaging, and GUI updates.
 
 from typing import cast, List
 import time
-from datetime import datetime
+from datetime import date, datetime
 from PySide6.QtCore import QObject, Signal
 from froth_monitor.handlers.logger_config import get_logger
 from froth_monitor.handlers.realtime_export import RealtimeExporter
@@ -42,6 +42,7 @@ class LidarDataProcessor(QObject):
         self.current_reading = None
         self.current_timestamp = None
         self.reading_history = []  # List of (timestamp, distance) tuples
+        self.history_velo_only = [] # List of only velocity readings
         self.reading_buffer = []  # Buffer for 1-second averaging
         self.reading_history_av1s = []
         self.reading_history_av1s_only_v = []  # 1-second averaged readings
@@ -79,7 +80,7 @@ class LidarDataProcessor(QObject):
         else:
             logger.info("LiDAR data processor switched to serial mode")
 
-    def process_lidar_data(self, timestamp, lidar_reading):
+    def process_lidar_data(self, lidar_data):
         """
         Process new LiDAR data received from the LidarThread.
 
@@ -99,17 +100,18 @@ class LidarDataProcessor(QObject):
             # timestamp = lidar_data.get("lidar_timestamp", datetime.now())
 
             # Update current readings
-            if lidar_reading is None:
+            if lidar_data is None:
                 return
 
-            self.current_lidar_reading_raw = lidar_reading
-            self.current_lidar_reading_calibrated = self.offset - lidar_reading
-            self.current_timestamp = timestamp
+            self.current_lidar_reading_raw = lidar_data.get("raw_reading(mm)", 0.0)
+            self.current_lidar_reading_calibrated = lidar_data.get("calibrated_reading(mm)", 0.0)
+            self.current_timestamp = lidar_data.get("timestamp", datetime.now())
 
             # Add to historical data
-            self.reading_history.append([timestamp, \
+            self.reading_history.append([self.current_timestamp, \
                 self.current_lidar_reading_raw, \
                     self.current_lidar_reading_calibrated])
+            self.history_velo_only.append(self.current_lidar_reading_calibrated)
 
             # Update GUI periodically
             current_time = datetime.now()
@@ -120,7 +122,7 @@ class LidarDataProcessor(QObject):
                 self._update_gui()
                 # # self._calculate_averages()
                 self.last_update_time = current_time
-                self.write_data_to_exporter(timestamp, 
+                self.write_data_to_exporter(self.current_timestamp, 
                     self.current_lidar_reading_raw, 
                     self.current_lidar_reading_calibrated)
 
@@ -321,17 +323,17 @@ class LidarDataProcessor(QObject):
 
         try:
             stats = {
-                "count": len(self.reading_history),
+                "count": len(self.history_velo_only),
                 "current": self.current_lidar_reading_calibrated,
-                "average": statistics.mean(self.reading_history),
-                "median": statistics.median(self.reading_history),
-                "min": min(self.reading_history),
-                "max": max(self.reading_history),
-                "range": max(self.reading_history) - min(self.reading_history),
+                "average": statistics.mean(self.history_velo_only),
+                "median": statistics.median(self.history_velo_only),
+                "min": min(self.history_velo_only),
+                "max": max(self.history_velo_only),
+                "range": max(self.history_velo_only) - min(self.history_velo_only),
             }
 
-            if len(self.reading_history) > 1:
-                stats["std_dev"] = statistics.stdev(self.reading_history)
+            if len(self.history_velo_only) > 1:
+                stats["std_dev"] = statistics.stdev(self.history_velo_only)
             else:
                 stats["std_dev"] = 0.0
 

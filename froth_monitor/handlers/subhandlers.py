@@ -2,6 +2,8 @@ import cv2
 import sys
 import os
 import time
+import queue
+import threading
 from typing import cast
 from PySide6.QtWidgets import (
     QApplication,
@@ -1527,7 +1529,7 @@ class VelocityLidarMatcher(QObject):
         self.start_time = cast(float, None)
 
         # Get current lidar data
-        lidar_history = self.lidar_data_processor.lidar_reading_history_av1s
+        lidar_history = self.lidar_data_processor.reading_history_av1s
 
         if not lidar_history:
             self.match_failed.emit(self.current_roi_number, velo_data)
@@ -1581,7 +1583,7 @@ class VelocityLidarMatcher(QObject):
             return
             
         # Check for new lidar data
-        current_lidar_history = self.lidar_data_processor.lidar_reading_history_av1s
+        current_lidar_history = self.lidar_data_processor.reading_history_av1s
         if len(current_lidar_history) > self.initial_lidar_count:
             # New data arrived
             new_latest_data = current_lidar_history[-1]
@@ -1602,6 +1604,69 @@ class VelocityLidarMatcher(QObject):
         """Stop the matching timer if it's running."""
         if self.matching_timer.isActive():
             self.matching_timer.stop() 
+
+class VideoRecordingWorker(QThread):
+    """
+    Worker thread for handling video recording asynchronously.
+    
+    This class runs in a separate thread to prevent video recording operations
+    from blocking the main UI thread and frame processing pipeline.
+    """
+    
+    def __init__(self, video_recorder: VideoRecorder):
+        super().__init__()
+        self.video_recorder = video_recorder
+        self.frame_queue = queue.Queue(maxsize=30)  # Limit queue size to prevent memory issues
+        self.running = True
+        
+    def add_frame(self, frame):
+        """
+        Add a frame to the recording queue.
+        
+        Args:
+            frame: The frame to be recorded
+        """
+        try:
+            # Use put_nowait to avoid blocking if queue is full
+            self.frame_queue.put_nowait(frame.copy())  # Copy frame to avoid reference issues
+        except queue.Full:
+            # If queue is full, skip this frame to prevent blocking
+            logger.warning("Video recording queue is full, skipping frame")
+    
+    def run(self):
+        """
+        Main thread loop for processing video recording frames.
+        """
+        while self.running:
+            try:
+                # Wait for a frame with timeout to allow checking running flag
+                frame = self.frame_queue.get(timeout=0.1)
+                
+                # Record the frame if recording is active
+                if self.video_recorder.is_active():
+                    self.video_recorder.record_frame(frame)
+                    
+                self.frame_queue.task_done()
+                
+            except queue.Empty:
+                # No frame available, continue loop
+                continue
+            except Exception as e:
+                logger.error(f"Error in video recording worker: {e}")
+    
+    def stop(self):
+        """
+        Stop the worker thread gracefully.
+        """
+        self.running = False
+        # Clear the queue
+        while not self.frame_queue.empty():
+            try:
+                self.frame_queue.get_nowait()
+                self.frame_queue.task_done()
+            except queue.Empty:
+                break
+        self.wait()  # Wait for thread to finish
 
 class FrameProcessor:
     def __init__(
@@ -1626,6 +1691,10 @@ class FrameProcessor:
 
         self.canvas_width = self.gui.video_canvas_label.width()
         self.canvas_height = self.gui.video_canvas_label.height()
+        
+        # Initialize and start the video recording worker thread
+        self.video_recording_worker = VideoRecordingWorker(self.video_recorder)
+        self.video_recording_worker.start()
 
     # -----------------------------------Frame Processing-----------------------------------------------
     def process_new_frame(self, frame):
@@ -1656,7 +1725,6 @@ class FrameProcessor:
         )
 
         # Process the frame with the frame model
-
         # Only allow to let frame pass in when the previous frame has been processed
         # This is to prevent the overstacking of frames
         self.video_thread.if_release = False
@@ -1669,9 +1737,12 @@ class FrameProcessor:
         # Update the overlay position
         self._update_overlay_position(pixmap)
 
-        # Record frame if recording is active
+        # start_time = time.time()
+        # Record frame if recording is active (non-blocking)
         if self.event_handler.recording_active and self.video_recorder.is_active():
-            self.video_recorder.record_frame(frame)
+            self.video_recording_worker.add_frame(frame)
+        # end_time = time.time()
+        # logger.info(f"Frame processing time with recording: {end_time - start_time} seconds")
 
         # Update status bar
         self._update_status_bar()
@@ -1729,21 +1800,21 @@ class FrameProcessor:
         Args:
             resized_frame: The resized frame to process
         """
-        start_time = time.time()
+        # start_time = time.time()
         self.current_frame_number, roi_list, update_velo_plot, update_average_velo = (
             self.frame_model.process_frame(resized_frame)
         )
         self.roi_handler.display_roi(roi_list)
-        end_time = time.time()
-        logger.info(f"Frame processing time without updating graph: {end_time - start_time} seconds")
+        # end_time = time.time()
+        # logger.info(f"Frame processing time without updating graph: {end_time - start_time} seconds")
 
         # Update the velocity plot with the latest data
         if update_velo_plot:
-            start_time = time.time()
+            # start_time = time.time()
             self.velocity_plotter.update_velocity_plot()
             self.velocity_plotter.update_arec_data()
-            end_time = time.time()
-            logger.info(f"Frame processing time with updating graph: {end_time - start_time} seconds")
+            # end_time = time.time()
+            # logger.info(f"Frame processing time with updating graph: {end_time - start_time} seconds")
 
     def _display_frame_on_canvas(self, scaled_image):
         """
@@ -1787,6 +1858,17 @@ class FrameProcessor:
             self.gui.statusBar().showMessage(
                 f"Frame: {self.current_frame_number} | Time: {self.frame_model.last_processed_time}"
             )
+    
+    def cleanup(self):
+        """
+        Clean up resources, particularly the video recording worker thread.
+        
+        This method should be called when the FrameProcessor is being destroyed
+        to ensure proper cleanup of the video recording worker thread.
+        """
+        if hasattr(self, 'video_recording_worker'):
+            self.video_recording_worker.stop()
+            logger.info("Video recording worker thread stopped")
 
 class AirRecoveryHandler:
     """Handler for air recovery functionality."""
