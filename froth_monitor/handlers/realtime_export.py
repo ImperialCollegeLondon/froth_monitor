@@ -24,9 +24,9 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill
 
+import time
+
 import logging
-
-
 logger = logging.getLogger(__name__)
 
 class RealtimeExporter(QFileDialog):
@@ -53,6 +53,9 @@ class RealtimeExporter(QFileDialog):
         self.calibration_queue = queue.Queue()
         self.lidar_queue = queue.Queue()
         self.roi_queues = {}  # Dictionary to store queues for each ROI
+        
+        # Configurable write interval (seconds)
+        self.write_interval = 5.0  # Write to Excel every 5 seconds
         
         # Excel workbook and worksheets
         self.workbook = cast(Workbook, None)
@@ -595,8 +598,8 @@ class RealtimeExporter(QFileDialog):
                         sheet_name = f"ROI_{roi_id}_summary"
                         self._process_queue(sheet_name, roi_queue)
                 
-                # Small sleep to prevent excessive CPU usage
-                time.sleep(0.01)
+                # Sleep for configured interval to reduce Excel save frequency
+                time.sleep(self.write_interval)
                 
             except Exception as e:
                 logger.error(f"Error in writer worker: {e}")
@@ -706,7 +709,7 @@ class RealtimeExporter(QFileDialog):
                 self.roi_queues[queue_name].put_nowait(data_row)
             except queue.Full:
                 logger.warning(f"ROI {roi_id} movement queue full, dropping data point")
-    
+
     def write_roi_summary_data(self, roi_id: int, sum_data_list: list):
         """
         Write ROI summary data to ROI summary sheet
@@ -808,61 +811,6 @@ class RealtimeExporter(QFileDialog):
             "sheet_info": self.get_sheet_info()
         }
 
-# # Global instance for easy access
-# _realtime_exporter = None
 
-# def get_realtime_exporter() -> RealtimeExporter:
-#     """
-#     Get the global realtime exporter instance
-#     """
-#     global _realtime_exporter
-#     if _realtime_exporter is None:
-#         _realtime_exporter = RealtimeExporter()
-#     return _realtime_exporter
-
-# # Convenience functions for easy integration
-# def start_realtime_export(session_name: Optional[str] = None) -> str:
-#     """Start realtime export session"""
-#     return get_realtime_exporter().start_session(session_name)
-
-# def stop_realtime_export():
-#     """Stop realtime export session"""
-#     get_realtime_exporter().stop_session()
-
-# def create_roi_sheets(roi_id: int) -> bool:
-#     """Create sheets for a new ROI"""
-#     return get_realtime_exporter().create_roi_sheets(roi_id)
-
-# def delete_roi_sheets(roi_id: int) -> bool:
-#     """Delete sheets for an ROI"""
-#     return get_realtime_exporter().delete_roi_sheets(roi_id)
-
-# def export_calibration_data(arrow_direction: float, px2mm: float):
-#     """Export calibration data"""
-#     get_realtime_exporter().write_calibration_data(arrow_direction, px2mm)
-
-# def export_lidar_data(reading_index: int, distance_mm: float):
-#     """Export LIDAR data"""
-#     get_realtime_exporter().write_lidar_data(reading_index, distance_mm)
-
-# def export_roi_movement_data(roi_id: int, frame_index: int, timestamp: str, 
-#                             delta_pixels_x: float, delta_pixels_y: float, 
-#                             calibrated_delta: float, velocity: float, froth_height: float):
-#     """Export ROI movement data"""
-#     get_realtime_exporter().write_roi_movement_data(
-#         roi_id, frame_index, timestamp, delta_pixels_x, delta_pixels_y, 
-#         calibrated_delta, velocity, froth_height
-#     )
-
-# def export_roi_summary_data(roi_id: int, timestamp: str, velocity: float, 
-#                            froth_height: float, air_recovery: float, 
-#                            air_flow_rate: float, air_flow_rate_mm3: float):
-#     """Export ROI summary data"""
-#     get_realtime_exporter().write_roi_summary_data(
-#         roi_id, timestamp, velocity, froth_height, air_recovery, 
-#         air_flow_rate, air_flow_rate_mm3
-#     )
-
-# def get_active_rois() -> Set[int]:
     # """Get currently active ROI IDs"""
     # return get_realtime_exporter().get_active_rois()

@@ -290,22 +290,11 @@ class EventHandler:
             self.video_recorder,
             self.roi_handler,
             self.data_handler,
+        )  
+
+        self.video_thread.frame_available.connect(
+            self.frame_processor.process_new_frame
         )
-
-        # Connect camera thread signals to frame processor
-        if self.video_handler.if_jetson:
-
-            self.video_thread.frame_available.connect(
-                self.frame_processor.process_new_frame_with_network_thread
-            )
-            self.video_thread.sensor_data_available.connect(    # type: ignore
-                self.sensor_data_processor.process_sensor_data # type: ignore
-            )
-            
-        else:
-            self.video_thread.frame_available.connect(
-                self.frame_processor.process_new_frame
-            )
 
         self.gui.confirm_arrow_button.clicked.connect(
             self.calibration_handler.confirm_arrow_n_ruler
@@ -330,11 +319,11 @@ class EventHandler:
         self.gui.delete_roi_button.clicked.connect(self.roi_handler.delete_last_roi)
 
     def finish_export_setting(self):
+
         self.frame_model.load_exporter(self.exporter)
         self.data_handler.load_exporter(self.exporter)
         self.calibration_handler.load_exporter(self.exporter)
         self.lidar_data_processor.load_exporter(self.exporter)
-
         self.update_guidance()
 
     def open_algorithm_configuration(self):

@@ -1493,7 +1493,6 @@ class DataHandler:
         except Exception as e:
             logger.error(f"Error in clear_display_history: {e}")
 
-
 class VelocityLidarMatcher(QObject):
     """Asynchronous matcher for velocity and lidar data based on timestamps."""
     
@@ -1677,45 +1676,6 @@ class FrameProcessor:
         # Update status bar
         self._update_status_bar()
 
-    def process_new_frame_with_network_thread(self, frame):
-        if (
-            not self.event_handler.video_handler.playing
-        ):  # Access playing state from VideoHandler
-            return
-
-        # Store the current frame for potential further processing
-        self.current_frame = frame
-        
-        # Convert frame to QImage and scale it
-        qt_image = self._convert_frame_to_qimage(frame)
-        scaled_image = self._scale_image_to_canvas(qt_image)
-
-        # Create a resized frame for processing
-        resized_frame = self._create_resized_frame(
-            frame, scaled_image.width(), scaled_image.height()
-        )
-
-        # Process the frame with the frame model
-
-        # Only allow to let frame pass in when the previous frame has been processed
-        # This is to prevent the overstacking of frames
-        self.video_thread.if_release = False
-        self._process_frame_with_model(resized_frame)
-        self.video_thread.if_release = True
-
-        # Display the frame on the canvas
-        pixmap = self._display_frame_on_canvas(scaled_image)
-
-        # Update the overlay position
-        self._update_overlay_position(pixmap)
-
-        # Record frame if recording is active
-        if self.event_handler.recording_active and self.video_recorder.is_active():
-            self.video_recorder.record_frame(frame)
-
-        # Update status bar
-        self._update_status_bar()
-
     def _convert_frame_to_qimage(self, frame):
         """
         Convert an OpenCV frame (BGR) to a Qt QImage (RGB).
@@ -1769,15 +1729,21 @@ class FrameProcessor:
         Args:
             resized_frame: The resized frame to process
         """
+        start_time = time.time()
         self.current_frame_number, roi_list, update_velo_plot, update_average_velo = (
             self.frame_model.process_frame(resized_frame)
         )
         self.roi_handler.display_roi(roi_list)
+        end_time = time.time()
+        logger.info(f"Frame processing time without updating graph: {end_time - start_time} seconds")
 
         # Update the velocity plot with the latest data
         if update_velo_plot:
+            start_time = time.time()
             self.velocity_plotter.update_velocity_plot()
-            self.velocity_plotter.update_arec_data()            
+            self.velocity_plotter.update_arec_data()
+            end_time = time.time()
+            logger.info(f"Frame processing time with updating graph: {end_time - start_time} seconds")
 
     def _display_frame_on_canvas(self, scaled_image):
         """
