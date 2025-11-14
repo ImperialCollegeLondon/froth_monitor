@@ -53,7 +53,10 @@ class RealtimeExporter(QFileDialog):
         self.calibration_queue = queue.Queue()
         self.lidar_queue = queue.Queue()
         self.roi_queues = {}  # Dictionary to store queues for each ROI
-        
+
+        # Configurable write interval (seconds)
+        self.write_interval = 5.0  # Write to Excel every 5 seconds
+
         # Excel workbook and worksheets
         self.workbook = cast(Workbook, None)
         self.worksheets = {}
@@ -595,8 +598,8 @@ class RealtimeExporter(QFileDialog):
                         sheet_name = f"ROI_{roi_id}_summary"
                         self._process_queue(sheet_name, roi_queue)
                 
-                # Small sleep to prevent excessive CPU usage
-                time.sleep(0.01)
+                # Sleep for configured interval to reduce Excel save frequency
+                time.sleep(self.write_interval)
                 
             except Exception as e:
                 logger.error(f"Error in writer worker: {e}")
