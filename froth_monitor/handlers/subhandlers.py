@@ -2,6 +2,8 @@ import cv2
 import sys
 import os
 import time
+import queue
+import threading
 from typing import cast
 from PySide6.QtWidgets import (
     QApplication,
@@ -16,7 +18,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QRect, QObject, Signal, QTimer
+from PySide6.QtCore import Qt, QRect, QObject, Signal, QTimer, QThread
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtGui import QIcon
 
@@ -1506,6 +1508,69 @@ class VelocityLidarMatcher(QObject):
         if self.matching_timer.isActive():
             self.matching_timer.stop() 
 
+class VideoRecordingWorker(QThread):
+    """
+    Worker thread for handling video recording asynchronously.
+    
+    This class runs in a separate thread to prevent video recording operations
+    from blocking the main UI thread and frame processing pipeline.
+    """
+    
+    def __init__(self, video_recorder: VideoRecorder):
+        super().__init__()
+        self.video_recorder = video_recorder
+        self.frame_queue = queue.Queue(maxsize=30)  # Limit queue size to prevent memory issues
+        self.running = True
+        
+    def add_frame(self, frame):
+        """
+        Add a frame to the recording queue.
+        
+        Args:
+            frame: The frame to be recorded
+        """
+        try:
+            # Use put_nowait to avoid blocking if queue is full
+            self.frame_queue.put_nowait(frame.copy())  # Copy frame to avoid reference issues
+        except queue.Full:
+            # If queue is full, skip this frame to prevent blocking
+            logger.warning("Video recording queue is full, skipping frame")
+    
+    def run(self):
+        """
+        Main thread loop for processing video recording frames.
+        """
+        while self.running:
+            try:
+                # Wait for a frame with timeout to allow checking running flag
+                frame = self.frame_queue.get(timeout=0.1)
+                
+                # Record the frame if recording is active
+                if self.video_recorder.is_active():
+                    self.video_recorder.record_frame(frame)
+                    
+                self.frame_queue.task_done()
+                
+            except queue.Empty:
+                # No frame available, continue loop
+                continue
+            except Exception as e:
+                logger.error(f"Error in video recording worker: {e}")
+    
+    def stop(self):
+        """
+        Stop the worker thread gracefully.
+        """
+        self.running = False
+        # Clear the queue
+        while not self.frame_queue.empty():
+            try:
+                self.frame_queue.get_nowait()
+                self.frame_queue.task_done()
+            except queue.Empty:
+                break
+        self.wait()  # Wait for thread to finish
+
 class FrameProcessor:
     def __init__(
         self,
@@ -1529,7 +1594,11 @@ class FrameProcessor:
 
         self.canvas_width = self.gui.video_canvas_label.width()
         self.canvas_height = self.gui.video_canvas_label.height()
-
+        
+        # Initialize video recording worker
+        self.video_recording_worker = VideoRecordingWorker(self.video_recorder)
+        self.video_recording_worker.start()
+        
     # -----------------------------------Frame Processing-----------------------------------------------
     def process_new_frame(self, timestamp: str, frame):
         """
@@ -1573,50 +1642,15 @@ class FrameProcessor:
         self._update_overlay_position(pixmap)
 
         # Record frame if recording is active
+        start_time = time.time()
+        # Record frame if recording is active (non-blocking)
         if self.event_handler.recording_active and self.video_recorder.is_active():
-            self.video_recorder.record_frame(frame)
-
+            self.video_recording_worker.add_frame(frame)
+        end_time = time.time()
+        logger.info(f"Frame processing time with recording: {end_time - start_time} seconds")
+        
         # Update status bar
         self._update_status_bar()
-
-    # def process_new_frame_with_network_thread(self, timestamp: str, frame):
-    #     if (
-    #         not self.event_handler.video_handler.playing
-    #     ):  # Access playing state from VideoHandler
-    #         return
-
-    #     # Store the current frame for potential further processing
-    #     self.current_frame = frame
-        
-    #     # Convert frame to QImage and scale it
-    #     qt_image = self._convert_frame_to_qimage(frame)
-    #     scaled_image = self._scale_image_to_canvas(qt_image)
-
-    #     # Create a resized frame for processing
-    #     resized_frame = self._create_resized_frame(
-    #         frame, scaled_image.width(), scaled_image.height()
-    #     )
-
-    #     # Process the frame with the frame model
-
-    #     # Only allow to let frame pass in when the previous frame has been processed
-    #     # This is to prevent the overstacking of frames
-    #     self.video_thread.if_release = False
-    #     self._process_frame_with_model(timestamp,resized_frame)
-    #     self.video_thread.if_release = True
-
-    #     # Display the frame on the canvas
-    #     pixmap = self._display_frame_on_canvas(scaled_image)
-
-    #     # Update the overlay position
-    #     self._update_overlay_position(pixmap)
-
-    #     # Record frame if recording is active
-    #     if self.event_handler.recording_active and self.video_recorder.is_active():
-    #         self.video_recorder.record_frame(frame)
-
-    #     # Update status bar
-    #     self._update_status_bar()
 
     def _convert_frame_to_qimage(self, frame):
         """
@@ -1723,6 +1757,17 @@ class FrameProcessor:
             self.gui.statusBar().showMessage(
                 f"Frame: {self.current_frame_number} | Time: {self.frame_model.last_processed_time}"
             )
+
+    def cleanup(self):
+        """
+        Clean up resources, particularly the video recording worker thread.
+        
+        This method should be called when the FrameProcessor is being destroyed
+        to ensure proper cleanup of the video recording worker thread.
+        """
+        if hasattr(self, 'video_recording_worker'):
+            self.video_recording_worker.stop()
+            logger.info("Video recording worker thread stopped")
 
 class AirRecoveryHandler:
     """Handler for air recovery functionality."""
