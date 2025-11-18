@@ -33,7 +33,7 @@ class DataReceiver():
     def get_data(self):
         server_data = cast(dict, None)
         consecutive_failures = 0
-        max_consecutive_failures = 10
+        max_consecutive_failures = 50
 
         while True:
             try:
