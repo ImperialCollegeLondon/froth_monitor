@@ -1,6 +1,6 @@
 """The entry point for the Bubble Analyser program."""
 
-from froth_monitor.handlers.event_handler import EventHandler
+from froth_monitor.handlers.main_handler import EventHandler
 from froth_monitor.handlers.gui_window import MainGUIWindow
 from froth_monitor.handlers.logger_config import get_logger
 
@@ -31,10 +31,10 @@ if __name__ == "__main__":
         }
     """)
     window = MainGUIWindow()
-    logger.info("Starting event handler")
+    logger.info("Main Handler: Starting event handler")
     handler = EventHandler(window)
     window.show()
-    logger.info("Application started successfully")
+    logger.info("Main Handler: Application started successfully")
     sys.exit(app.exec())
 
 ### Air_rec Formula - unit of %

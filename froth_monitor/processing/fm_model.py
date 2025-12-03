@@ -36,6 +36,7 @@ print(f"Processing frame {frame_number}")
 import numpy as np
 import time
 import cv2
+import threading
 from typing import cast
 from datetime import datetime
 from PySide6.QtCore import QRect
@@ -219,11 +220,15 @@ class ROI:
             return False
 
     def get_algorithm_n_params(self, algorithm: str, params: dict):
+        
         self.analysis.current_algorithm = algorithm
+
         if algorithm == "Farneback":
             self.analysis.of_params = params
         elif algorithm == "Lucas-kanade":
             self.analysis.lk_params = params
+        elif algorithm == "DIS":
+            self.analysis.set_dis_preset(params.get("preset", "Medium"))
 
     def update_sum_history(self, list):
         self.sum_history.append(list)
@@ -270,13 +275,17 @@ class FrameModel:
 
         self.roi_list = []
         self.last_processed_time = None
+        
+        # Thread safety: Lock for protecting roi_list and algorithm parameters
+        self._processing_lock = threading.Lock()
 
         self.px2mm = 1.0
         self.degree = -90.0
 
         # Algorithm parameters
-        self.current_algorithm = "Farneback"
-        self.algorithm_list = ["Farneback", "Lucas-Kanade"]
+        self.current_algorithm = "DIS"
+        self.algorithm_list = ["Farneback", "Lucas-Kanade", "DIS"]
+        
         self.lk_params = dict(
             winSize=(15, 15),
             maxLevel=2,
@@ -290,10 +299,15 @@ class FrameModel:
             poly_n=int(7),
             poly_sigma=1.5,
         )
+        self.dis_params = dict(
+            preset="Medium"
+        )
 
     def confirm_algorithm_n_params(self, algorithm: str, params: dict) -> None:
         """
         Confirm the algorithm and parameters for optical flow.
+        
+        This method is thread-safe and can be called while video processing is active.
 
         Parameters
         ----------
@@ -302,15 +316,23 @@ class FrameModel:
         params : dict
             The parameters for the optical flow algorithm.
         """
+        # Acquire lock to prevent race condition with process_frame()
+        with self._processing_lock:
+            self.current_algorithm = algorithm
 
-        self.current_algorithm = algorithm
-        if algorithm == "Farneback":
-            self.of_params = params
-        elif algorithm == "Lucas-Kanade":
-            self.lk_params = params
+            if algorithm == "Farneback":
+                self.of_params = params
+            elif algorithm == "Lucas-Kanade":
+                self.lk_params = params
+            elif algorithm == "DIS":
+                self.dis_params = params
 
-        logger.info(f"Algorithm set as: {self.current_algorithm}, Parameters: {params}")
-        self.algo_roi.get_algorithm_n_params(self.current_algorithm, params)
+            # Update all existing ROIs with the new algorithm and parameters
+            for roi in self.roi_list:
+                roi.get_algorithm_n_params(algorithm, params)
+
+            logger.info(f"Frame model: Algorithm set as: {self.current_algorithm}, Parameters: {params}")
+            self.algo_roi.get_algorithm_n_params(self.current_algorithm, params)
 
     def process_frame(self, frame: np.ndarray) -> tuple[int, list[ROI], bool, bool]:
         """
@@ -318,6 +340,8 @@ class FrameModel:
         along with the processed frame. For each ROI in the roi_list, crop the frame
         according to the ROI coordinates and pass the cropped frame to the ROI's
         process_frame method.
+        
+        This method is thread-safe and protected against concurrent algorithm parameter changes.
 
         Parameters
         ----------
@@ -345,38 +369,38 @@ class FrameModel:
         update_velo_plot = False
         update_average_velo = False
 
-        # Process each ROI in the roi_list
-        for roi_id, roi in enumerate(self.roi_list):
-            
-            roi.id = roi_id + 1
+        # Acquire lock to prevent race condition with confirm_algorithm_n_params()
+        with self._processing_lock:
+            # Process each ROI in the roi_list
+            for roi_id, roi in enumerate(self.roi_list):
+                roi.id = roi_id + 1
 
-            # Get the ROI coordinates
-            x1 = roi.coordinate[0]
-            y1 = roi.coordinate[1]
-            x2 = roi.coordinate[2]
-            y2 = roi.coordinate[3]
+                # Get the ROI coordinates
+                x1 = roi.coordinate[0]
+                y1 = roi.coordinate[1]
+                x2 = roi.coordinate[2]
+                y2 = roi.coordinate[3]
 
-            # Crop the frame according to the ROI coordinates
-            # Ensure the coordinates are within the frame boundaries
-            if x1 >= 0 and y1 >= 0 and x2 > 0 and y2 > 0:
-                cropped_frame = frame[y1 : y1 + y2, x1 : x1 + x2]
+                # Crop the frame according to the ROI coordinates
+                # Ensure the coordinates are within the frame boundaries
+                if x1 >= 0 and y1 >= 0 and x2 > 0 and y2 > 0:
+                    cropped_frame = frame[y1 : y1 + y2, x1 : x1 + x2]
 
-                # Pass the cropped frame to the ROI's process_frame method
-                _new_velo, _new_average = roi.process_frame(cropped_frame)
-                if _new_velo == True:
-                    if_new_velo += 1
-                if _new_average == True:
-                    if_new_average += 1
-            
-            if self.exporter is not None:
-                if len(roi.delta_history)>1:
-                    self.exporter.write_roi_movement_data(roi.id, roi.delta_history[-1])
+                    # Pass the cropped frame to the ROI's process_frame method
+                    _new_velo, _new_average = roi.process_frame(cropped_frame)
+                    if _new_velo == True:
+                        if_new_velo += 1
+                    if _new_average == True:
+                        if_new_average += 1
                 
+                if self.exporter is not None:
+                    if len(roi.delta_history)>1:
+                        self.exporter.write_roi_movement_data(roi.id, roi.delta_history[-1])
 
-        if if_new_velo > 0:
-            update_velo_plot = True
-        if if_new_average > 0:
-            update_average_velo = True
+            if if_new_velo > 0:
+                update_velo_plot = True
+            if if_new_average > 0:
+                update_average_velo = True
         
         # print("time to process a frame: ", time.time() - time_1, "s")
         return self.frame_count, self.roi_list, update_velo_plot, update_average_velo
@@ -435,7 +459,19 @@ class FrameModel:
 
     def add_roi(self, roi):
         new_roi = ROI(roi, self.px2mm, self.degree)
-        new_roi.get_algorithm_n_params(self.current_algorithm, self.of_params)
+        
+        # Select the correct parameters based on the current algorithm
+        if self.current_algorithm == "Farneback":
+            params = self.of_params
+        elif self.current_algorithm == "Lucas-Kanade":
+            params = self.lk_params
+        elif self.current_algorithm == "DIS":
+            params = self.dis_params
+        else:
+            params = self.of_params # Default fallback
+            
+        new_roi.get_algorithm_n_params(self.current_algorithm, params)
+        
         self.roi_list.append(new_roi)
 
         if self.exporter is not None:

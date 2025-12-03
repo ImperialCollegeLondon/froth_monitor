@@ -9,6 +9,7 @@ from typing import List, Dict
 from datetime import datetime
 import statistics
 from froth_monitor.handlers.logger_config import get_logger
+from froth_monitor.utils.performance_monitor import PerformanceMonitor
 
 # Initialize logger for this module
 logger = get_logger(__name__)
@@ -63,6 +64,8 @@ class AirRecoveryDataProcessor:
         self.statistics_cache = {}
         self.last_stats_update = datetime.now()
         self.stats_update_interval = 1.0  # seconds
+        
+        self.perf_monitor = PerformanceMonitor()
 
     def process_air_recovery_data(self, 
     velocity: float, 
@@ -83,7 +86,9 @@ class AirRecoveryDataProcessor:
             self.current_timestamp = timestamp
 
             # Calculate air recovery
+            self.perf_monitor.start_timer("air_recovery_calculation")
             air_recovery = self._calculate_air_recovery(velocity, froth_height)
+            self.perf_monitor.stop_timer("air_recovery_calculation")
             self.current_air_recovery = air_recovery
 
             # Add to historical data

@@ -1,7 +1,6 @@
 """The main module for froth monitor."""
 
 from froth_monitor.processing.image_analysis import VideoAnalysis
-from froth_monitor.handlers.autosaver import AutoSaver
 
 
 

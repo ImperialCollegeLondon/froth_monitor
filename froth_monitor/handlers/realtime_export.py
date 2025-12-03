@@ -3,7 +3,6 @@ import threading
 import queue
 import time
 from PySide6.QtWidgets import (
-    QMainWindow,
     QPushButton,
     QLabel,
     QVBoxLayout,
@@ -15,18 +14,19 @@ from PySide6.QtWidgets import (
     QRadioButton,
     QFrame,
 )
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Set, cast
+from typing import Dict, List, Any, Set, cast
 from openpyxl import Workbook
-from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill
+import shutil
+import os
 
 import time
 
 import logging
+from froth_monitor.utils.performance_monitor import PerformanceMonitor
 logger = logging.getLogger(__name__)
 
 class RealtimeExporter(QFileDialog):
@@ -63,6 +63,12 @@ class RealtimeExporter(QFileDialog):
         self.row_counters = {}  # Track current row for each sheet
         self.excel_file_path = cast(str, None)
         
+        # CSV handling
+        self.session_dir = cast(str, None)
+        self.csv_files = {} # sheet_name -> file_path
+        self.csv_handles = {} # sheet_name -> file_handle
+        self.csv_writers = {} # sheet_name -> csv_writer
+        
         # Threading control
         self.writer_thread = None
         self.is_running = False
@@ -97,6 +103,8 @@ class RealtimeExporter(QFileDialog):
             "timestamp", "velocity(mm/s)", "froth_height(mm)", "air_recovery(%)", 
             "air_flow_Jg(cm/s)", "air_flow_rate(L/min)"
         ]
+        
+        self.perf_monitor = PerformanceMonitor()
 
     def add_video_selection_section(self, layout: QVBoxLayout, dialog: QDialog) -> None:
         """
@@ -379,27 +387,19 @@ class RealtimeExporter(QFileDialog):
 
     def start_session(self) -> None:
         """
-        Start a new export session with a single Excel file containing base sheets
-        
-        Parameters
-        ----------
-        session_name : str, optional
-            Custom session name, defaults to timestamp
-            
-        Returns
-        -------
-        str
-            Session ID for reference
+        Start a new export session with CSV logging
         """
         self.start_time = datetime.now()
-    
         
-        # Create Excel file path
+        # Create Excel file path (for final save)
         self.excel_file_path = f"{self.export_directory}/{self.export_filename}.xlsx"
-
         
-        # Initialize Excel workbook with base sheets
-        self._initialize_excel_file()
+        # Create temporary session directory for CSVs
+        self.session_dir = os.path.join(self.export_directory, f"temp_session_{self.export_filename}_{int(time.time())}")
+        os.makedirs(self.session_dir, exist_ok=True)
+        
+        # Initialize base CSVs
+        self._initialize_csv_files()
         
         # Start writer thread
         self.is_running = True
@@ -407,41 +407,34 @@ class RealtimeExporter(QFileDialog):
         self.writer_thread.start()
         
         logger.info(f"Started realtime export session: {self.export_filename}")
-        logger.info(f"Excel file: {self.excel_file_path}")
+        logger.info(f"Session directory: {self.session_dir}")
     
-    def _initialize_excel_file(self):
+    def _initialize_csv_files(self):
         """
-        Initialize Excel workbook with base sheets (calibration_data and lidar_data)
+        Initialize CSV files for base sheets
         """
-        self.workbook = Workbook()
-        
-        # Remove default sheet
-        if "Sheet" in self.workbook.sheetnames:
-            self.workbook.remove(self.workbook["Sheet"])
-        
-        # Create base sheets with headers
         for sheet_name, config in self.base_sheet_configs.items():
-            worksheet = self.workbook.create_sheet(title=sheet_name)
-            self.worksheets[sheet_name] = worksheet
-            self.row_counters[sheet_name] = 1
+            self._create_csv_file(sheet_name, config["headers"])
             
-            # Add headers with formatting
-            headers = config["headers"]
-            for col_idx, header in enumerate(headers, 1):
-                cell = worksheet.cell(row=1, column=col_idx, value=header)
-                cell.font = Font(bold=True)
-                cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
-            
-            # Auto-adjust column widths
-            for col_idx in range(1, len(headers) + 1):
-                column_letter = get_column_letter(col_idx)
-                worksheet.column_dimensions[column_letter].width = 15
-            
-            self.row_counters[sheet_name] = 2  # Next row for data
+    def _create_csv_file(self, sheet_name: str, headers: List[str]):
+        """
+        Create a new CSV file and initialize writer
+        """
+        file_path = os.path.join(self.session_dir, f"{sheet_name}.csv")
         
-        # Save initial file
-        self.workbook.save(self.excel_file_path)
-        logger.info(f"Initialized Excel file with base sheets: {list(self.base_sheet_configs.keys())}")
+        try:
+            f = open(file_path, 'w', newline='')
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            f.flush()
+            
+            self.csv_files[sheet_name] = file_path
+            self.csv_handles[sheet_name] = f
+            self.csv_writers[sheet_name] = writer
+            self.row_counters[sheet_name] = 2 # 1 for header, next is 2
+            
+        except Exception as e:
+            logger.error(f"Failed to create CSV file for {sheet_name}: {e}")
     
     def create_roi_sheets(self, roi_id: int) -> bool:
         """
@@ -464,45 +457,11 @@ class RealtimeExporter(QFileDialog):
             try:
                 # Create movement data sheet
                 movement_sheet_name = f"ROI_{roi_id}_movement_data"
-
-                if self.workbook is None:
-                    self.workbook = Workbook()
-
-                movement_worksheet = self.workbook.create_sheet(title=movement_sheet_name)
-                self.worksheets[movement_sheet_name] = movement_worksheet
-                self.row_counters[movement_sheet_name] = 1
-                
-                # Add headers for movement sheet
-                for col_idx, header in enumerate(self.roi_movement_headers, 1):
-                    cell = movement_worksheet.cell(row=1, column=col_idx, value=header)
-                    cell.font = Font(bold=True)
-                    cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
-                
-                # Auto-adjust column widths
-                for col_idx in range(1, len(self.roi_movement_headers) + 1):
-                    column_letter = get_column_letter(col_idx)
-                    movement_worksheet.column_dimensions[column_letter].width = 15
-                
-                self.row_counters[movement_sheet_name] = 2
+                self._create_csv_file(movement_sheet_name, self.roi_movement_headers)
                 
                 # Create summary sheet
                 summary_sheet_name = f"ROI_{roi_id}_summary"
-                summary_worksheet = self.workbook.create_sheet(title=summary_sheet_name)
-                self.worksheets[summary_sheet_name] = summary_worksheet
-                self.row_counters[summary_sheet_name] = 1
-                
-                # Add headers for summary sheet
-                for col_idx, header in enumerate(self.roi_summary_headers, 1):
-                    cell = summary_worksheet.cell(row=1, column=col_idx, value=header)
-                    cell.font = Font(bold=True)
-                    cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
-                
-                # Auto-adjust column widths
-                for col_idx in range(1, len(self.roi_summary_headers) + 1):
-                    column_letter = get_column_letter(col_idx)
-                    summary_worksheet.column_dimensions[column_letter].width = 15
-                
-                self.row_counters[summary_sheet_name] = 2
+                self._create_csv_file(summary_sheet_name, self.roi_summary_headers)
                 
                 # Create queues for this ROI
                 self.roi_queues[f"roi_{roi_id}_movement"] = queue.Queue()
@@ -511,10 +470,7 @@ class RealtimeExporter(QFileDialog):
                 # Add to active ROIs
                 self.active_rois.add(roi_id)
                 
-                # Save workbook
-                self.workbook.save(self.excel_file_path)
-                
-                logger.info(f"Created ROI sheets for ROI {roi_id}: {movement_sheet_name}, {summary_sheet_name}")
+                logger.info(f"Created ROI CSVs for ROI {roi_id}")
                 return True
                 
             except Exception as e:
@@ -541,22 +497,12 @@ class RealtimeExporter(QFileDialog):
         with self.lock:
             try:
 
-                if self.workbook is None:
-                    self.workbook = Workbook()
-
                 movement_sheet_name = f"ROI_{roi_id}_movement_data"
                 summary_sheet_name = f"ROI_{roi_id}_summary"
                 
-                # Remove worksheets
-                if movement_sheet_name in self.worksheets:
-                    self.workbook.remove(self.worksheets[movement_sheet_name])
-                    del self.worksheets[movement_sheet_name]
-                    del self.row_counters[movement_sheet_name]
-                
-                if summary_sheet_name in self.worksheets:
-                    self.workbook.remove(self.worksheets[summary_sheet_name])
-                    del self.worksheets[summary_sheet_name]
-                    del self.row_counters[summary_sheet_name]
+                # Close and remove CSV handlers
+                self._close_csv_file(movement_sheet_name)
+                self._close_csv_file(summary_sheet_name)
                 
                 # Remove queues
                 if f"roi_{roi_id}_movement" in self.roi_queues:
@@ -567,15 +513,24 @@ class RealtimeExporter(QFileDialog):
                 # Remove from active ROIs
                 self.active_rois.discard(roi_id)
                 
-                # Save workbook
-                self.workbook.save(self.excel_file_path)
-                
                 logger.info(f"Deleted ROI sheets for ROI {roi_id}")
                 return True
                 
             except Exception as e:
                 logger.error(f"Error deleting ROI sheets for ROI {roi_id}: {e}")
                 return False
+
+    def _close_csv_file(self, sheet_name: str):
+        """Close a specific CSV file handle"""
+        if sheet_name in self.csv_handles:
+            try:
+                self.csv_handles[sheet_name].close()
+                del self.csv_handles[sheet_name]
+                del self.csv_writers[sheet_name]
+                del self.csv_files[sheet_name]
+                del self.row_counters[sheet_name]
+            except Exception as e:
+                logger.error(f"Error closing CSV {sheet_name}: {e}")
     
     def _writer_worker(self):
         """
@@ -583,6 +538,7 @@ class RealtimeExporter(QFileDialog):
         """
         while self.is_running:
             try:
+                start_time = time.perf_counter()
                 # Process base queues
                 self._process_queue("calibration_data", self.calibration_queue)
                 self._process_queue("lidar_data", self.lidar_queue)
@@ -598,6 +554,9 @@ class RealtimeExporter(QFileDialog):
                         sheet_name = f"ROI_{roi_id}_summary"
                         self._process_queue(sheet_name, roi_queue)
                 
+                duration = time.perf_counter() - start_time
+                self.perf_monitor.log_generic_event("background_export", {"duration": duration})
+
                 # Sleep for configured interval to reduce Excel save frequency
                 time.sleep(self.write_interval)
                 
@@ -606,7 +565,7 @@ class RealtimeExporter(QFileDialog):
     
     def _process_queue(self, sheet_name: str, data_queue: queue.Queue):
         """
-        Process items from a specific queue and write to Excel sheet
+        Process items from a specific queue and write to CSV
         """
         items_processed = 0
         try:
@@ -614,15 +573,9 @@ class RealtimeExporter(QFileDialog):
                 data_row = data_queue.get_nowait()
                 
                 with self.lock:
-                    if sheet_name in self.worksheets:
-                        worksheet = self.worksheets[sheet_name]
-                        current_row = self.row_counters[sheet_name]
-                        
-                        # Write data to current row
-                        for col_idx, value in enumerate(data_row, 1):
-                            worksheet.cell(row=current_row, column=col_idx, value=value)
-                        
-                        # Increment row counter
+                    if sheet_name in self.csv_writers:
+                        writer = self.csv_writers[sheet_name]
+                        writer.writerow(data_row)
                         self.row_counters[sheet_name] += 1
                         items_processed += 1
                 
@@ -631,13 +584,14 @@ class RealtimeExporter(QFileDialog):
         except queue.Empty:
             pass  # No more items in queue
         
-        # Save file if any items were processed
+        # Flush file if any items were processed
         if items_processed > 0:
             with self.lock:
                 try:
-                    self.workbook.save(self.excel_file_path) #type: ignore
+                    if sheet_name in self.csv_handles:
+                        self.csv_handles[sheet_name].flush()
                 except Exception as e:
-                    logger.error(f"Error saving Excel file: {e}")
+                    logger.error(f"Error flushing CSV file: {e}")
     
     # ============ INITIALIZE EXPORTER DURING RUN =========
     def initialize_roi_sheets(self, roi_list: list):
@@ -691,6 +645,7 @@ class RealtimeExporter(QFileDialog):
         if not self.is_running or roi_id not in self.active_rois:
             return
 
+        self.perf_monitor.start_timer("realtime_export")
         timestamp = frame_data_list[0]
         delta_pixels_x = frame_data_list[1][0]
         delta_pixels_y = frame_data_list[1][1]
@@ -709,6 +664,8 @@ class RealtimeExporter(QFileDialog):
                 self.roi_queues[queue_name].put_nowait(data_row)
             except queue.Full:
                 logger.warning(f"ROI {roi_id} movement queue full, dropping data point")
+        
+        self.perf_monitor.stop_timer("realtime_export")
 
     def write_roi_summary_data(self, roi_id: int, sum_data_list: list):
         """
@@ -717,6 +674,7 @@ class RealtimeExporter(QFileDialog):
         if not self.is_running or roi_id not in self.active_rois:
             return
         
+        self.perf_monitor.start_timer("realtime_export")
         # list format
         # timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm
         data_row = sum_data_list
@@ -727,6 +685,8 @@ class RealtimeExporter(QFileDialog):
                 self.roi_queues[queue_name].put_nowait(data_row)
             except queue.Full:
                 logger.warning(f"ROI {roi_id} summary queue full, dropping data point")
+        
+        self.perf_monitor.stop_timer("realtime_export")
     
     def get_active_rois(self) -> Set[int]:
         """
@@ -746,11 +706,11 @@ class RealtimeExporter(QFileDialog):
         sheet_info = {}
         
         with self.lock:
-            for sheet_name, worksheet in self.worksheets.items():
+            for sheet_name, writer in self.csv_writers.items():
                 sheet_info[sheet_name] = {
                     "current_row": self.row_counters.get(sheet_name, 1),
-                    "data_rows": max(0, self.row_counters.get(sheet_name, 1) - 2),  # Exclude header
-                    "columns": worksheet.max_column
+                    "data_rows": max(0, self.row_counters.get(sheet_name, 1) - 2),
+                    "columns": 0 # Not tracking columns in CSV mode easily
                 }
         
         return sheet_info
@@ -771,20 +731,71 @@ class RealtimeExporter(QFileDialog):
         # Final save and close
         with self.lock:
             try:
-                if self.workbook:
-                    self.workbook.save(self.excel_file_path)
-                    self.workbook.close()
-                    
-                self.workbook = None
-                self.worksheets.clear()
+                # Close all CSVs
+                for handle in self.csv_handles.values():
+                    handle.close()
+                
+                # Compile to Excel
+                self._compile_to_excel()
+                
+                # Cleanup
+                self.csv_handles.clear()
+                self.csv_writers.clear()
+                self.csv_files.clear()
                 self.row_counters.clear()
                 self.roi_queues.clear()
                 self.active_rois.clear()
                 
+                # Remove temporary directory
+                if self.session_dir and os.path.exists(self.session_dir):
+                    shutil.rmtree(self.session_dir)
+                
             except Exception as e:
-                logger.error(f"Error closing Excel file: {e}")
+                logger.error(f"Error closing session: {e}")
         
         logger.info(f"Stopped realtime export session: {self.session_id}")
+        logger.info(f"Final Excel file saved: {self.excel_file_path}")
+        self.session_id = None
+
+    def _compile_to_excel(self):
+        """
+        Read all CSV files and compile them into the final Excel workbook
+        """
+        logger.info("Compiling CSVs to Excel...")
+        wb = Workbook()
+        if "Sheet" in wb.sheetnames:
+            wb.remove(wb["Sheet"])
+            
+        for sheet_name, file_path in self.csv_files.items():
+            if not os.path.exists(file_path):
+                continue
+                
+            ws = wb.create_sheet(title=sheet_name)
+            
+            with open(file_path, 'r') as f:
+                reader = csv.reader(f)
+                for r_idx, row in enumerate(reader, 1):
+                    for c_idx, value in enumerate(row, 1):
+                        cell = ws.cell(row=r_idx, column=c_idx, value=value)
+                        if r_idx == 1: # Header
+                            cell.font = Font(bold=True)
+                            cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+                            
+            # Auto-adjust column widths
+            for col in ws.columns:
+                max_length = 0
+                column = col[0].column_letter # Get the column name
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2)
+                ws.column_dimensions[column].width = adjusted_width
+
+        wb.save(self.excel_file_path)
+        logger.info("Excel compilation complete")
         logger.info(f"Final Excel file saved: {self.excel_file_path}")
         self.session_id = None
     

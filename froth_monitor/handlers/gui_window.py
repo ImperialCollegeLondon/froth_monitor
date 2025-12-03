@@ -575,7 +575,7 @@ class MainGUIWindow(QMainWindow):
 
     def _add_reset_buttons(self, layout: QVBoxLayout) -> None:
         """Add responsive reset buttons."""
-        self.record_button = QPushButton("  Video Recording")
+        self.record_button = QPushButton("  Start Video Recording")
         self.record_button.setIcon(
             QIcon(self.resource_path("froth_monitor/resources/camera_icon.ico"))
         )
@@ -598,7 +598,7 @@ class MainGUIWindow(QMainWindow):
         )
         layout.addWidget(self.record_button)
 
-        self.simple_reset_button = QPushButton("Reset")
+        self.simple_reset_button = QPushButton("End Session and Reset")
         self.simple_reset_button.setStyleSheet(
             self.ENABLED_BUTTON_STYLE
         )
@@ -848,7 +848,7 @@ class MainGUIWindow(QMainWindow):
         export_layout.setSpacing(10)
 
         # roi_layout = QHBoxLayout()
-        self.export_button = QPushButton("Export/Recording Settings")
+        self.export_button = QPushButton("Export & Recording Settings")
         self.export_button.setStyleSheet(
             self.ENABLED_BUTTON_STYLE
         )

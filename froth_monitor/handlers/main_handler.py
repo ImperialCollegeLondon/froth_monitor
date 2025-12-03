@@ -5,7 +5,7 @@ It handles events triggered by user interactions with the GUI and manages the un
 data processing and analysis.
 """
 
-
+import cv2
 import sys
 import os
 from typing import cast
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 from PySide6.QtCore import QRect
+from PySide6.QtGui import QIcon
 
 # Import MainGUIWindow at the beginning
 from froth_monitor.handlers.gui_window import MainGUIWindow
@@ -31,7 +32,6 @@ from froth_monitor.handlers.gui_window import MainGUIWindow
 from froth_monitor.processing.fm_model import FrameModel
 
 # Import the custom overlay widget
-from froth_monitor.lidar_thread import lidar_data_processor
 from froth_monitor.handlers.overlay_widget import OverlayWidget
 
 # Import the camera and network threads
@@ -39,13 +39,13 @@ from froth_monitor.video_threads.camera_thread import CameraThread
 from froth_monitor.video_threads.network_thread import NetworkThread
 from froth_monitor.lidar_thread.lidar_thread import LidarThread
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
-
+from froth_monitor.air_recovery.air_recovery_data_processor import AirRecoveryDataProcessor
+from froth_monitor.handlers import AlgorithmConfigurationHandler
 from froth_monitor.handlers.realtime_export import RealtimeExporter
 
 # Import the video recorder module
 from froth_monitor.handlers.video_recorder import VideoRecorder
-from froth_monitor.handlers.subhandlers import (
-    AlgorithmConfigurationHandler,
+from froth_monitor.handlers import (
     LidarHandler,
     VideoHandler,
     CalibrationHandler,
@@ -80,7 +80,8 @@ class EventHandler:
 
     def __init__(self, gui: MainGUIWindow):
         self.gui = gui
-        self.handlers_initial_before_overlay_creation()
+        self.initialize_level_one_handlers()
+        self.initialize_level_two_handlers()
 
         # Parameters of the event handling logic
         self.current_frame = None
@@ -88,7 +89,7 @@ class EventHandler:
         self.if_record = False
 
         # Connect GUI signals to handler methods
-        self.connect_signals()
+        self.connect_gui_signals()
         self.initialize_gui_guidance()
         self.update_guidance()
 
@@ -124,108 +125,230 @@ class EventHandler:
                 self.gui._update_guidance("enable_recording")
 
     # ============= Different mode trigger ==============
-    def trigger_normal_mode(self):
+    def start_playing(self):
         self.network_thread.reset()
         self.video_thread = self.camera_thread
         self.video_handler.update_video_thread(self.video_thread)
-        self.initialze_tool_window_n_handlers()
+        self.initialize_level_three_handlers()
         
         if not self.lidar_data_processor.if_lidar:
             self.gui._trigger_normal_mode()
+        
+        self.update_guidance()
 
-    # ============= Step 1: Initialize handlders ==============
-    def handlers_initial_before_overlay_creation(self):
-        self.canvas_width = self.gui.video_canvas_label.width()
-        self.canvas_height = self.gui.video_canvas_label.height()
-
-        # Initialize the frame model for processing video frames
+    # ============= Handler Initialization Pipeline ==============
+    def initialize_level_one_handlers(self) -> None:
+        """Initialize foundational components with no inter-handler dependencies.
+        
+        This level establishes core infrastructure components that other handlers
+        will depend on. These components are stateless or have minimal dependencies,
+        making them safe to initialize first.
+        
+        Components initialized:
+            - FrameModel: Video frame processing and analysis engine
+            - Video threads: Camera, network, and unified video thread management
+            - LiDAR thread:  For depth sensing management
+            - VideoRecorder: Frame capture and storage system
+        
+        Note:
+            This method must be called before initialize_level_two_handlers().
+        """
+        # Core processing model - no dependencies
         self.frame_model = FrameModel()
         self.current_frame_number = 0
 
+        # Hardware interface threads - minimal dependencies
         self.lidar_thread = LidarThread()
-        
-        # Initialize LiDAR data processor and connect signals
-        self.lidar_data_processor = LidarDataProcessor(
-            self, self.lidar_thread
-        )
-        self.lidar_thread.data_available.connect(
-            self.lidar_data_processor.process_lidar_data
-        )
-        
-        # Initialize Air Recovery data processor
-        from froth_monitor.air_recovery.air_recovery_data_processor import AirRecoveryDataProcessor
-        self.air_recovery_data_processor = AirRecoveryDataProcessor(self)
-
-        self.data_handler = DataHandler(self.gui, self.frame_model, self.lidar_data_processor, self.air_recovery_data_processor)
-
-        self.exporter = RealtimeExporter(self.gui)
-        self.exporter.setting_finished.connect(self.finish_export_setting)
-
-        # Overlay related attributes
-        self.overlay_active = False
-        self.video_rect = QRect()
-
-        # Initialize camera thread for event-driven frame capture
         self.camera_thread = CameraThread()
         self.network_thread = NetworkThread()
-
-        self.lidar_handler = LidarHandler(self.lidar_thread, self.lidar_data_processor,
-                                        self.gui, self)
-                                        
-        self.gui.lidar_configuration.clicked.connect(self.lidar_handler.open_lidar_control)
         
-        # Initialize Air Recovery handler
-        self.air_recovery_handler = AirRecoveryHandler(self.air_recovery_data_processor, self.gui, self)
-        self.gui.air_rec_configuration.clicked.connect(self.air_recovery_handler.open_air_recovery_control)
-
+        # Active video source (defaults to camera thread)
         self.video_thread: NetworkThread | CameraThread = \
             cast(NetworkThread | CameraThread, CameraThread())
 
-        # Initialize video recorder
+        # Recording infrastructure
         self.video_recorder = VideoRecorder()
         self.recording_active = False
 
-        # Initialize handlers
-        self.overlay_handler = OverlayHandler(self.gui, self)
-        self.video_handler = VideoHandler(
+    def initialize_level_two_handlers(self) -> None:
+        """Initialize data processors and handlers that depend on Level 1 components.
+        
+        This level creates handlers that require the foundational components from
+        Level 1. These handlers coordinate between data sources, processing logic,
+        and GUI presentation. Signal connections are established to enable
+        event-driven communication.
+        
+        Components initialized:
+            - Data processors: LiDAR, air recovery, and integrated data handling
+            - Control handlers: Video, overlay, LiDAR, and air recovery management
+            - Export infrastructure: Real-time data export to external formats
+        
+        Dependencies:
+            - Requires: frame_model, video threads, lidar_thread
+            - Required by: Level 3 handlers (FrameProcessor, ROIHandler, etc.)
+        
+        Note:
+            This method must be called after initialize_level_one_handlers() and
+            before initialize_level_three_handlers().
+        """
+        # LiDAR data processing pipeline
+        self.lidar_data_processor = LidarDataProcessor(self, self.lidar_thread)
+        self.lidar_thread.data_available.connect(
+            self.lidar_data_processor.process_lidar_data
+        )
+
+        # Air recovery calculation and control
+        self.air_recovery_data_processor = AirRecoveryDataProcessor(self)
+        self.air_recovery_handler = AirRecoveryHandler(
+            self.air_recovery_data_processor, self.gui, self
+        )
+
+        # Integrated data handling and visualization
+        self.data_handler = DataHandler(
             self.gui, 
             self.frame_model, 
-            self.camera_thread, 
+            self.lidar_data_processor, 
+            self.air_recovery_data_processor
+        )
+        
+        # LiDAR control interface
+        self.lidar_handler = LidarHandler(
+            self.lidar_thread, self.lidar_data_processor, self.gui, self
+        )
+
+        # Overlay management (prepares for Level 3 initialization)
+        self.overlay_handler = OverlayHandler(self.gui, self)
+        
+        # Video playback and capture control
+        self.video_handler = VideoHandler(
+            self.frame_model,
+            self.camera_thread,
             self.network_thread,
             self.video_thread
         )
-        self.video_handler.trigger_normal.connect(self.trigger_normal_mode)
+        
+        # Video handler signal routing
+        self.video_handler.camera_selection_requested.connect(self._show_camera_dialog)
+        self.video_handler.file_selection_requested.connect(self._show_file_dialog)
+        self.video_handler.video_started.connect(self._video_started)
+        self.video_handler.video_cannot_resume.connect(self._video_cannot_resume)
+        self.video_handler.playback_state_changed.connect(self._playback_state_changed)
+        self.video_handler.thread_activate.connect(self.start_playing)
 
-    # ============= Step 2: Connect GUI signals to the buttons =============
-    def connect_signals(self):
-        """Connect GUI signals to their respective handler methods."""
+        # Real-time data export infrastructure
+        self.exporter = RealtimeExporter(self.gui)
+        self.exporter.setting_finished.connect(self._finish_export_setting)
 
-        # Connect menu actions directly
-        self.gui.import_button.clicked.connect(self.video_handler.handle_video_import)
-        self.gui.export_button.clicked.connect(self.export_settings)
-
-        # # Connect buttons directly using the gui reference
-        self.gui.play_pause_button.clicked.connect(self.video_handler._pause_play)
-
-        self.gui.algorithm_configuration.clicked.connect(
-            self.open_algorithm_configuration
-        )
-
-        # self.gui.save_button.clicked.connect(self.save_data)
-        self.gui.record_button.clicked.connect(self.toggle_recording)
-        self.gui.simple_reset_button.clicked.connect(self.reset_mission)
-        self.gui.refresh_graph_button.clicked.connect(self.data_handler.clear_display_history)
-
-    def initialze_tool_window_n_handlers(self):
-        if not self.video_handler.playing:  # Access playing state from VideoHandler
+    def initialize_level_three_handlers(self) -> None:
+        """Initialize UI-dependent handlers that require active video playback.
+        
+        This level creates handlers that depend on the overlay widget and active
+        video stream. These components facilitate user interaction with live video,
+        including ROI definition, calibration, and frame processing. This method
+        is called dynamically when video playback starts.
+        
+        Components initialized:
+            - CalibrationHandler: Spatial calibration and measurement tools
+            - ROIHandler: Region of interest creation and management
+            - FrameProcessor: Real-time frame processing and display pipeline
+        
+        Dependencies:
+            - Requires: overlay_widget (created by overlay_handler)
+            - Requires: Active video stream (video_handler.playing == True)
+            - Requires: All Level 1 and Level 2 handlers
+        
+        Signal Routing:
+            Establishes connections between overlay interactions, calibration
+            actions, and ROI management for coordinated user workflow.
+        
+        Note:
+            This method is called from start_playing() when video begins.
+            It will abort if video is not actively playing.
+        
+        Raises:
+            Logs info message and returns early if video is not playing.
+        """
+        # Guard: Ensure video is actively playing before creating UI handlers
+        if not self.video_handler.playing:
             logger.info("Video is not playing, cannot initialize tool window.")
             return
 
+        # Create overlay widget for video interaction layer
         self.overlay_handler.initialize_tool_window()
         self.overlay_widget = self.overlay_handler.overlay_widget
 
-        self.handlers_initial_after_overlay_creation()
-        self.update_guidance()
+        # Spatial calibration and measurement system
+        self.calibration_handler = CalibrationHandler(
+            self.gui, self.frame_model, self.overlay_widget
+        )
+        self.calibration_handler.calibration_confirmed.connect(self.update_guidance)
+        
+        # Region of interest management
+        self.roi_handler = ROIHandler(
+            self, self.gui, self.frame_model, self.video_thread, self.overlay_widget
+        )
+
+        # Real-time frame processing pipeline
+        self.frame_processor = FrameProcessor(
+            self,
+            self.gui,
+            self.frame_model,
+            self.video_thread,
+            self.overlay_widget,
+            self.video_recorder,
+            self.roi_handler,
+            self.data_handler,
+        )
+        
+        # Frame processor state synchronization
+        self.video_handler.playback_state_changed.connect(
+            self.frame_processor.set_playback_state
+        )
+        self.video_thread.frame_available.connect(
+            self.frame_processor.process_new_frame
+        )
+
+        # Calibration workflow signal routing
+        self.overlay_widget.ruler_measured.connect(
+            self.calibration_handler.handle_ruler_measurement
+        )
+        self.overlay_widget.arrow_drawn.connect(
+            self.calibration_handler.handle_arrow_drawing
+        )
+
+        # ROI creation signal routing
+        self.overlay_widget.roi_created.connect(
+            self.roi_handler.handle_roi_created
+        )
+
+        self.gui.confirm_arrow_button.clicked.connect(self.calibration_handler.confirm_arrow_n_ruler)
+        self.gui.add_arrow_button.clicked.connect(self.calibration_handler.start_arrow_drawing)
+        self.gui.calibration_button.clicked.connect(self.calibration_handler.start_ruler_calibration)
+        self.gui.delete_roi_button.clicked.connect(self.roi_handler.delete_last_roi)
+        self.gui.add_roi_button.clicked.connect(self.roi_handler.add_roi)
+        
+  # Connect to the signal emitted by OverlayWidget
+
+    # ============= Step 2: Connect GUI signals to the buttons =============
+    def connect_gui_signals(self):
+        """Connect GUI signals to their respective handler methods."""
+
+        # Connect menu actions 
+        self.gui.import_button.clicked.connect(self._on_import_button_clicked)
+        self.gui.export_button.clicked.connect(self.export_settings)
+
+        # Connect left panel buttons
+        self.gui.algorithm_configuration.clicked.connect(self.open_algorithm_configuration)
+        self.gui.record_button.clicked.connect(self.toggle_recording)
+        self.gui.simple_reset_button.clicked.connect(self.reset_mission)
+
+        # Connect central panel buttons
+        self.gui.play_pause_button.clicked.connect(self.video_handler._pause_play)
+        self.gui.refresh_graph_button.clicked.connect(self.data_handler.clear_display_history)
+
+        # Connect right panel buttons
+        self.gui.lidar_configuration.clicked.connect(self.lidar_handler.open_lidar_control)
+        self.gui.air_rec_configuration.clicked.connect(self.air_recovery_handler.open_air_recovery_control)
 
     def disconnect_signals(self):
         # Connect menu actions directly
@@ -267,58 +390,97 @@ class EventHandler:
 
         self.gui.refresh_graph_button.clicked.disconnect(self.data_handler.clear_display_history)
 
-    def handlers_initial_after_overlay_creation(self):
-        """
-        Initialize the event handlers after the overlay widget is created.
-        """
+    def reset_signals(self):
+        self.gui.export_button.clicked.connect(self.export_settings)
 
-        self.calibration_handler = CalibrationHandler(
-            self.gui, self.frame_model, self.overlay_widget
-        )
-        self.calibration_handler.calibration_confirmed.connect(
-            self.update_guidance
-        )
-        self.roi_handler = ROIHandler(
-            self, self.gui, self.frame_model, self.video_thread, self.overlay_widget
-        )
-        self.frame_processor = FrameProcessor(
-            self,
-            self.gui,
-            self.frame_model,
-            self.video_thread,
-            self.overlay_widget,
-            self.video_recorder,
-            self.roi_handler,
-            self.data_handler,
-        )  
-
-        self.video_thread.frame_available.connect(
-            self.frame_processor.process_new_frame
+        # # Connect buttons directly using the gui reference
+        self.gui.play_pause_button.clicked.connect(self.video_handler._pause_play)
+        self.gui.algorithm_configuration.clicked.connect(
+            self.open_algorithm_configuration
         )
 
-        self.gui.confirm_arrow_button.clicked.connect(
-            self.calibration_handler.confirm_arrow_n_ruler
-        )
-        self.gui.add_arrow_button.clicked.connect(
-            self.calibration_handler.start_arrow_drawing
-        )
-        self.gui.calibration_button.clicked.connect(
-            self.calibration_handler.start_ruler_calibration
-        )
-        self.overlay_widget.ruler_measured.connect(
-            self.calibration_handler.handle_ruler_measurement
-        )
-        self.overlay_widget.arrow_drawn.connect(
-            self.calibration_handler.handle_arrow_drawing
-        )
+        # self.gui.save_button.clicked.connect(self.save_data)
+        self.gui.record_button.clicked.connect(self.toggle_recording)
+        self.gui.simple_reset_button.clicked.connect(self.reset_mission)
+        self.gui.refresh_graph_button.clicked.connect(self.data_handler.clear_display_history)
 
-        self.gui.add_roi_button.clicked.connect(self.roi_handler.add_roi)
-        self.overlay_widget.roi_created.connect(
-            self.roi_handler.handle_roi_created
-        )  # Connect to the signal emitted by OverlayWidget
-        self.gui.delete_roi_button.clicked.connect(self.roi_handler.delete_last_roi)
+    # ============= Video Handlers signal and related GUI interaction =============
+    def _resource_path(self,relative_path):
+        if hasattr(sys, "_MEIPASS"):
+            return os.path.join(sys._MEIPASS, relative_path)  # type: ignore
+        return relative_path
 
-    def finish_export_setting(self):
+    def _on_import_button_clicked(self):
+        """Handle import button click by reading GUI state and calling handler."""
+        if self.gui.webcam_radio.isChecked():
+            self.video_handler.handle_video_import("webcam")
+        elif self.gui.prerecorded_radio.isChecked():
+            self.video_handler.handle_video_import("file")
+
+    def _show_camera_dialog(self):
+        """Show camera selection dialog and pass result to video handler."""
+        # Detect available cameras
+        available_cameras = []
+        for index in range(10):
+            cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                available_cameras.append(f"Camera {index}")
+                cap.release()
+        
+        if not available_cameras:
+            QMessageBox.critical(self.gui, "Error", "No cameras detected!")
+            return
+        
+        # Show dialog
+        dialog = QDialog(self.gui)
+        dialog.setWindowTitle("Select Camera")
+        layout = QVBoxLayout(dialog)
+        
+        camera_combo = QComboBox(dialog)
+        camera_combo.addItems(available_cameras)
+        layout.addWidget(camera_combo)
+        
+        confirm_button = QPushButton("Load Camera", dialog)
+        confirm_button.clicked.connect(dialog.accept)
+        layout.addWidget(confirm_button)
+        
+        # If user confirms, pass the selected camera to VideoHandler
+        if dialog.exec():
+            selected_camera = camera_combo.currentText()
+            camera_index = int(selected_camera.split(" ")[1])
+            self.video_handler.load_camera(camera_index)
+
+    def _show_file_dialog(self):
+        """Show file selection dialog and pass result to video handler."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self.gui, 
+            "Open Video File", 
+            "", 
+            "Video Files (*.mp4 *.avi *.mkv)"
+        )
+        
+        if file_path:
+            self.video_handler.load_video_file(file_path)
+
+    def _playback_state_changed(self, state):
+        if state:
+            self.gui.statusBar().showMessage("Video playing")
+            self.gui.play_pause_button.setIcon(
+                QIcon(self._resource_path("froth_monitor/resources/play_icon.ico"))
+            )
+        else:
+            self.gui.statusBar().showMessage("Video paused")
+            self.gui.play_pause_button.setIcon(
+                QIcon(self._resource_path("froth_monitor/resources/pause_icon.ico"))
+            )
+
+    def _video_cannot_resume(self):
+        QMessageBox.warning(self.gui, "Warning", "Cannot resume video!")
+
+    def _video_started(self):
+        self.gui.statusBar().showMessage("Video started")
+
+    def _finish_export_setting(self):
 
         self.frame_model.load_exporter(self.exporter)
         self.data_handler.load_exporter(self.exporter)
@@ -376,7 +538,7 @@ class EventHandler:
 
             if success:
                 self.recording_active = False
-                self.gui.record_button.setText("  Video Recording")
+                self.gui.record_button.setText("  Start Video Recording")
                 self.gui.record_button.setStyleSheet(
                     "QPushButton {\
                         background-color: red; color: white; font-size: 15px; \
@@ -398,14 +560,7 @@ class EventHandler:
 
         # Reset video handler
         # self.video_handler = cast(VideoHandler, None)
-        self.video_handler = VideoHandler(
-            self.gui, 
-            self.frame_model, 
-            self.camera_thread, 
-            self.network_thread,
-            self.video_thread
-        )
-        self.video_handler.trigger_normal.connect(self.trigger_normal_mode)
+        self.video_handler.reset()
 
     def reset_mission(self):
         """Reset the application for a new mission."""
@@ -425,13 +580,11 @@ class EventHandler:
             # The X button will return QMessageBox.StandardButton.No by default
             if reply != QMessageBox.StandardButton.Yes:
                 return  # Exit the function without resetting
-
-        # If we get here, either data was saved or user confirmed reset
-        QMessageBox.information(self.gui, "Info", "Application reset for new mission.")
     
         self.if_save = False
         self.calibration_handler.confirm_calibration = False
         self.current_frame_number = 0
+        self.exporter.stop_session()
         
         self.gui.video_canvas_label.clear()
         self.gui.plot_widget.clear()
@@ -442,9 +595,12 @@ class EventHandler:
         logger.info("Initializing handlers...")
         self.reset_handlers()
         logger.info("Connecting Signals...")
-        self.connect_signals()
+        self.reset_signals()
         logger.info("Updating Guidance...")
         self.update_guidance()
+
+        # If we get here, either data was saved or user confirmed reset
+        QMessageBox.information(self.gui, "Info", "Application reset for new mission.")
 
     def toggle_recording(self):
         """Start or stop video recording."""
@@ -521,7 +677,7 @@ class EventHandler:
 
             if success:
                 self.recording_active = False
-                self.gui.record_button.setText("  Video Recording")
+                self.gui.record_button.setText("  Start Video Recording")
                 self.gui.record_button.setStyleSheet(
                     "QPushButton {\
                         background-color: red; color: white; font-size: 15px; \

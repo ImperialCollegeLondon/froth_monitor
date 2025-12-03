@@ -107,6 +107,24 @@ class VideoAnalysis:
             poly_sigma=1.5,
         )
 
+        # Initialize DIS Optical Flow
+        self.dis_preset = "Medium"
+        self.dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+
+    def set_dis_preset(self, preset: str):
+        if preset == self.dis_preset:
+            return
+            
+        self.dis_preset = preset
+        if preset == "Ultra Fast":
+            val = cv2.DISOPTICAL_FLOW_PRESET_ULTRAFAST
+        elif preset == "Fast":
+            val = cv2.DISOPTICAL_FLOW_PRESET_FAST
+        else: # Medium
+            val = cv2.DISOPTICAL_FLOW_PRESET_MEDIUM
+            
+        self.dis = cv2.DISOpticalFlow_create(val)
+
     def analyze(self, current_frame: np.ndarray) -> tuple[float, float]:
         if self.previous_frame is None:
             self.previous_frame = current_frame
@@ -204,6 +222,27 @@ class VideoAnalysis:
 
             else:
                 avg_flow_x, avg_flow_y = 0.0, 0.0
+
+        elif self.current_algorithm == "DIS":
+            flow = self.dis.calc(gray_previous, gray_current, None)
+            
+            flow_x = flow[..., 0]
+            flow_y = flow[..., 1]
+            
+            # Filter out invalid values before calculating mean
+            valid_flow_x = flow_x[np.isfinite(flow_x)]
+            valid_flow_y = flow_y[np.isfinite(flow_y)]
+            
+            if len(valid_flow_x) > 0:
+                avg_flow_x = sanitize_flow_value(np.mean(valid_flow_x))
+            else:
+                avg_flow_x = 0.0
+                
+            if len(valid_flow_y) > 0:
+                avg_flow_y = sanitize_flow_value(np.mean(valid_flow_y))
+            else:
+                avg_flow_y = 0.0
+
         else:
             raise ValueError(f"Unknown algorithm: {self.current_algorithm}")
 

@@ -207,7 +207,6 @@ class OverlayWidget(QWidget):
                     painter.drawText(text_x, text_y, f"{self.arrow_angle:.1f}°")
 
         elif self.if_algo_config:
-            print("algo config draw")
             self.drawROI_algo(painter)
 
         else:
@@ -388,7 +387,6 @@ class OverlayWidget(QWidget):
         self.drawing_ruler = False
         self.arrow_start_point = QPoint()
         self.arrow_end_point = QPoint()
-        print(self.arrow_start_point, self.arrow_end_point)
         self.arrow_angle = 0.0
 
     def reset_arrow_mode(self):
@@ -592,42 +590,47 @@ class OverlayWidget(QWidget):
 
         painter.setPen(QPen(QColor(255, 255, 255, 230)))  # White with 90% opacity
 
-        # Draw the moving cross based on delta_pixels if available
-        if self.algo_delta_pixels is not None:
-            delta_x, delta_y = self.algo_delta_pixels
+        if self.algo_delta_pixels is not (None, None):
+            
+            try: 
+                delta_x, delta_y = self.algo_delta_pixels
 
-            if self.algo_delta_cross_pos == (None, None):
-                self.algo_delta_cross_pos = int(x1 + x2 // 2), int(y1 + y2 // 2)
+                if self.algo_delta_cross_pos == (None, None):
+                    self.algo_delta_cross_pos = int(x1 + x2 // 2), int(y1 + y2 // 2)
 
-            # Calculate the new position for the cross
-            cross_x, cross_y = self.algo_delta_cross_pos
-            cross_x += int(delta_x)
-            cross_y += int(delta_y)
+                # Calculate the new position for the cross
+                cross_x, cross_y = self.algo_delta_cross_pos
+                cross_x += int(delta_x)
+                cross_y += int(delta_y)
 
-            # Ensure the cross is within the ROI boundaries
-            if cross_x < x1:
-                cross_x += width
-            if cross_y < y1:
-                cross_y += height
-            if cross_x >= x1 + x2:
-                cross_x -= width
-            if cross_y >= y1 + y2:
-                cross_y -= height
+                # Ensure the cross is within the ROI boundaries
+                if cross_x < x1:
+                    cross_x += width
+                if cross_y < y1:
+                    cross_y += height
+                if cross_x >= x1 + x2:
+                    cross_x -= width
+                if cross_y >= y1 + y2:
+                    cross_y -= height
 
-            # Draw the cross with a bright color
-            painter.setPen(
-                QPen(QColor(255, 50, 50, 230), 2)
-            )  # Red with 90% opacity, 2px width
+                # Draw the cross with a bright color
+                painter.setPen(
+                    QPen(QColor(255, 50, 50, 230), 2)
+                )  # Red with 90% opacity, 2px width
 
-            # Draw horizontal line of the cross (spanning the full width of ROI)
-            painter.drawLine(x1, cross_y, x1 + x2, cross_y)
+                # Draw horizontal line of the cross (spanning the full width of ROI)
+                painter.drawLine(x1, cross_y, x1 + x2, cross_y)
 
-            # # Draw vertical line of the cross (spanning the full height of ROI)
-            painter.drawLine(cross_x, y1, cross_x, y1 + y2)
+                # # Draw vertical line of the cross (spanning the full height of ROI)
+                painter.drawLine(cross_x, y1, cross_x, y1 + y2)
 
-            self.algo_delta_cross_pos = cross_x, cross_y
-            print(self.algo_delta_cross_pos)
-            print(x1, y1, x2, y2)
+                self.algo_delta_cross_pos = cross_x, cross_y
+                # print(self.algo_delta_cross_pos)
+                # print(x1, y1, x2, y2)
+            
+            except Exception as e:
+                print(f"Error in drawROI_algo: {e}")
+
 
     def reset(self) -> None:
         """
