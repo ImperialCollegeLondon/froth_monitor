@@ -33,11 +33,12 @@ print(f"Processing frame {frame_number}")
 ```
 """
 
+import math  # For trigonometric calculations in velocity projection
 import numpy as np
 import time
 import cv2
 import threading
-from typing import cast
+from typing import Any
 from datetime import datetime
 from PySide6.QtCore import QRect
 from froth_monitor.processing.image_analysis import VideoAnalysis
@@ -48,42 +49,114 @@ from froth_monitor.handlers.realtime_export import RealtimeExporter
 # Initialize logger for this module
 logger = get_logger(__name__)
 
+
+class ROIConstants:
+    """Configuration constants for ROI processing."""
+    AVERAGE_VELOCITY_WINDOW_SIZE = 30  # Samples for rolling average
+    TIMESTAMP_PRECISION = 8  # HH:MM:SS format length
+    MAX_VALID_DELTA = 1e6  # Maximum valid delta/velocity
+    DEFAULT_PX2MM = 1.0
+    DEFAULT_DEGREE = -90.0
+
+
+
 class ROI:
-    def __init__(self, roi_coordinate: QRect, px2mm, degree) -> None:
-        self.coordinate = roi_coordinate
+    """Region of Interest for Optical Flow Analysis.
+    
+    Manages optical flow velocity calculations with coordinate transformations,
+    velocity accumulation, and historical data tracking.
+    """
+    
+    def __init__(self, px2mm: float, degree: float) -> None:
+        """Initialize ROI with calibration parameters."""
+        self._init_coordinates()
+        self._init_optical_flow()
+        self._init_calibration(px2mm, degree)
+        self._init_history_tracking()
+        self._init_timestamps()
+        
+        logger.debug(f"ROI initialized: px2mm={px2mm}, degree={degree}")
+    
+    # ============ Initialization Helpers ============
+    
+    def _init_coordinates(self) -> None:
+        """Initialize coordinate system."""
+        self.display_coordinate: tuple[int, int, int, int] | None = None
+        self.processing_coordinate: tuple[int, int, int, int] | None = None
+        self.coordinate: tuple[int, int, int, int] | None = None
+    
+    def _init_optical_flow(self) -> None:
+        """Initialize optical flow components."""
         self.analysis = VideoAnalysis(0, 0)
+        self.delta_pixels: tuple[float, float] | None = (0.0, 0.0)
+        self.cross_position: Any | None = None
+        self.matcher: Any | None = None
+    
+    def _init_calibration(self, px2mm: float, degree: float) -> None:
+        """Initialize calibration parameters."""
+        if px2mm <= 0:
+            raise ValueError(f"px2mm must be positive, got {px2mm}")
+        
         self.id = 0
-
-        self.delta_pixels = (cast(float, None), cast(float, None))
-        self.cross_position = None
-
-        self.delta_history = []
-        # timestamp, delta_pixels, calibrated_delta
-
-        self.sum_history = []
-        # timestamp, velocity, froth_height, air_recovery, air flow rate, crcted air flrt
-        self.sum_history_for_display = []
-
-        self.arrow_dir = 0.0
         self.px2mm = px2mm
         self.mm2px = 1 / px2mm
         self.degree = degree
-
-        # Initialize timestamp
+        self.arrow_dir = 0.0
+    
+    def _init_history_tracking(self) -> None:
+        """Initialize history tracking lists."""
+        self.delta_history: list = []
+        self.sum_history: list = []
+        self.velo_history: list[float] = []
+        self.velo_history_with_time: list = []
+        self.current_velocity = 0.0
+        self.average_velocity_past_30s: float | None = None
+    
+    def _init_timestamps(self) -> None:
+        """Initialize timestamp tracking."""
         self.timestamp = time.strftime("%H:%M:%S", time.localtime())
         self.timestamp_buffer = self.timestamp
-        self.current_velocity = 0.0
-        self.velo_only_history = []
-        self.velo_only_history_for_display = []
-
-        self.velo_history_with_time = []
+    
+    # ============ Properties for Backward Compatibility ============
+    
+    @property
+    def velo_only_history(self) -> list[float]:
+        """Alias for velo_history."""
+        return self.velo_history
+    
+    @property
+    def velo_only_history_for_display(self) -> list[float]:
+        """DEPRECATED: Use velo_history directly."""
+        return self.velo_history
+    
+    @property
+    def sum_history_for_display(self) -> list:
+        """DEPRECATED: Use sum_history directly."""
+        return self.sum_history
+    
+    # ============ Validation Helpers ============
+    
+    def _is_valid_delta(self, value: float) -> bool:
+        """Check if delta value is valid and finite."""
+        return np.isfinite(value) and abs(value) < ROIConstants.MAX_VALID_DELTA
+    
+    def _sanitize_delta(self, value: float) -> float:
+        """Sanitize delta, returning 0.0 if invalid."""
+        return value if self._is_valid_delta(value) else 0.0
+    
+    # ============ Coordinate Management ============
+    
+    def set_display_coordinate(self, display_coord: tuple[int, int, int, int]) -> None:
+        self.display_coordinate = display_coord
+    
+    def set_processing_coordinate(self, proc_coord: tuple[int, int, int, int]) -> None:
+        """Set coordinates for processing space and update active coordinate.
         
-
-        self.average_velocity_past_30s = cast(float, None)
-        self.matcher = None
-
-        # Initialize delta filter
-        # self.delta_filter = DeltaFilter(max_history_size=1000)
+        Args:
+            proc_coord: (x, y, width, height) in processing resolution
+        """
+        self.processing_coordinate = proc_coord
+        self.coordinate = proc_coord  # Processing uses this coordinate
     
     def update_id(self, id: int):
         self.id = id
@@ -189,8 +262,7 @@ class ROI:
             if not np.isfinite(velocity_to_append) or abs(velocity_to_append) > 1e6:
                 velocity_to_append = 0.0
             
-            self.velo_only_history.append(velocity_to_append)
-            self.velo_only_history_for_display.append(velocity_to_append)
+            self.velo_history.append(velocity_to_append)
             self.velo_history_with_time.append([velocity_to_append, self.timestamp, time.time()])
             self.current_velocity = delta
             return True
@@ -230,13 +302,13 @@ class ROI:
         elif algorithm == "DIS":
             self.analysis.set_dis_preset(params.get("preset", "Medium"))
 
-    def update_sum_history(self, list):
-        self.sum_history.append(list)
-        self.sum_history_for_display.append(list)
+    def update_sum_history(self, data: list) -> None:
+        """Append data to summary history."""
+        self.sum_history.append(data)
 
-    def clear_display_history(self):
-        self.sum_history_for_display = []
-        self.velo_only_history_for_display = []
+    def clear_display_history(self) -> None:
+        """Clear display history - no-op since properties are views."""
+        pass  # Properties are views of main lists
 
 class FrameModel:
     """
@@ -271,7 +343,7 @@ class FrameModel:
         """
         self.frame_count = 0
 
-        self.exporter: RealtimeExporter = cast(RealtimeExporter, None)
+        self.exporter: RealtimeExporter | None = None
 
         self.roi_list = []
         self.last_processed_time = None
@@ -407,12 +479,15 @@ class FrameModel:
 
     def initialize_algo_config(self):
         roi = QRect(0, 0, 0, 0)
-        self.algo_roi = ROI(roi, 1, 1)
+        self.algo_roi = ROI(1, 1)
+        self.algo_roi.set_processing_coordinate(roi) # type: ignore
         self.algo_roi.get_algorithm_n_params(self.current_algorithm, self.of_params)
 
-    def process_frame_for_algo_config(self, frame: np.ndarray) -> tuple[float, float]:
+    def process_frame_for_algo_config(self, frame: np.ndarray) -> tuple[float, float] | None:
+        """Process frame for algorithm configuration."""
         self.algo_roi.process_frame(frame)
         return self.algo_roi.delta_pixels
+
 
     def get_frame_count(self) -> int:
         """
@@ -453,12 +528,13 @@ class FrameModel:
 
         # pixels of 20mm
         self.px2mm = px_ratio
+        logger.info(f"Frame model: px2mm set as: {self.px2mm}")
 
     def get_overflow_direction(self, degree: float) -> None:
         self.degree = degree
 
-    def add_roi(self, roi):
-        new_roi = ROI(roi, self.px2mm, self.degree)
+    def add_roi(self):
+        new_roi = ROI(self.px2mm, self.degree)
         
         # Select the correct parameters based on the current algorithm
         if self.current_algorithm == "Farneback":
@@ -477,6 +553,8 @@ class FrameModel:
         if self.exporter is not None:
             self.exporter.create_roi_sheets(len(self.roi_list))
 
+        return new_roi
+        
     def delete_last_roi(self):
         """
         Delete the last ROI from the roi_list and release its memory.

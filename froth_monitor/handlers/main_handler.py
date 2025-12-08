@@ -93,7 +93,7 @@ class EventHandler:
         self.initialize_gui_guidance()
         self.update_guidance()
 
-    # ============= Step 3: GUI guidance =============
+    # ============= GUI guidance =============
     def initialize_gui_guidance(self):
         self.step_import = False
         self.step_algo_config = False
@@ -235,6 +235,11 @@ class EventHandler:
         self.video_handler.playback_state_changed.connect(self._playback_state_changed)
         self.video_handler.thread_activate.connect(self.start_playing)
 
+        # Frame resampling configuration (decouples processing from display resolution)
+        from froth_monitor.handlers.frame_resample_handler import FrameResampleHandler
+        self.frame_resample_handler = FrameResampleHandler()
+        logger.info(f"MainHandler: FrameResampleHandler initialized with {self.frame_resample_handler.current_preset.value} preset")
+
         # Real-time data export infrastructure
         self.exporter = RealtimeExporter(self.gui)
         self.exporter.setting_finished.connect(self._finish_export_setting)
@@ -275,29 +280,82 @@ class EventHandler:
 
         # Create overlay widget for video interaction layer
         self.overlay_handler.initialize_tool_window()
-        self.overlay_widget = self.overlay_handler.overlay_widget
+        self.overlay_widget = self.overlay_handler.overlay_widget  # Get overlay widget reference
+        
+        # Real-time frame processing pipeline
+        # Create display manager for GUI operations
+        from froth_monitor.handlers.frame_display_manager import FrameDisplayManager
+        self.display_manager = FrameDisplayManager(
+            self.gui.video_canvas_label,
+            self.gui.statusBar(),
+            self.overlay_widget
+        )
 
         # Spatial calibration and measurement system
         self.calibration_handler = CalibrationHandler(
-            self.gui, self.frame_model, self.overlay_widget
+            self.gui.px2mm_result_textbox.text(),
+            self.gui.px2mm_spinbox.value(), 
+            self.gui.direction_textbox.text(), 
+            self.frame_resample_handler.source_resolution,  # For source resolution
+            self.display_manager.get_video_dimensions(),
+            self.frame_resample_handler.custom_scale
         )
+        self.display_manager.first_frame_ready.connect(self.calibration_handler.update_overlay_res)
+        self.frame_resample_handler.resolution_changed.connect(self.calibration_handler.update_source_res)
+        self.frame_resample_handler.scale_changed.connect(self.calibration_handler.update_scale_factor)
+        self.calibration_handler.ruler_draw_start.connect(self.overlay_widget.ruler_calibration)
+        self.calibration_handler.arrow_draw_start.connect(self.overlay_widget.start_arrow_drawing)
+        self.calibration_handler.release_px2mm.connect(self.frame_model.get_px_to_mm)
+        self.calibration_handler.release_arrow_direction.connect(self.frame_model.get_overflow_direction)
+        self.gui.px2mm_result_textbox.textChanged.connect(self.calibration_handler.update_display_px2mm)
+        self.gui.px2mm_spinbox.valueChanged.connect(self.calibration_handler.update_distance_mm)
+        self.gui.direction_textbox.textChanged.connect(self.calibration_handler.update_arrow_direction)
+        self.calibration_handler.status_message.connect(self._status_message)
+        self.calibration_handler.message_box.connect(self._message_box)
+        self.calibration_handler.warning_box.connect(self._warning_box)
         self.calibration_handler.calibration_confirmed.connect(self.update_guidance)
-        
+        self.calibration_handler.set_textbox_px2mm.connect(self.gui.px2mm_result_textbox.setText)
+        self.calibration_handler.set_textbox_arrow_direction.connect(self.gui.direction_textbox.setText)
+        self.overlay_widget.ruler_measured.connect(self.calibration_handler.handle_ruler_measurement)
+        self.overlay_widget.arrow_drawn.connect(self.calibration_handler.handle_arrow_drawing)
+
+
         # Region of interest management
         self.roi_handler = ROIHandler(
-            self, self.gui, self.frame_model, self.video_thread, self.overlay_widget
+            display_res=self.display_manager.get_video_dimensions(),
+            processing_res=self.frame_resample_handler.processing_resolution,
+            video_running=self.video_thread.is_running()
         )
-
-        # Real-time frame processing pipeline
+        
+        # Dynamic resolution/state updates
+        self.display_manager.first_frame_ready.connect(self.roi_handler.update_display_res)
+        self.frame_resample_handler.resolution_changed.connect(self.roi_handler.update_processing_res)
+        # Note: Video thread state is tracked via is_running() checks rather than signals
+        # as CameraThread/NetworkThread don't expose started/stopped signals
+        
+        # ROI drawing workflow
+        self.roi_handler.roi_draw_start.connect(self.overlay_widget.start_roi_drawing)
+        self.overlay_widget.roi_created.connect(self.roi_handler.handle_roi_created)
+        
+        # ROI data flow
+        self.roi_handler.roi_added.connect(self._handle_roi_data)
+        self.roi_handler.roi_deleted.connect(self.frame_model.delete_last_roi)
+        
+        # UI updates
+        self.roi_handler.request_overlay_update.connect(self.overlay_widget.update)
+        
+        # User feedback
+        self.roi_handler.status_message.connect(self._status_message)
+        self.roi_handler.warning_box.connect(self._warning_box)
+        
         self.frame_processor = FrameProcessor(
-            self,
-            self.gui,
             self.frame_model,
             self.video_thread,
-            self.overlay_widget,
             self.video_recorder,
             self.roi_handler,
             self.data_handler,
+            self.frame_resample_handler,
+            self.display_manager,
         )
         
         # Frame processor state synchronization
@@ -308,26 +366,44 @@ class EventHandler:
             self.frame_processor.process_new_frame
         )
 
-        # Calibration workflow signal routing
-        self.overlay_widget.ruler_measured.connect(
-            self.calibration_handler.handle_ruler_measurement
-        )
-        self.overlay_widget.arrow_drawn.connect(
-            self.calibration_handler.handle_arrow_drawing
-        )
-
         # ROI creation signal routing
-        self.overlay_widget.roi_created.connect(
-            self.roi_handler.handle_roi_created
-        )
+        # self.overlay_widget.roi_created.connect(
+        #     self.roi_handler.handle_roi_created
+        # )
 
         self.gui.confirm_arrow_button.clicked.connect(self.calibration_handler.confirm_arrow_n_ruler)
         self.gui.add_arrow_button.clicked.connect(self.calibration_handler.start_arrow_drawing)
         self.gui.calibration_button.clicked.connect(self.calibration_handler.start_ruler_calibration)
         self.gui.delete_roi_button.clicked.connect(self.roi_handler.delete_last_roi)
         self.gui.add_roi_button.clicked.connect(self.roi_handler.add_roi)
+
+    def _finish_export_setting(self):
         
-  # Connect to the signal emitted by OverlayWidget
+        self.calibration_handler.update_export_status(True)
+        self.calibration_handler.release_export_data.connect(self.exporter.write_calibration_data)
+        self.frame_model.load_exporter(self.exporter)
+        self.data_handler.load_exporter(self.exporter)
+        self.lidar_data_processor.load_exporter(self.exporter)
+        self.update_guidance()
+    
+    def _handle_roi_data(self, display_coords, proc_coords):
+        """Handle ROI creation by adding to FrameModel.
+        
+        Called when ROIHandler emits roi_added signal after coordinate transformation.
+        
+        Args:
+            display_coords (tuple): Display coordinates (x, y, width, height)
+            proc_coords (tuple): Processing coordinates (x, y, width, height)
+        """
+        # Add ROI to FrameModel
+        roi = self.frame_model.add_roi()
+        roi.set_display_coordinate(display_coords)
+        roi.set_processing_coordinate(proc_coords)
+        
+        logger.info(
+            f"MainHandler: ROI added to FrameModel - "
+            f"Display: {display_coords}, Processing: {proc_coords}"
+        )
 
     # ============= Step 2: Connect GUI signals to the buttons =============
     def connect_gui_signals(self):
@@ -464,30 +540,31 @@ class EventHandler:
 
     def _playback_state_changed(self, state):
         if state:
-            self.gui.statusBar().showMessage("Video playing")
-            self.gui.play_pause_button.setIcon(
-                QIcon(self._resource_path("froth_monitor/resources/play_icon.ico"))
-            )
-        else:
-            self.gui.statusBar().showMessage("Video paused")
+            self._status_message("Video playing")
             self.gui.play_pause_button.setIcon(
                 QIcon(self._resource_path("froth_monitor/resources/pause_icon.ico"))
+            )
+        else:
+            self._status_message("Video paused")
+            self.gui.play_pause_button.setIcon(
+                QIcon(self._resource_path("froth_monitor/resources/play_icon.ico"))
             )
 
     def _video_cannot_resume(self):
         QMessageBox.warning(self.gui, "Warning", "Cannot resume video!")
 
     def _video_started(self):
-        self.gui.statusBar().showMessage("Video started")
+        self._status_message("Video started")
 
-    def _finish_export_setting(self):
+    def _message_box(self, message):
+        QMessageBox.information(self.gui, "Information", message)
+    
+    def _status_message(self, message):
+        self.gui.statusBar().showMessage(message)
 
-        self.frame_model.load_exporter(self.exporter)
-        self.data_handler.load_exporter(self.exporter)
-        self.calibration_handler.load_exporter(self.exporter)
-        self.lidar_data_processor.load_exporter(self.exporter)
-        self.update_guidance()
-
+    def _warning_box(self, message):
+        QMessageBox.warning(self.gui, "Warning", message)
+    
     def open_algorithm_configuration(self):
         """
         Open a dialog to configure the velocity calculation algorithm.
@@ -561,6 +638,7 @@ class EventHandler:
         # Reset video handler
         # self.video_handler = cast(VideoHandler, None)
         self.video_handler.reset()
+        self.frame_processor.cleanup()
 
     def reset_mission(self):
         """Reset the application for a new mission."""

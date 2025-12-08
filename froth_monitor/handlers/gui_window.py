@@ -43,8 +43,10 @@ class MainGUIWindow(QMainWindow):
         """
         super(MainGUIWindow, self).__init__()
         self.setWindowTitle("Froth Monitor")
-        self.setMinimumSize(800, 600)
-        self.resize(1200, 800)  # Default size, but resizable
+        # Set minimum and default window size
+        # Minimum: Left panel (250px) + Video container (700px) + Right table (~350px) + margins (~50px) = ~1350px
+        self.setMinimumSize(1350, 700)  # Ensures all UI elements are visible
+        self.resize(1400, 850)  # Default size for comfortable viewing
         # self.showMaximized()
         self.setStyleSheet("background-color: #f0f0f0;")
         self._create_stylesheets()
@@ -389,18 +391,18 @@ class MainGUIWindow(QMainWindow):
             QGroupBox: The video source group box with radio buttons.
         """
         source_group = QGroupBox("Video Source")
-        source_group.setStyleSheet("font-weight: bold; font-size: 15px; color: black")
+        source_group.setStyleSheet("font-weight: bold; font-size: 15px; color: black; background-color: transparent;")
         source_layout = QVBoxLayout(source_group)
         source_layout.setSpacing(10)
 
         # Radio buttons for video source
         self.webcam_radio = QRadioButton("Webcam")
         self.webcam_radio.setStyleSheet(
-            "font-weight: normal; font-size: 12px; color: black"
+            "font-weight: normal; font-size: 12px; color: black; background-color: transparent;"
         )
         self.prerecorded_radio = QRadioButton("Pre-recorded")
         self.prerecorded_radio.setStyleSheet(
-            "font-weight: normal; font-size: 12px; color: black"
+            "font-weight: normal; font-size: 12px; color: black; background-color: transparent;"
         )
         self.webcam_radio.setChecked(True)
 
@@ -632,11 +634,23 @@ class MainGUIWindow(QMainWindow):
         self.video_container.setStyleSheet(
             "background-color: #333333; border-radius: 4px;"
         )
+        
+        # Use QVBoxLayout with proper margins to prevent overflow
         video_container_layout = QVBoxLayout(self.video_container)
+        video_container_layout.setContentsMargins(5, 5, 5, 5)  # Add margins
+        video_container_layout.setSpacing(0)  # No spacing needed
 
+        # Video canvas label - this holds the actual video frame
         self.video_canvas_label = QLabel("")
         self.video_canvas_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_canvas_label.setStyleSheet("background-color: #333333;")
+        
+        # Critical: Set size policy to prevent label from expanding beyond container
+        self.video_canvas_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self.video_canvas_label.setScaledContents(False)  # Don't scale contents, we handle that
+        
         video_container_layout.addWidget(self.video_canvas_label)
 
         # Table container (right side)--------------------------------------------------

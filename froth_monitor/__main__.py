@@ -31,10 +31,10 @@ if __name__ == "__main__":
         }
     """)
     window = MainGUIWindow()
-    logger.info("Main Handler: Starting event handler")
+    logger.info("MainHandler: Starting application...")
     handler = EventHandler(window)
     window.show()
-    logger.info("Main Handler: Application started successfully")
+    logger.info("MainHandler: Application started successfully!")
     sys.exit(app.exec())
 
 ### Air_rec Formula - unit of %

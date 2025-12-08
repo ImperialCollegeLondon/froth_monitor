@@ -10,6 +10,8 @@ from PySide6.QtCore import Qt, QTimer, QRect, QPoint, Signal
 from PySide6.QtGui import QPainter, QFont, QColor, QPen, QPolygon
 import time
 import math
+
+from cv2 import log
 from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
@@ -47,7 +49,7 @@ class OverlayWidget(QWidget):
         # Initialize timestamp
         self.timestamp = time.strftime("%H:%M:%S", time.localtime())
 
-        # Store video dimensions
+        # Store video dimensions (for local drawing only)
         self.video_width = 0
         self.video_height = 0
 
@@ -152,25 +154,6 @@ class OverlayWidget(QWidget):
                     QPen(QColor(255, 0, 0, 200), 2)
                 )  # Red with 80% opacity, 2px width
                 painter.drawLine(self.ruler_start_point, self.ruler_end_point)
-
-                # Calculate and display the distance
-                if self.ruler_distance > 0:
-                    # Draw the distance text near the end point
-                    painter.setFont(QFont("Arial", 12))
-                    painter.setPen(QColor(255, 255, 255))  # White text
-                    # Draw text with black outline for better visibility
-                    text_x = self.ruler_end_point.x() + 10
-                    text_y = self.ruler_end_point.y() + 10
-                    painter.setPen(QColor(0, 0, 0))
-                    for dx in [-1, 0, 1]:
-                        for dy in [-1, 0, 1]:
-                            painter.drawText(
-                                text_x + dx,
-                                text_y + dy,
-                                f"{self.ruler_distance:.1f} px",
-                            )
-                    painter.setPen(QColor(255, 255, 255))
-                    painter.drawText(text_x, text_y, f"{self.ruler_distance:.1f} px")
 
         elif self.drawing_arrow:
             # Draw arrow if we're in arrow drawing mode
@@ -312,13 +295,12 @@ class OverlayWidget(QWidget):
 
             elif self.drawing_ruler:
                 self.ruler_end_point = event.position().toPoint()
-
                 # Calculate the final distance
                 dx = self.ruler_end_point.x() - self.ruler_start_point.x()
                 dy = self.ruler_end_point.y() - self.ruler_start_point.y()
                 self.ruler_distance = math.sqrt(dx * dx + dy * dy)
 
-                # Emit signal with the measured distance
+                # Emit signal with RAW overlay distance (no transformation)
                 self.ruler_measured.emit(self.ruler_distance)
 
                 # Keep the ruler visible but exit drawing mode after a short delay
@@ -488,10 +470,10 @@ class OverlayWidget(QWidget):
         # Draw each ROI in the list
         for i, roi in enumerate(self.roi_list):
             # Get the ROI coordinates
-            x1 = roi.coordinate[0]
-            y1 = roi.coordinate[1]
-            x2 = roi.coordinate[2]
-            y2 = roi.coordinate[3]
+            x1 = roi.display_coordinate[0]
+            y1 = roi.display_coordinate[1]
+            x2 = roi.display_coordinate[2]
+            y2 = roi.display_coordinate[3]
 
             # Calculate width and height of the ROI
             width = x2
@@ -630,7 +612,6 @@ class OverlayWidget(QWidget):
             
             except Exception as e:
                 print(f"Error in drawROI_algo: {e}")
-
 
     def reset(self) -> None:
         """

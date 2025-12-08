@@ -46,7 +46,7 @@ class FrameResampleHandler(QObject):
 ├─────────────────────────────────────────────────────┤
 │                                                     │
 │  Quality Preset:                                    │
-│    ○ Ultra (100% - Full camera resolution)         │
+│    ○ Ultra (100% - Full camera/video resolution)         │
 │    ○ High (75% - 1920x1080 max)                    │
 │    ● Medium (50% - 1280x720 max)  [Default]        │
 │    ○ Low (25% - 640x480)                           │

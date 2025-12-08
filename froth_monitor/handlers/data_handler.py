@@ -2,6 +2,7 @@ import time
 from typing import cast
 
 from PySide6.QtCore import QObject, Signal, QTimer
+from cv2 import log
 
 # Import MainGUIWindow at the beginning
 from froth_monitor.handlers.gui_window import MainGUIWindow
@@ -43,7 +44,7 @@ class DataHandler:
         
         Thread-safe: Acquires frame_model lock to prevent race conditions.
         """
-        logger.info("Data handler: Updating velocity table")
+        logger.info("Data handler: Updating air recovery data")
 
         # Acquire lock to safely read roi_list
         with self.frame_model._processing_lock:
@@ -247,6 +248,7 @@ class DataHandler:
         from the right edge and older data scrolling to the left. When the history exceeds
         30 elements, the oldest elements are removed to maintain the fixed window size.
         """
+        logger.info("Data handler: Updating froth height plot")
         import numpy as np
         
         # Clear the plot widget
@@ -346,6 +348,7 @@ class DataHandler:
         
         Thread-safe: Acquires frame_model lock to prevent race conditions.
         """
+        logger.info("Data handler: Updating velocity plot")
         import numpy as np
         
         # Clear the plot widget
@@ -355,6 +358,8 @@ class DataHandler:
         with self.frame_model._processing_lock:
             # Check if there are any ROIs to plot
             if not self.frame_model.roi_list:
+                print(self.frame_model.roi_list)
+                logger.info("Data handler: No ROIs to plot")
                 return
 
             # Define a list of colors for different ROIs

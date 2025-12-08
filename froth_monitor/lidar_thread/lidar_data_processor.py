@@ -65,7 +65,7 @@ class LidarDataProcessor(QObject):
         # Network mode flag - True when receiving LiDAR data via network thread
         self.network_mode = False
         self.exporter = cast(RealtimeExporter, None)
-        logger.info("LiDAR data processor initialized")
+        logger.info("LidarDataProcessor: LiDAR data processor initialized")
 
     def set_network_mode(self, enabled: bool):
         """
