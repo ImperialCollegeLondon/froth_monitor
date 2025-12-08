@@ -19,7 +19,7 @@ from PySide6.QtGui import QImage, QPixmap
 from froth_monitor.handlers.gui_window import MainGUIWindow
 
 # Import FrameModel from fm_model module
-from froth_monitor.processing.fm_model import FrameModel, ROI
+from froth_monitor.processing import FrameModel, ROI
 
 # Import the custom overlay widget
 from froth_monitor.handlers.overlay_widget import OverlayWidget

@@ -1,50 +1,19 @@
-import cv2
-import sys
-import os
-import time
-import queue
-import threading
+
 from typing import cast
 from PySide6.QtWidgets import (
-    QApplication,
-    QFileDialog,
-    QDialog,
-    QComboBox,
-    QHBoxLayout,
-    QLabel,
-    QDoubleSpinBox,
     QMessageBox,
-    QTableWidget,
-    QPushButton,
-    QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QRect, QObject, Signal, QTimer, QThread
-from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtGui import QIcon
+
 
 # Import MainGUIWindow at the beginning
 from froth_monitor.handlers.gui_window import MainGUIWindow
 
-# Import FrameModel from fm_model module
-from froth_monitor.processing.fm_model import FrameModel, ROI
-from froth_monitor.processing.delta_filter import DeltaFilter
-from froth_monitor.utils.performance_monitor import PerformanceMonitor
-
-# Import the custom overlay widget
-from froth_monitor.handlers.overlay_widget import OverlayWidget
 
 # Import the camera and network threads
-from froth_monitor.video_threads.camera_thread import CameraThread
-from froth_monitor.video_threads.network_thread import NetworkThread
+
 from froth_monitor.lidar_thread.lidar_thread import LidarThread
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 from froth_monitor.lidar_thread.lidar_control_dialog import LidarControlDialog
-from froth_monitor.air_recovery.air_recovery_data_processor import AirRecoveryDataProcessor
-from froth_monitor.handlers.realtime_export import RealtimeExporter
-
-# Import the video recorder module
-from froth_monitor.handlers.video_recorder import VideoRecorder
-# from froth_monitor.event_handler import EventHandler
 from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module

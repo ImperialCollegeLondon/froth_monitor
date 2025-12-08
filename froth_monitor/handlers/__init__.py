@@ -8,3 +8,16 @@ from froth_monitor.handlers.lidar_handler import LidarHandler
 from froth_monitor.handlers.data_handler import DataHandler
 from froth_monitor.handlers.air_rec_handler import AirRecoveryHandler
 from froth_monitor.handlers.logger_config import get_logger
+
+__all__ = [
+    "AlgorithmConfigurationHandler",
+    "FrameProcessor",
+    "OverlayHandler",
+    "ROIHandler",
+    "VideoHandler",
+    "CalibrationHandler",
+    "LidarHandler",
+    "DataHandler",
+    "AirRecoveryHandler",
+    "get_logger",
+]

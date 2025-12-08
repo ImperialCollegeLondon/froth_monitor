@@ -29,10 +29,7 @@ from PySide6.QtGui import QIcon
 from froth_monitor.handlers.gui_window import MainGUIWindow
 
 # Import FrameModel from fm_model module
-from froth_monitor.processing.fm_model import FrameModel
-
-# Import the custom overlay widget
-from froth_monitor.handlers.overlay_widget import OverlayWidget
+from froth_monitor.processing import FrameModel
 
 # Import the camera and network threads
 from froth_monitor.video_threads.camera_thread import CameraThread

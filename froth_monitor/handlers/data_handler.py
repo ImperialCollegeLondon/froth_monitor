@@ -8,7 +8,7 @@ from cv2 import log
 from froth_monitor.handlers.gui_window import MainGUIWindow
 
 # Import FrameModel from fm_model module
-from froth_monitor.processing.fm_model import FrameModel, ROI
+from froth_monitor.processing import FrameModel, ROI
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 from froth_monitor.air_recovery.air_recovery_data_processor import AirRecoveryDataProcessor
 from froth_monitor.handlers.realtime_export import RealtimeExporter

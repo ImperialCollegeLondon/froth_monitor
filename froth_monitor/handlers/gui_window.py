@@ -600,7 +600,7 @@ class MainGUIWindow(QMainWindow):
         )
         layout.addWidget(self.record_button)
 
-        self.simple_reset_button = QPushButton("End Session and Reset")
+        self.simple_reset_button = QPushButton("End Session and Save")
         self.simple_reset_button.setStyleSheet(
             self.ENABLED_BUTTON_STYLE
         )

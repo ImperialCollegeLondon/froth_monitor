@@ -19,7 +19,7 @@ from typing import Optional, Union
 from PySide6.QtCore import QObject, Signal
 
 # Import FrameModel from fm_model module
-from froth_monitor.processing.fm_model import FrameModel
+from froth_monitor.processing import FrameModel
 from froth_monitor.video_threads.camera_thread import CameraThread
 from froth_monitor.video_threads.network_thread import NetworkThread
 from froth_monitor.handlers.logger_config import get_logger
