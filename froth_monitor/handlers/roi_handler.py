@@ -64,7 +64,7 @@ class ROIHandler(QObject):
     # ROI data flow
     roi_added = Signal(tuple, tuple)  # (display_coords, proc_coords) → FrameModel
     roi_deleted = Signal()  # Last ROI deleted → FrameModel
-    
+
     # User feedback
     status_message = Signal(str)  # Status bar messages → MainHandler
     warning_box = Signal(str)  # Warning dialogs → MainHandler
@@ -96,7 +96,7 @@ class ROIHandler(QObject):
             f"processing_res: {self.processing_res}, "
             f"video_running: {self.video_running}"
         )
-    
+
     # ============ Dynamic Updates: External State Synchronization ============
     
     def update_display_res(self, display_res):

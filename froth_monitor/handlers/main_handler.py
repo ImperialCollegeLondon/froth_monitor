@@ -49,9 +49,11 @@ from froth_monitor.handlers import (
     OverlayHandler,
     ROIHandler,
     FrameProcessor,
-    DataHandler,
+    # DataHandler, # Deprecated
     AirRecoveryHandler
 )
+from froth_monitor.handlers.data_coordinator import DataCoordinator
+from froth_monitor.handlers.visualization_handler import VisualizationHandler
 from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
@@ -201,12 +203,16 @@ class EventHandler:
         )
 
         # Integrated data handling and visualization
-        self.data_handler = DataHandler(
-            self.gui, 
-            self.frame_model, 
-            self.lidar_data_processor, 
+        # Integrated data handling and visualization
+        self.data_coordinator = DataCoordinator(
+            self.frame_model,
+            self.lidar_data_processor,
             self.air_recovery_data_processor
         )
+        self.visualization_handler = VisualizationHandler(self.gui)
+
+        self.lidar_data_processor.display_data_available.connect(self.visualization_handler.update_fh_plot)
+        self.data_coordinator.air_recovery_updated.connect(self.visualization_handler.update_arec_display)
         
         # LiDAR control interface
         self.lidar_handler = LidarHandler(
@@ -350,11 +356,11 @@ class EventHandler:
             self.video_thread,
             self.video_recorder,
             self.roi_handler,
-            self.data_handler,
             self.frame_resample_handler,
             self.display_manager,
         )
-        
+        self.frame_processor.update_velocity_plot.connect(self.visualization_handler.update_velocity_plot)
+        self.frame_processor.update_velocity_plot.connect(self.data_coordinator.process_new_velocity_data)
         # Frame processor state synchronization
         self.video_handler.playback_state_changed.connect(
             self.frame_processor.set_playback_state
@@ -379,7 +385,7 @@ class EventHandler:
         self.calibration_handler.update_export_status(True)
         self.calibration_handler.release_export_data.connect(self.exporter.write_calibration_data)
         self.frame_model.load_exporter(self.exporter)
-        self.data_handler.load_exporter(self.exporter)
+        self.data_coordinator.load_exporter(self.exporter)
         self.lidar_data_processor.load_exporter(self.exporter)
         self.update_guidance()
     
@@ -417,7 +423,7 @@ class EventHandler:
 
         # Connect central panel buttons
         self.gui.play_pause_button.clicked.connect(self.video_handler._pause_play)
-        self.gui.refresh_graph_button.clicked.connect(self.data_handler.clear_display_history)
+        self.gui.refresh_graph_button.clicked.connect(self.visualization_handler.clear_display)
 
         # Connect right panel buttons
         self.gui.lidar_configuration.clicked.connect(self.lidar_handler.open_lidar_control)
@@ -461,7 +467,7 @@ class EventHandler:
         )  # Connect to the signal emitted by OverlayWidget
         self.gui.delete_roi_button.clicked.disconnect(self.roi_handler.delete_last_roi)
 
-        self.gui.refresh_graph_button.clicked.disconnect(self.data_handler.clear_display_history)
+        self.gui.refresh_graph_button.clicked.disconnect(self.visualization_handler.clear_display)
 
     def reset_signals(self):
         self.gui.export_button.clicked.connect(self.export_settings)
@@ -475,7 +481,7 @@ class EventHandler:
         # self.gui.save_button.clicked.connect(self.save_data)
         self.gui.record_button.clicked.connect(self.toggle_recording)
         self.gui.simple_reset_button.clicked.connect(self.reset_mission)
-        self.gui.refresh_graph_button.clicked.connect(self.data_handler.clear_display_history)
+        self.gui.refresh_graph_button.clicked.connect(self.visualization_handler.clear_display)
 
     # ============= Video Handlers signal and related GUI interaction =============
     def _resource_path(self,relative_path):

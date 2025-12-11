@@ -97,11 +97,12 @@ class LidarThread(QObject):
             # Start the reading thread
             self.running = True
             self.paused = False
-
-            self.serial_connection.write(f"iSET:7,{10}\r\n".encode())
-            time.sleep(0.1)
-            self.serial_connection.write(b"iFACM\r\n")
-
+            
+            # Remember to uncomment the following lines to set the LiDAR to manual mode
+            # self.serial_connection.write(f"iSET:7,{10}\r\n".encode())
+            # time.sleep(0.1)
+            # self.serial_connection.write(b"iFACM\r\n")
+            
             self.thread_ = threading.Thread(target=self._lidar_loop, daemon=True)
             self.thread_.start()
             

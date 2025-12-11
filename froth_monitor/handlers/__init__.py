@@ -5,9 +5,12 @@ from froth_monitor.handlers.roi_handler import ROIHandler
 from froth_monitor.handlers.video_handler import VideoHandler
 from froth_monitor.handlers.calibration_handler import CalibrationHandler
 from froth_monitor.handlers.lidar_handler import LidarHandler
-from froth_monitor.handlers.data_handler import DataHandler
+
 from froth_monitor.handlers.air_rec_handler import AirRecoveryHandler
 from froth_monitor.handlers.logger_config import get_logger
+from froth_monitor.handlers.data_matcher import VelocityLidarMatcher
+from froth_monitor.handlers.data_coordinator import DataCoordinator
+from froth_monitor.handlers.visualization_handler import VisualizationHandler
 
 __all__ = [
     "AlgorithmConfigurationHandler",
@@ -17,7 +20,10 @@ __all__ = [
     "VideoHandler",
     "CalibrationHandler",
     "LidarHandler",
-    "DataHandler",
+    # "DataHandler",
     "AirRecoveryHandler",
     "get_logger",
+    "VelocityLidarMatcher",
+    "DataCoordinator",
+    "VisualizationHandler"
 ]

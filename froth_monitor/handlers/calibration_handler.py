@@ -347,11 +347,12 @@ class CalibrationHandler(QObject):
             scale_x, scale_y = mapper.get_scale_factors()
             scale = (scale_x + scale_y) / 2
             source_px = overlay_px * scale
-            
+            source_px = source_px / self.scale_factor
+
             logger.info(
                 f"Ruler calibration:\n"
                 f"  Overlay:  {overlay_px:.1f}px at {overlay_res}\n"
-                f"  Source:   {source_px:.1f}px at {source_res}\n"
+                f"  Source (proc res):   {source_px:.1f}px at {source_res}\n"
                 f"  Scale:    {scale:.2f}x"
             )
         else:
@@ -369,20 +370,18 @@ class CalibrationHandler(QObject):
         self.release_px2mm.emit(self.processed_px2mm)
         
         # Update GUI textbox with display px2mm (user-facing value)
-        self.set_textbox_px2mm.emit(f"{self.display_px2mm:.1f}")
+        self.set_textbox_px2mm.emit(f"{self.display_px2mm:.2f}")
         
         # Display detailed result to user
         self.message_box.emit(
             f"Ruler Calibration\n"
-            f"Measured {source_px:.1f}px in source video\n"
-            f"Px to mm ratio for display resolution: {self.display_px2mm:.1f} per mm\n"
-            f"Px to mm ratio for processed resolution: {self.processed_px2mm:.1f} per mm",
+            f"Px to mm ratio: {self.display_px2mm:.2f} per mm\n"
         )
         
         # Update status bar with summary
         self.status_message.emit(
             f"Calibrated: {source_px:.1f}px = {self.distance_mm}mm\n"
-            f"Px2mm: {self.processed_px2mm:.1f}"
+            f"Px2mm: {self.display_px2mm:.2f}"
         )
 
     # ============ Arrow Direction Workflow ============
@@ -424,13 +423,13 @@ class CalibrationHandler(QObject):
             # Emit values to FrameModel for use in optical flow calculations
             self.release_px2mm.emit(self.processed_px2mm)
             self.release_arrow_direction.emit(arrow_direction)
-            self.set_textbox_px2mm.emit(str(self.display_px2mm))
+            self.set_textbox_px2mm.emit(str(f"{self.display_px2mm:.2f}"))
             self.set_textbox_arrow_direction.emit(str(arrow_direction))
             
             logger.info(
                 f"CalibrationHandler: Calibration confirmed:\n"
                 f"  Arrow direction: {arrow_direction:.2f}°\n"
-                f"  Display px2mm: {self.display_px2mm:.1f}\n"
+                f"  Display px2mm: {self.display_px2mm:.2f}\n"
                 f"  Processing px2mm: {self.processed_px2mm:.1f}"
             )
             

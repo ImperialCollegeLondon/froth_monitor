@@ -981,7 +981,8 @@ class MainGUIWindow(QMainWindow):
 
     def _update_guidance(self, event: str) -> None:
         if event == "step_1":
-            self.statusBar().showMessage("Step 1: Import a Video Source")
+            self.statusBar().showMessage("GUI Window: Step 1: Import a Video Source")
+            logger.info("GUI Window: Step 1: Import a Video Source")
             self.algorithm_configuration.setStyleSheet(
                 self.DISABLED_BUTTON_STYLE
             )
@@ -1023,6 +1024,8 @@ class MainGUIWindow(QMainWindow):
             # self.save_button.setDisabled(True)
 
         if event == "step_2":
+            self.statusBar().showMessage("GUI Window: Step 2: Calibration and Arrow Confirmation")
+            logger.info("GUI Window: Step 2: Calibration and Arrow Confirmation")
             self.algorithm_configuration.setStyleSheet(
                 self.ENABLED_BUTTON_STYLE
             )
@@ -1054,8 +1057,8 @@ class MainGUIWindow(QMainWindow):
             self.refresh_graph_button.setDisabled(False)
 
         if event == "step_3":
-            self.statusBar().showMessage("Step 3: ROI drawing")
-            print("ROI drawing enabled")
+            self.statusBar().showMessage("GUI Window: Step 3: ROI drawing")
+            logger.info("GUI Window: Step 3: ROI drawing")
             self.roi_group.setStyleSheet(
                 self.ENABLED_ROI_BUTTON_STYLE
             )

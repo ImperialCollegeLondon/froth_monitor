@@ -20,8 +20,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-
-
 class FrameModel:
     """
     Frame Model Class for Video Frame Processing.
@@ -61,7 +59,7 @@ class FrameModel:
         self.last_processed_time = None
         
         # Thread safety: Lock for protecting roi_list and algorithm parameters
-        self._processing_lock = threading.Lock()
+        self._processing_lock = threading.RLock()
 
         self.px2mm = 1.0
         self.degree = -90.0

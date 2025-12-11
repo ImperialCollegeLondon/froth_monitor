@@ -1,6 +1,6 @@
 import cv2
 import queue
-from PySide6.QtCore import Qt, QRect
+from PySide6.QtCore import Qt, QRect, QObject, Signal, QTimer
 from PySide6.QtGui import QImage, QPixmap
 
 # Import MainGUIWindow at the beginning
@@ -21,35 +21,35 @@ from froth_monitor.handlers.video_recorder import VideoRecorder
 from froth_monitor.handlers.logger_config import get_logger
 
 
-
-from froth_monitor.handlers.overlay_widget import OverlayWidget
 from froth_monitor.handlers.roi_handler import ROIHandler
 from froth_monitor.handlers.recorder_thread import VideoRecordingWorker 
 from froth_monitor.handlers.video_recorder import VideoRecorder
-from froth_monitor.handlers.data_handler import DataHandler
+# from froth_monitor.handlers.data_handler import DataHandler
 from froth_monitor.utils.frame_converter import FrameConverter
 from froth_monitor.handlers.frame_display_manager import FrameDisplayManager
 
 # Initialize logger for this module
 logger = get_logger(__name__)
 
-class FrameProcessor:
+class FrameProcessor(QObject):
+
+    update_velocity_plot = Signal(list)
+
     def __init__(
         self,
         frame_model: FrameModel,
         video_thread: CameraThread | NetworkThread,
         video_recorder: VideoRecorder,
         roi_handler: ROIHandler,
-        velocity_plotter: DataHandler,
         frame_resample_handler,
         display_manager: FrameDisplayManager,
     ):
+        super().__init__()
         self.playing = True # Set to True by default, frame processor can only be initialised when the video is playing
         self.frame_model = frame_model
         self.video_thread = video_thread
         self.video_recorder = video_recorder
         self.roi_handler = roi_handler
-        self.velocity_plotter = velocity_plotter
         self.frame_resample_handler = frame_resample_handler
         self.display_manager = display_manager
         
@@ -101,10 +101,11 @@ class FrameProcessor:
 
         # Display frame and update status
         self.display_manager.display_frame(scaled_image)
-        self.display_manager.update_status(
-            self.current_frame_number,
-            self.frame_model.last_processed_time or "N/A"
-        )
+        with self.frame_model._processing_lock:
+            self.display_manager.update_status(
+                self.current_frame_number,
+                self.frame_model.last_processed_time or "N/A"
+            )
 
         # Record frame if recording is active (non-blocking)
         if self.video_recorder.is_active():
@@ -124,20 +125,21 @@ class FrameProcessor:
         """
         # Process the frame
         self.perf_monitor.start_timer("fm_model_processing")
-        self.current_frame_number, roi_list, update_velo_plot, update_average_velo = (
-            self.frame_model.process_frame(resized_frame)
-        )
+        with self.frame_model._processing_lock:
+            self.current_frame_number, roi_list, update_velo_plot, update_average_velo = (
+                self.frame_model.process_frame(resized_frame)
+            )
         self.perf_monitor.stop_timer("fm_model_processing")
 
         # Display ROIs on overlay widget
+        self.perf_monitor.start_timer("roi_display_on_canvas")
         self.display_manager.overlay_widget.display_roi(roi_list)
+        self.perf_monitor.stop_timer("roi_display_on_canvas")
 
         # Update the velocity plot with the latest data
         if update_velo_plot:
-            self.perf_monitor.start_timer("gui_display")
-            self.velocity_plotter.update_velocity_plot()
-            self.velocity_plotter.update_arec_data()
-            self.perf_monitor.stop_timer("gui_display")
+            self.perf_monitor.start_timer("receive_plot_signal")
+            self.update_velocity_plot.emit(roi_list)
             
         self.perf_monitor.log_frame(self.current_frame_number)
     
@@ -167,10 +169,5 @@ class FrameProcessor:
         
         # Clear current frame reference
         self.current_frame = None
-        
-        # Stop performance monitor
-        if hasattr(self, 'perf_monitor'):
-            from typing import cast
-            self.perf_monitor = cast(PerformanceMonitor, None)
         
         logger.info("FrameProcessor: Cleanup complete")
