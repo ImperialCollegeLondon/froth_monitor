@@ -95,8 +95,14 @@ class VelocityLidarMatcher(QObject):
             self.matching_timer.stop()
             self.match_failed.emit(self.context, self.current_velo_data)
             return
+        
+        try:
+            formatted_history = self.data_provider()
+        except Exception as e:
+            logger.error(f"DataMatcher: Error getting lidar history: {e}")
+            self.match_failed.emit(self.context, self.current_velo_data)
+            return
             
-        formatted_history = self.data_provider()
         if len(formatted_history) > self.initial_lidar_count:
             new_items = formatted_history[self.initial_lidar_count:]
             self.initial_lidar_count = len(formatted_history)

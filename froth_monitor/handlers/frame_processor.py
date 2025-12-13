@@ -107,9 +107,12 @@ class FrameProcessor(QObject):
                 self.frame_model.last_processed_time or "N/A"
             )
 
+        self.perf_monitor.start_timer("frame_recording")
         # Record frame if recording is active (non-blocking)
         if self.video_recorder.is_active():
             self.video_recording_worker.add_frame(frame)
+        self.perf_monitor.stop_timer("frame_recording")
+
 
     # Note: Utility methods extracted to dedicated classes:
     # - Frame conversion → FrameConverter utility class

@@ -613,7 +613,9 @@ class RealtimeExporter(QFileDialog):
         """
         Write calibration data to calibration_data sheet
         """
+        logger.info(f"Writing calibration data: {arrow_direction}, {px2mm}")
         if not self.is_running:
+            logger.warning("Export is not running, calibration data not written")
             return
             
         data_row = [arrow_direction, px2mm]

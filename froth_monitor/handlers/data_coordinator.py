@@ -55,7 +55,7 @@ class DataCoordinator(QObject):
                     # assuming the last items are the ones we want to match.
                     logger.debug(f"DataCoordinator: Start matching velocity and lidar for ROI {i + 1}")
                     self.start_matching_velo_n_lidar(i, roi, len(roi.delta_history)-1)
-        
+         
         self.perf_monitor.stop_timer("data_coordinator_process")
 
     def start_matching_velo_n_lidar(self, roi_number, roi: ROI, index):

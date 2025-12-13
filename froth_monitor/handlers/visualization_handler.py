@@ -1,4 +1,5 @@
 from PySide6.QtCore import QObject, Slot
+from PySide6.QtWidgets import QTableWidgetItem
 import numpy as np
 import logging
 
@@ -70,9 +71,12 @@ class PlotHelper:
         for p_series in processed_series:
             data = p_series['data']
             length = len(data)
-            full_len = p_series['full_len']
+            # full_len = p_series['full_len']
             
-            start_pos = full_len - length
+            # Align the last element to x_max (right alignment)
+            # This ensures that if series B is shorter than A (started later), 
+            # its latest point still aligns with A's latest point.
+            start_pos = x_max - length + 1
             x_data = [start_pos + j for j in range(length)]
             
             if data:
@@ -95,6 +99,11 @@ class VisualizationHandler(QObject):
         super().__init__()
         self.gui = gui
         self.perf_monitor = PerformanceMonitor()
+        
+        # Initialize table headers once
+        self.gui.velo_widget.setHorizontalHeaderLabels([
+            "timestamp", "v(mm/s)", "f_height(mm)", "air_rec(%)"
+        ])
 
     @Slot(list)
     def update_velocity_plot(self, roi_list: list[ROI]):
@@ -161,10 +170,19 @@ class VisualizationHandler(QObject):
             list_data_a = roi.sum_history[-1][1:4]
             table_list_data.append([timestamp] + list_data_a)
 
-        self.gui.velo_widget.setData(table_list_data)
-        # Note: SetHorizontalHeaderLabels etc. should ideally be done once in init, 
-        # but maintaining original logic for now that sets it here.
-        # Ideally we move setup code to init.
+        # Update table rows without clearing headers
+        self.gui.velo_widget.setRowCount(len(table_list_data))
+        
+        for row, row_data in enumerate(table_list_data):
+            for col, value in enumerate(row_data):
+                # Format floats
+                if isinstance(value, float):
+                    text = f"{value:.1f}"
+                else:
+                    text = str(value)
+                
+                item = QTableWidgetItem(text)
+                self.gui.velo_widget.setItem(row, col, item)
         
     def _update_arec_plot(self, roi_list: list[ROI]):
         if not roi_list:

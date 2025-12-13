@@ -239,9 +239,14 @@ class EventHandler:
         self.video_handler.thread_activate.connect(self.start_playing)
 
         # Frame resampling configuration (decouples processing from display resolution)
-        from froth_monitor.handlers.frame_resample_handler import FrameResampleHandler
+        from froth_monitor.handlers.frame_resample_handler import FrameResampleHandler, ResolutionPreset
         self.frame_resample_handler = FrameResampleHandler()
         logger.info(f"MainHandler: FrameResampleHandler initialized with {self.frame_resample_handler.current_preset.value} preset")
+        
+        # Connect resolution dropdown if available
+        if hasattr(self.gui, 'resolution_combo'):
+            self.gui.resolution_combo.currentTextChanged.connect(self._on_resolution_changed)
+            self.frame_resample_handler.available_resolutions.connect(self._update_resolution_dropdown)
 
         # Real-time data export infrastructure
         self.exporter = RealtimeExporter(self.gui)
@@ -381,10 +386,17 @@ class EventHandler:
         self.gui.add_roi_button.clicked.connect(self.roi_handler.add_roi)
 
     def _finish_export_setting(self):
-        
+
+        self.calibration_handler.release_export_data.connect(lambda degree, px2mm: self.exporter.write_calibration_data(degree, px2mm))
         self.calibration_handler.update_export_status(True)
-        self.calibration_handler.release_export_data.connect(self.exporter.write_calibration_data)
-        self.frame_model.load_exporter(self.exporter)
+
+        self.frame_model.initialize_roi_sheets.connect(lambda num_roi: self.exporter.initialize_roi_sheets(num_roi))
+        self.frame_model.create_roi_sheets.connect(lambda num_roi: self.exporter.create_roi_sheets(num_roi))
+        self.frame_model.delete_roi_sheets.connect(lambda num_roi: self.exporter.delete_roi_sheets(num_roi))
+        self.frame_model.release_roi_movement_data.connect(lambda roi_id, delta_list: self.exporter.write_roi_movement_data(roi_id, delta_list))
+        self.frame_model.update_export_status(True)
+
+        # self.frame_model.load_exporter(self.exporter)
         self.data_coordinator.load_exporter(self.exporter)
         self.lidar_data_processor.load_exporter(self.exporter)
         self.update_guidance()
@@ -495,6 +507,60 @@ class EventHandler:
             self.video_handler.handle_video_import("webcam")
         elif self.gui.prerecorded_radio.isChecked():
             self.video_handler.handle_video_import("file")
+
+    def _on_resolution_changed(self, text):
+        """Handle resolution preset change from GUI."""
+        from froth_monitor.handlers.frame_resample_handler import ResolutionPreset
+        try:
+            # simple mapping based on text.upper() matching enum names
+            # Enum is ULTRA, HIGH, MEDIUM, LOW
+            # Format might get "MEDIUM (1280x720)" -> split to get "MEDIUM"
+            preset_name = text.split(" (")[0].upper()
+            
+            if hasattr(ResolutionPreset, preset_name):
+                preset = ResolutionPreset[preset_name]
+                self.frame_resample_handler.set_preset(preset)
+                self._status_message(f"Resolution changed to {text}")
+        except Exception as e:
+            logger.error(f"Error changing resolution: {e}")
+
+    def _update_resolution_dropdown(self, resolutions_map: dict):
+        """Update resolution dropdown with dynamic labels."""
+        try:
+            from froth_monitor.handlers.frame_resample_handler import ResolutionPreset
+            
+            # Store current selection to try and restore it
+            current_text = self.gui.resolution_combo.currentText()
+            # If current text has parentheses, extract the preset name
+            current_preset_name = current_text.split(" (")[0].upper()
+            
+            self.gui.resolution_combo.blockSignals(True)
+            self.gui.resolution_combo.clear()
+            
+            # Order: ORIGINAL, High, Medium, Low
+            ordered_presets = [
+                ResolutionPreset.ORIGINAL,
+                ResolutionPreset.HIGH,
+                ResolutionPreset.MEDIUM,
+                ResolutionPreset.LOW
+            ]
+            
+            for preset in ordered_presets:
+                if preset in resolutions_map:
+                    self.gui.resolution_combo.addItem(resolutions_map[preset])
+            
+            # Restore selection
+            for i in range(self.gui.resolution_combo.count()):
+                item_text = self.gui.resolution_combo.itemText(i)
+                if item_text.split(" (")[0].upper() == current_preset_name:
+                    self.gui.resolution_combo.setCurrentIndex(i)
+                    break
+                    
+            self.gui.resolution_combo.blockSignals(False)
+            logger.debug("Resolution dropdown updated with dynamic labels")
+            
+        except Exception as e:
+            logger.error(f"Error updating resolution dropdown: {e}")
 
     def _show_camera_dialog(self):
         """Show camera selection dialog and pass result to video handler."""
@@ -645,22 +711,22 @@ class EventHandler:
 
     def reset_mission(self):
         """Reset the application for a new mission."""
-        # Check if data has been saved
-        if not self.if_save:
-            # Show confirmation dialog
-            reply = QMessageBox.question(
-                self.gui,
-                "Confirmation",
-                "Are you sure you want to reset the application for a new mission? \
-                    \nAll unsaved data will be lost.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,  # Set default button to No
-            )
 
-            # Only proceed if user explicitly clicked Yes
-            # The X button will return QMessageBox.StandardButton.No by default
-            if reply != QMessageBox.StandardButton.Yes:
-                return  # Exit the function without resetting
+        # Check if data has been saved
+        # if not self.if_save:
+        #     # Show confirmation dialog
+        reply = QMessageBox.question(
+            self.gui,
+            "Confirmation",
+            "Are you sure you want to end the session and save data?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,  # Set default button to No
+        )
+
+        # Only proceed if user explicitly clicked Yes
+        # The X button will return QMessageBox.StandardButton.No by default
+        if reply != QMessageBox.StandardButton.Yes:
+            return  # Exit the function without resetting
     
         self.if_save = False
         self.calibration_handler.confirm_calibration = False

@@ -18,7 +18,7 @@ class ResolutionPreset(Enum):
     Each preset defines a scale factor and maximum resolution limits
     to balance quality and performance.
     """
-    ULTRA = "ultra"      # 100% of source, no limits
+    ORIGINAL = "original"      # 100% of source, no limits
     HIGH = "high"        # 75% of source, max 1920x1080
     MEDIUM = "medium"    # 50% of source, max 1280x720
     LOW = "low"          # 25% of source, max 640x480
@@ -27,7 +27,7 @@ class ResolutionPreset(Enum):
 
 # Preset configuration mappings
 PRESET_CONFIG = {
-    ResolutionPreset.ULTRA: {
+    ResolutionPreset.ORIGINAL: {
         "scale": 1.0,
         "max_width": None,
         "max_height": None,
@@ -77,6 +77,7 @@ class FrameResampleHandler(QObject):
     resolution_changed = Signal(tuple)  # (width, height)
     scale_changed = Signal(float)       # Scale factor
     preset_changed = Signal(str)        # Preset name
+    available_resolutions = Signal(object) # Dictionary of preset: formatting string
     
     def __init__(self):
         """Initialize handler with default Medium preset."""
@@ -94,6 +95,48 @@ class FrameResampleHandler(QObject):
         
         logger.info(f"FrameResampleHandler initialized with preset: {self.current_preset.value}")
     
+    def _calculate_all_resolutions(self) -> dict:
+        """Calculate resolution for all presets based on current source."""
+        if self.source_resolution == (0, 0):
+            return {}
+            
+        src_w, src_h = self.source_resolution
+        resolutions = {}
+        
+        for preset in ResolutionPreset:
+            if preset == ResolutionPreset.CUSTOM:
+                continue
+                
+            config = PRESET_CONFIG[preset]
+            scale = config["scale"]
+            max_w = config["max_width"]
+            max_h = config["max_height"]
+            
+            # Reimplement calculation logic for this specific preset
+            # (We cannot call calculate_processing_size directly as it relies on self.current_preset)
+            
+            proc_w = int(src_w * scale)
+            proc_h = int(src_h * scale)
+            
+            if max_w and proc_w > max_w:
+                ratio = max_w / proc_w
+                proc_w = max_w
+                proc_h = int(proc_h * ratio)
+            
+            if max_h and proc_h > max_h:
+                ratio = max_h / proc_h
+                proc_h = max_h
+                proc_w = int(proc_w * ratio)
+                
+            proc_w = proc_w - (proc_w % 2)
+            proc_h = proc_h - (proc_h % 2)
+            
+            # Format: "Original (1920x1080)"
+            label = f"{preset.value.title()} ({proc_w}x{proc_h})"
+            resolutions[preset] = label
+            
+        return resolutions
+    
     def set_preset(self, preset: ResolutionPreset) -> None:
         """Change the active resolution preset.
         
@@ -104,7 +147,8 @@ class FrameResampleHandler(QObject):
             self.current_preset = preset
             logger.info(f"FrameResampleHandler: Resolution preset changed to: {preset.value}")
             self.preset_changed.emit(preset.value)
-            
+            self.custom_scale = PRESET_CONFIG[preset]["scale"]
+
             # Recalculate if source resolution is known
             if self.source_resolution != (0, 0):
                 self._recalculate_processing_resolution()
@@ -170,8 +214,8 @@ class FrameResampleHandler(QObject):
         proc_h = proc_h - (proc_h % 2)
         
         # Enforce minimum dimensions
-        proc_w = max(320, proc_w)
-        proc_h = max(240, proc_h)
+        # proc_w = max(320, proc_w)
+        # proc_h = max(240, proc_h)
         
         return proc_w, proc_h
     
@@ -223,6 +267,10 @@ class FrameResampleHandler(QObject):
             
             self.resolution_changed.emit(self.processing_resolution)
             self.scale_changed.emit(self.custom_scale)
+            
+            # Update available resolutions list GUI
+            resolutions_map = self._calculate_all_resolutions()
+            self.available_resolutions.emit(resolutions_map)
     
     def get_resolution_info(self) -> dict:
         """Get current resolution information.

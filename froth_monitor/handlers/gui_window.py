@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
     QSizePolicy,
+    QComboBox,
 )
 from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QIcon, QFont
@@ -49,6 +50,7 @@ class MainGUIWindow(QMainWindow):
         self.resize(1400, 850)  # Default size for comfortable viewing
         # self.showMaximized()
         self.setStyleSheet("background-color: #f0f0f0;")
+        # self.setStyleSheet("background-color: black;")
         self._create_stylesheets()
 
         # Initialize overlay related attributes
@@ -671,11 +673,22 @@ class MainGUIWindow(QMainWindow):
         self._create_air_flow_control_panel(table_layout)
 
         # Add to horizontal layout
-        video_table_layout.addWidget(self.video_container, 1)
+        # Create a vertical container for the left side (Video + Controls)
+        left_column_widget = QWidget()
+        left_column_layout = QVBoxLayout(left_column_widget)
+        left_column_layout.setContentsMargins(0, 0, 0, 0)
+        left_column_layout.setSpacing(5)
+
+        # Add video container to left column
+        left_column_layout.addWidget(self.video_container)
+
+        # Add controls to left column (below video)
+        self._create_media_controls(left_column_layout)
+
+        video_table_layout.addWidget(left_column_widget, 1)
         video_table_layout.addWidget(table_container, 0)
 
         layout.addWidget(video_table_container)
-        self._create_media_controls(layout)
 
     def _create_table_group(self, layout) -> None:
         table_label_1 = QLabel("Average froth data over the last second")
@@ -685,23 +698,24 @@ class MainGUIWindow(QMainWindow):
         example_2d_data = [["N/A", "N/A", "N/A", "N/A"]]
         self.velo_widget = pg.TableWidget()
         self.velo_widget.setData(example_2d_data)
-        self.velo_widget.setHorizontalHeaderLabels(["timestamp", "v(mm/s)", "f_height(mm)", "air_rec(%)"])
+        self.velo_widget.setHorizontalHeaderLabels(["timestamp", "v(mm/s)", "f_h(mm)", "air_rec(%)"])
         self.velo_widget.setFormat("%.2f")
         self.velo_widget.setMinimumHeight(80)
-        self.velo_widget.setMinimumWidth(50)  # Fixed width
+        self.velo_widget.setMinimumWidth(30)  # Fixed width
         self.velo_widget.setStyleSheet(
             """
             background-color: #f0f0f0; 
             font-size: 10px;
             border: 1px solid #ccc;
-            border-radius: 4px;
+            border-radius: 2px;
             """
         )
 
         # Set minimum column width
-        self.velo_widget.setColumnWidth(0, 80)
-        self.velo_widget.setColumnWidth(1, 80)
-        self.velo_widget.setColumnWidth(2, 80)
+        self.velo_widget.setColumnWidth(0, 70)
+        self.velo_widget.setColumnWidth(1, 70)
+        self.velo_widget.setColumnWidth(2, 70)
+        self.velo_widget.setColumnWidth(3, 70)
 
         # self.velo_widget.setFixedHeight(80) 
         self.velo_widget.setSizePolicy(
@@ -750,7 +764,6 @@ class MainGUIWindow(QMainWindow):
         )
         self.ar_plot_widget.showAxis("left")
         self.ar_plot_widget.showAxis("bottom")
-
 
         # Apply custom fonts
         self.ar_plot_widget.setLabel("left", "Air Recovery", units="%", **self.plot_label_style)
@@ -960,13 +973,49 @@ class MainGUIWindow(QMainWindow):
         self.play_pause_button.setToolTip("Play/Pause Video")
 
         self.refresh_graph_button = QPushButton("Refresh Graphs")
+        self.refresh_graph_button.setFixedHeight(35)
         self.refresh_graph_button.setStyleSheet(
             self.DISABLED_BUTTON_STYLE
         )
 
+        # Resolution Dropdown
+        self.resolution_combo = QComboBox()
+        self.resolution_combo.addItems(["Original", "High", "Medium", "Low"])
+        self.resolution_combo.setCurrentText("Medium") # Default to Medium
+        self.resolution_combo.setStyleSheet("""
+            QComboBox {
+                background-color: white;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 5px;
+                min-width: 120px;
+                font-size: 11px;
+                color: black;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 2px solid #333;
+                border-bottom: 2px solid #333;
+                width: 6px;
+                height: 6px;
+                margin-right: 5px;
+                transform: rotate(-45deg); /* Simple arrow styling */
+            }
+        """)
+        self.resolution_combo.setToolTip("Select Processing Resolution")
+
+        # Add label for resolution
+        res_label = QLabel("Processing Quality:")
+        res_label.setStyleSheet("color: black; font-size: 12px; margin-right: 5px;")
+
         media_controls_layout.addWidget(self.play_pause_button)
         media_controls_layout.addWidget(self.refresh_graph_button)
         media_controls_layout.addStretch()
+        media_controls_layout.addWidget(res_label)
+        media_controls_layout.addWidget(self.resolution_combo)
         layout.addWidget(media_controls_container)
 
     def _trigger_lidar_mode(self) -> None:

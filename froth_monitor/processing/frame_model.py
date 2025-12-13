@@ -9,6 +9,7 @@ import time
 import cv2
 import threading
 import logging
+from PySide6.QtCore import QObject, Signal, QTimer
 from typing import TYPE_CHECKING
 from datetime import datetime
 from PySide6.QtCore import QRect
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FrameModel:
+class FrameModel(QObject):
     """
     Frame Model Class for Video Frame Processing.
 
@@ -46,13 +47,20 @@ class FrameModel:
     get_current_time() -> str
         Returns the current timestamp in the format "dd/mm/yyyy HH:MM:SS.sss".
     """
+    initialize_roi_sheets = Signal(int)
+    release_roi_movement_data = Signal(int, list)
+    create_roi_sheets = Signal(int)
+    delete_roi_sheets = Signal(int)
 
     def __init__(self) -> None:
         """
         Initialize the FrameModel with default values.
         """
+        super().__init__()
+        
         self.frame_count = 0
 
+        self.export_enable = False
         self.exporter: 'RealtimeExporter | None' = None
 
         self.roi_list = []
@@ -175,9 +183,10 @@ class FrameModel:
                     if _new_average == True:
                         if_new_average += 1
                 
-                if self.exporter is not None:
+                if self.export_enable:
                     if len(roi.delta_history)>1:
-                        self.exporter.write_roi_movement_data(roi.id, roi.delta_history[-1])
+                        self.release_roi_movement_data.emit(roi.id, roi.delta_history[-1])
+                        # self.exporter.write_roi_movement_data(roi.id, roi.delta_history[-1])
 
             if if_new_velo > 0:
                 update_velo_plot = True
@@ -259,8 +268,8 @@ class FrameModel:
         
         self.roi_list.append(new_roi)
 
-        if self.exporter is not None:
-            self.exporter.create_roi_sheets(len(self.roi_list))
+        if self.export_enable:
+            self.create_roi_sheets.emit(len(self.roi_list))
 
         return new_roi
         
@@ -276,19 +285,26 @@ class FrameModel:
         if not self.roi_list:
             return False
 
-        if self.exporter is not None:
-            self.exporter.delete_roi_sheets(len(self.roi_list))
+        if self.export_enable:
+            self.delete_roi_sheets.emit(len(self.roi_list))
 
         # Remove the last ROI from the list
         self.roi_list.pop()
 
         return True
 
-    def load_exporter(self, exporter: 'RealtimeExporter'):
-        self.exporter = exporter
-        
+    def update_export_status(self, status: bool):
+        self.export_enable = status
+        logger.info(f"Frame model: Export status set to {self.export_enable}")
         if len(self.roi_list) > 0 :
-            self.exporter.initialize_roi_sheets(self.roi_list)
+            if self.export_enable:
+                self.initialize_roi_sheets.emit(len(self.roi_list))
+    
+    # def load_exporter(self, exporter: 'RealtimeExporter'):
+    #     self.exporter = exporter
+        
+    #     if len(self.roi_list) > 0 :
+    #         self.exporter.initialize_roi_sheets(self.roi_list)
 
     def reset(self):
         self.frame_count = 0

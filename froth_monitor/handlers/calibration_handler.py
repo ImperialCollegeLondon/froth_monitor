@@ -296,10 +296,10 @@ class CalibrationHandler(QObject):
         
         logger.info(
             f"CalibrationHandler: px2mm calculation:"
-            f"  Source pixels: {source_px:.1f}px"
+            f"  Source pixels: {source_px:.2f}px"
             f"  Distance: {self.distance_mm}mm"
-            f"  Display px2mm: {px_ratio_display_res:.1f}"
-            f"  Processing px2mm: {px_ratio_processing_res:.1f} (scale: {scale_factor:.2f})"
+            f"  Display px2mm: {px_ratio_display_res:.2f}"
+            f"  Processing px2mm: {px_ratio_processing_res:.2f} (scale: {scale_factor:.2f})"
         )
         
         return px_ratio_display_res, px_ratio_processing_res
