@@ -713,8 +713,6 @@ class EventHandler:
         """Reset the application for a new mission."""
 
         # Check if data has been saved
-        # if not self.if_save:
-        #     # Show confirmation dialog
         reply = QMessageBox.question(
             self.gui,
             "Confirmation",
@@ -728,7 +726,6 @@ class EventHandler:
         if reply != QMessageBox.StandardButton.Yes:
             return  # Exit the function without resetting
     
-        self.if_save = False
         self.calibration_handler.confirm_calibration = False
         self.current_frame_number = 0
         self.exporter.stop_session()
