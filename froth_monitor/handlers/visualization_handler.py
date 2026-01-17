@@ -9,6 +9,12 @@ from froth_monitor.utils.performance_monitor import PerformanceMonitor
 
 logger = logging.getLogger(__name__)
 
+class CompatibleTableWidgetItem(QTableWidgetItem):
+    """Helper class to silence pyqtgraph's TableWidget AttributeError."""
+    def itemChanged(self):
+        """No-op method to satisfy pyqtgraph's internal signal handling."""
+        pass
+
 class PlotHelper:
     """Helper class to consolidate repetitive plotting logic."""
     
@@ -181,7 +187,7 @@ class VisualizationHandler(QObject):
                 else:
                     text = str(value)
                 
-                item = QTableWidgetItem(text)
+                item = CompatibleTableWidgetItem(text)
                 self.gui.velo_widget.setItem(row, col, item)
         
     def _update_arec_plot(self, roi_list: list[ROI]):

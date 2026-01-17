@@ -47,7 +47,7 @@ class FrameModel(QObject):
     get_current_time() -> str
         Returns the current timestamp in the format "dd/mm/yyyy HH:MM:SS.sss".
     """
-    initialize_roi_sheets = Signal(int)
+    initialize_roi_sheets = Signal(list)
     release_roi_movement_data = Signal(int, list)
     create_roi_sheets = Signal(int)
     delete_roi_sheets = Signal(int)
@@ -269,6 +269,7 @@ class FrameModel(QObject):
         self.roi_list.append(new_roi)
 
         if self.export_enable:
+            logger.info(f"Frame model: Release signal to create ROI sheets of number: {len(self.roi_list)}")
             self.create_roi_sheets.emit(len(self.roi_list))
 
         return new_roi
@@ -286,6 +287,7 @@ class FrameModel(QObject):
             return False
 
         if self.export_enable:
+            logger.info(f"Frame model: Release signal to delete ROI sheets for {len(self.roi_list)} ROIs")
             self.delete_roi_sheets.emit(len(self.roi_list))
 
         # Remove the last ROI from the list
@@ -294,12 +296,13 @@ class FrameModel(QObject):
         return True
 
     def update_export_status(self, status: bool):
+
+        if len(self.roi_list) > 0 and status:
+            if status:
+                self.initialize_roi_sheets.emit(self.roi_list)
         self.export_enable = status
         logger.info(f"Frame model: Export status set to {self.export_enable}")
-        if len(self.roi_list) > 0 :
-            if self.export_enable:
-                self.initialize_roi_sheets.emit(len(self.roi_list))
-    
+
     # def load_exporter(self, exporter: 'RealtimeExporter'):
     #     self.exporter = exporter
         

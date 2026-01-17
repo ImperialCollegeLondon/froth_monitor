@@ -23,6 +23,7 @@ class DataCoordinator(QObject):
     
     # Signals to notify UI or other components that new processed data is ready
     air_recovery_updated = Signal(list) # Emitted when a match is found and AR is calculated
+    release_roi_summary_data = Signal(int, list)
 
     def __init__(self, frame_model: FrameModel, 
                  lidar_data_processor: LidarDataProcessor, 
@@ -33,10 +34,11 @@ class DataCoordinator(QObject):
         self.air_recovery_data_processor = air_recovery_data_processor
         
         self.perf_monitor = PerformanceMonitor()
-        self.exporter: RealtimeExporter = cast(RealtimeExporter, None)
+        self.export_enable = False
 
-    def load_exporter(self, exporter: RealtimeExporter):
-        self.exporter = exporter
+    def update_export_status(self, status: bool):
+        self.export_enable = status
+        logger.info(f"DataCoordinator: Export status set to {self.export_enable}")
 
     def process_new_velocity_data(self, roi_list: list[ROI]):
         """
@@ -120,8 +122,8 @@ class DataCoordinator(QObject):
         append_list = [timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm]
         roi.update_sum_history(append_list)
 
-        if self.exporter is not None:
-            self.exporter.write_roi_summary_data(roi.id, append_list)
+        if self.export_enable:
+            self.release_roi_summary_data.emit(roi.id, append_list)
 
     def stop_all_matchers(self):
         """Helper to stop matchers on closing."""

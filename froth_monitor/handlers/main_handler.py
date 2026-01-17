@@ -390,14 +390,17 @@ class EventHandler:
         self.calibration_handler.release_export_data.connect(lambda degree, px2mm: self.exporter.write_calibration_data(degree, px2mm))
         self.calibration_handler.update_export_status(True)
 
-        self.frame_model.initialize_roi_sheets.connect(lambda num_roi: self.exporter.initialize_roi_sheets(num_roi))
+        self.frame_model.initialize_roi_sheets.connect(lambda roi_list: self.exporter.initialize_roi_sheets(roi_list))
         self.frame_model.create_roi_sheets.connect(lambda num_roi: self.exporter.create_roi_sheets(num_roi))
         self.frame_model.delete_roi_sheets.connect(lambda num_roi: self.exporter.delete_roi_sheets(num_roi))
         self.frame_model.release_roi_movement_data.connect(lambda roi_id, delta_list: self.exporter.write_roi_movement_data(roi_id, delta_list))
         self.frame_model.update_export_status(True)
 
         # self.frame_model.load_exporter(self.exporter)
-        self.data_coordinator.load_exporter(self.exporter)
+        # self.data_coordinator.load_exporter(self.exporter)
+        self.data_coordinator.release_roi_summary_data.connect(lambda roi_id, summary_list: self.exporter.write_roi_summary_data(roi_id, summary_list))
+        self.data_coordinator.update_export_status(True)
+
         self.lidar_data_processor.load_exporter(self.exporter)
         self.update_guidance()
     

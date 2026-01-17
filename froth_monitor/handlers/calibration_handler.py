@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 from PySide6.QtCore import QObject, Signal
+from cv2 import log
 
 # Import MainGUIWindow at the beginning
 from froth_monitor.handlers.realtime_export import RealtimeExporter
@@ -419,16 +420,17 @@ class CalibrationHandler(QObject):
             
             # Apply scaling to get processing resolution px2mm
             self.display_px2mm, self.processed_px2mm = self._calculate_px2mm_with_scaling(source_px)
-            
+            self.arrow_direction = arrow_direction
+
             # Emit values to FrameModel for use in optical flow calculations
             self.release_px2mm.emit(self.processed_px2mm)
-            self.release_arrow_direction.emit(arrow_direction)
+            self.release_arrow_direction.emit(self.arrow_direction)
             self.set_textbox_px2mm.emit(str(f"{self.display_px2mm:.2f}"))
             self.set_textbox_arrow_direction.emit(str(arrow_direction))
             
             logger.info(
                 f"CalibrationHandler: Calibration confirmed:\n"
-                f"  Arrow direction: {arrow_direction:.2f}°\n"
+                f"  Arrow direction: {self.arrow_direction:.2f}°\n"
                 f"  Display px2mm: {self.display_px2mm:.2f}\n"
                 f"  Processing px2mm: {self.processed_px2mm:.1f}"
             )
@@ -443,6 +445,9 @@ class CalibrationHandler(QObject):
         
         # Emit confirmation signal
         self.calibration_confirmed.emit()
+
+        if self.export_enable == True:
+            self.release_export_data.emit(self.arrow_direction, self.display_px2mm)
         
         # Notify user
         self.message_box.emit("Overflow direction (arrow) and calibration (ruler) confirmed.")
@@ -498,7 +503,6 @@ class CalibrationHandler(QObject):
         self.status_message.emit(f"arrow angle: {degree:.1f} degrees")
 
     # ============ Data Export Workflow ============
-
     def update_export_status(self, state: bool):
         """Enable or disable data export functionality.
         
@@ -513,4 +517,5 @@ class CalibrationHandler(QObject):
 
         # If both calibration and export are ready, export immediately
         if self.confirm_calibration == True and self.export_enable == True:
-            self.release_export_data.emit(self.arrow_direction, self.processed_px2mm)
+            logger.info(f"Exporting calibration data: arrow direction = {self.arrow_direction:.2f}°, px2mm = {self.display_px2mm:.2f}")
+            self.release_export_data.emit(self.arrow_direction, self.display_px2mm)

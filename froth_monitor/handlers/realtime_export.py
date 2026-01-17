@@ -450,6 +450,7 @@ class RealtimeExporter(QFileDialog):
         bool
             True if sheets were created successfully
         """
+        logger.info(f"Exporter: Creating ROI sheets for ROI {roi_id}")
         if not self.is_running or roi_id in self.active_rois:
             return False
         
@@ -460,17 +461,17 @@ class RealtimeExporter(QFileDialog):
                 self._create_csv_file(movement_sheet_name, self.roi_movement_headers)
                 
                 # Create summary sheet
-                summary_sheet_name = f"ROI_{roi_id}_summary"
+                summary_sheet_name = f"ROI_{roi_id}_per_sec_summary"
                 self._create_csv_file(summary_sheet_name, self.roi_summary_headers)
                 
                 # Create queues for this ROI
                 self.roi_queues[f"roi_{roi_id}_movement"] = queue.Queue()
-                self.roi_queues[f"roi_{roi_id}_summary"] = queue.Queue()
+                self.roi_queues[f"ROI_{roi_id}_per_sec_summary"] = queue.Queue()
                 
                 # Add to active ROIs
                 self.active_rois.add(roi_id)
                 
-                logger.info(f"Created ROI CSVs for ROI {roi_id}")
+                logger.info(f"Exporter: Created ROI CSVs for ROI {roi_id}")
                 return True
                 
             except Exception as e:
@@ -498,7 +499,7 @@ class RealtimeExporter(QFileDialog):
             try:
 
                 movement_sheet_name = f"ROI_{roi_id}_movement_data"
-                summary_sheet_name = f"ROI_{roi_id}_summary"
+                summary_sheet_name = f"ROI_{roi_id}_per_sec_summary"
                 
                 # Close and remove CSV handlers
                 self._close_csv_file(movement_sheet_name)
@@ -507,8 +508,8 @@ class RealtimeExporter(QFileDialog):
                 # Remove queues
                 if f"roi_{roi_id}_movement" in self.roi_queues:
                     del self.roi_queues[f"roi_{roi_id}_movement"]
-                if f"roi_{roi_id}_summary" in self.roi_queues:
-                    del self.roi_queues[f"roi_{roi_id}_summary"]
+                if f"ROI_{roi_id}_per_sec_summary" in self.roi_queues:
+                    del self.roi_queues[f"ROI_{roi_id}_per_sec_summary"]
                 
                 # Remove from active ROIs
                 self.active_rois.discard(roi_id)
@@ -551,7 +552,7 @@ class RealtimeExporter(QFileDialog):
                         self._process_queue(sheet_name, roi_queue)
                     elif "summary" in queue_name:
                         roi_id = queue_name.split("_")[1]
-                        sheet_name = f"ROI_{roi_id}_summary"
+                        sheet_name = f"ROI_{roi_id}_per_sec_summary"
                         self._process_queue(sheet_name, roi_queue)
                 
                 duration = time.perf_counter() - start_time
@@ -598,10 +599,10 @@ class RealtimeExporter(QFileDialog):
         """
         Initialize ROI sheets when the exporter is loaded
         """
-        logger.info("Initializing ROI sheets")
+        logger.info("Exporter: Initializing ROI sheets")
 
         for id, roi in enumerate(roi_list):
-
+            logger.info(f"Exporter: Initializing ROI {id}")
             self.create_roi_sheets(roi.id)
             for data in roi.delta_history:
                 self.write_roi_movement_data(roi.id, data)
@@ -613,9 +614,9 @@ class RealtimeExporter(QFileDialog):
         """
         Write calibration data to calibration_data sheet
         """
-        logger.info(f"Writing calibration data: {arrow_direction}, {px2mm}")
+        logger.info(f"Exporter: Writing calibration data: {arrow_direction}, {px2mm}")
         if not self.is_running:
-            logger.warning("Export is not running, calibration data not written")
+            logger.warning("Exporter: Export is not running, calibration data not written")
             return
             
         data_row = [arrow_direction, px2mm]
@@ -623,7 +624,7 @@ class RealtimeExporter(QFileDialog):
         try:
             self.calibration_queue.put_nowait(data_row)
         except queue.Full:
-            logger.warning("Calibration queue full, dropping data point")
+            logger.warning("Exporter: Calibration queue full, dropping data point")
     
     def write_lidar_data(self, timestamp: str, raw_reading: float, calibrated_reading: float):
         """
@@ -681,7 +682,7 @@ class RealtimeExporter(QFileDialog):
         # timestamp, velocity, froth_height, air_rec, current_air_flow, current_air_flow_in_mm
         data_row = sum_data_list
         
-        queue_name = f"roi_{roi_id}_summary"
+        queue_name = f"ROI_{roi_id}_per_sec_summary"
         if queue_name in self.roi_queues:
             try:
                 self.roi_queues[queue_name].put_nowait(data_row)
