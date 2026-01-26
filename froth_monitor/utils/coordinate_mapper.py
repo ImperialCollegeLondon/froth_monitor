@@ -24,7 +24,7 @@ class CoordinateMapper:
         Processing resolution: 320x240 (50% scale)
         
         User draws ROI at (100, 50, 200, 150) on display
-        → Transformed to (50, 25, 100, 75) for processing
+        -> Transformed to (50, 25, 100, 75) for processing
     """
     
     def __init__(self, display_resolution: Tuple[int, int], 
@@ -53,7 +53,7 @@ class CoordinateMapper:
         
         logger.debug(
             f"CoordinateMapper initialized: "
-            f"Display {display_resolution} → Processing {processing_resolution} "
+            f"Display {display_resolution} -> Processing {processing_resolution} "
             f"(scale: {self.scale_x:.2%} x {self.scale_y:.2%})"
         )
     
@@ -81,7 +81,7 @@ class CoordinateMapper:
         proc_height = max(1, int(height * self.scale_y))  # Minimum 1 pixel
         
         logger.debug(
-            f"Display→Processing: ({x}, {y}, {width}, {height}) → "
+            f"Display->Processing: ({x}, {y}, {width}, {height}) -> "
             f"({proc_x}, {proc_y}, {proc_width}, {proc_height})"
         )
         
@@ -111,7 +111,7 @@ class CoordinateMapper:
         disp_height = max(1, int(height / self.scale_y))  # Minimum 1 pixel
         
         logger.debug(
-            f"Processing→Display: ({x}, {y}, {width}, {height}) → "
+            f"Processing->Display: ({x}, {y}, {width}, {height}) -> "
             f"({disp_x}, {disp_y}, {disp_width}, {disp_height})"
         )
         
@@ -144,7 +144,7 @@ class CoordinateMapper:
             (20.0, 10.0)
         """
         if to_display:
-            # Processing → Display: divide by scale factor
+            # Processing -> Display: divide by scale factor
             scaled_x = delta_x / self.scale_x
             scaled_y = delta_y / self.scale_y
         else:

@@ -62,7 +62,7 @@ class ROIHandler(QObject):
     roi_draw_start = Signal()  # Request overlay to enter ROI drawing mode
     
     # ROI data flow
-    roi_added = Signal(tuple, tuple)  # (display_coords, proc_coords) → FrameModel
+    roi_added = Signal(tuple, tuple)  # (display_coords, proc_coords) -> FrameModel
     roi_deleted = Signal()  # Last ROI deleted → FrameModel
 
     # User feedback
@@ -159,7 +159,7 @@ class ROIHandler(QObject):
     def handle_roi_created(self, rect):
         """Handle ROI creation with coordinate transformation.
         
-        Transforms ROI rectangle from display space → processing space using
+        Transforms ROI rectangle from display space -> processing space using
         CoordinateMapper, then emits the transformed coordinates for consumption
         by FrameModel.
         
@@ -168,7 +168,7 @@ class ROIHandler(QObject):
         
         Workflow:
             1. Extract display coordinates from QRect
-            2. Transform: display pixels → processing pixels
+            2. Transform: display pixels -> processing pixels
             3. Emit roi_added signal with both coordinate sets
             4. Update status bar with creation info
         
@@ -181,7 +181,7 @@ class ROIHandler(QObject):
         # Extract display coordinates
         display_coords = (rect.x(), rect.y(), rect.width(), rect.height())
         
-        # Transform display coordinates → processing coordinates
+        # Transform display coordinates -> processing coordinates
         if self.display_res != (0, 0) and self.processing_res != (0, 0) and self.display_res[0] > 0:
             # Create coordinate mapper
             mapper = CoordinateMapper(self.display_res, self.processing_res)
@@ -211,7 +211,7 @@ class ROIHandler(QObject):
         # Status update
         self.status_message.emit(
             f"ROI created at ({display_coords[0]}, {display_coords[1]}) "
-            f"→ Processing: ({proc_coords[0]}, {proc_coords[1]})"
+            f"-> Processing: ({proc_coords[0]}, {proc_coords[1]})"
         )
     
     def delete_last_roi(self):
@@ -221,9 +221,9 @@ class ROIHandler(QObject):
         overlay widget to redraw.
         
         Workflow:
-            1. Emit roi_deleted signal → FrameModel removes ROI
-            2. Emit request_overlay_update → Overlay redraws
-            3. Emit status message → User feedback
+            1. Emit roi_deleted signal -> FrameModel removes ROI
+            2. Emit request_overlay_update -> Overlay redraws
+            3. Emit status message -> User feedback
         """
         self.roi_deleted.emit()
         self.request_overlay_update.emit()

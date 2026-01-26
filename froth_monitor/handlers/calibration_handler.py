@@ -42,7 +42,7 @@ class CalibrationHandler(QObject):
     
     Data Flow:
         1. User draws ruler on overlay (overlay pixels)
-        2. Coordinates transformed: overlay → source resolution
+        2. Coordinates transformed: overlay -> source resolution
         3. px2mm calculated for both display and processing resolutions
         4. Results emitted via signals for consumption by FrameModel/GUI
     
@@ -75,9 +75,9 @@ class CalibrationHandler(QObject):
         
         Example:
             User draws 400px ruler on 800x450 overlay
-            → Maps to 640px in 1280x720 source video
-            → Display px2mm = 640/20mm = 32.0 px/mm
-            → Processing px2mm = 32 * 0.5 = 16.0 px/mm (for 50% scale)
+            -> Maps to 640px in 1280x720 source video
+            -> Display px2mm = 640/20mm = 32.0 px/mm
+            -> Processing px2mm = 32 * 0.5 = 16.0 px/mm (for 50% scale)
     
     State Management:
         - confirm_calibration: Whether calibration has been confirmed
@@ -246,9 +246,9 @@ class CalibrationHandler(QObject):
         known distance.
         
         Workflow:
-            1. Emit ruler_draw_start → OverlayWidget.ruler_calibration()
+            1. Emit ruler_draw_start -> OverlayWidget.ruler_calibration()
             2. User draws line on overlay
-            3. OverlayWidget.ruler_measured → handle_ruler_measurement()
+            3. OverlayWidget.ruler_measured -> handle_ruler_measurement()
         """
         if self.confirm_calibration:
             self.warning_box.emit(
@@ -308,7 +308,7 @@ class CalibrationHandler(QObject):
     def handle_ruler_measurement(self, overlay_px: float):
         """Process ruler measurement with coordinate transformation.
         
-        Transforms ruler measurement from overlay space → source space → calculates
+        Transforms ruler measurement from overlay space -> source space -> calculates
         px2mm for both display and processing resolutions.
         
         Args:
@@ -316,8 +316,8 @@ class CalibrationHandler(QObject):
         
         Workflow:
             1. Validate resolutions are initialized
-            2. Transform: overlay pixels → source pixels (using CoordinateMapper)
-            3. Calculate: source pixels → px2mm (display and processing)
+            2. Transform: overlay pixels -> source pixels (using CoordinateMapper)
+            3. Calculate: source pixels -> px2mm (display and processing)
             4. Emit results via signals
             5. Update GUI textbox and show user feedback
         
@@ -339,7 +339,7 @@ class CalibrationHandler(QObject):
         source_res = self.source_res
         overlay_res = self.overlay_res
         
-        # Transform overlay pixels → source pixels
+        # Transform overlay pixels -> source pixels
         if source_res != (0, 0) and overlay_res != (0, 0) and overlay_res[0] > 0:
             # Create mapper for coordinate transformation
             mapper = CoordinateMapper(overlay_res, source_res)
@@ -460,9 +460,9 @@ class CalibrationHandler(QObject):
         the direction of froth overflow.
         
         Workflow:
-            1. Emit arrow_draw_start → OverlayWidget.start_arrow_drawing()
+            1. Emit arrow_draw_start -> OverlayWidget.start_arrow_drawing()
             2. User draws arrow on overlay
-            3. OverlayWidget.arrow_drawn → handle_arrow_drawing()
+            3. OverlayWidget.arrow_drawn -> handle_arrow_drawing()
         """
         if self.confirm_calibration:
             logger.warning("You have already confirmed the arrow and ruler. Please reset the application if you want to change them.")

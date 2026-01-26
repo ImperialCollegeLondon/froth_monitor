@@ -115,9 +115,9 @@ class FrameProcessor(QObject):
 
 
     # Note: Utility methods extracted to dedicated classes:
-    # - Frame conversion → FrameConverter utility class
-    # - GUI display → FrameDisplayManager
-    # - Frame resampling → FrameResampleHandler
+    # - Frame conversion -> FrameConverter utility class
+    # - GUI display -> FrameDisplayManager
+    # - Frame resampling -> FrameResampleHandler
 
     def _process_frame_with_model(self, resized_frame):
         """
