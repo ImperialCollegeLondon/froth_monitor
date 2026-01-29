@@ -112,12 +112,29 @@ class VideoRecorder(QObject):
         # Initialize video writer
         # Use H.264 codec (XVID is more widely supported than mp4v)
         fourcc = cv2.VideoWriter.fourcc(*"XVID")
+        
+        # Log initialization parameters for debugging
+        logger.info(
+            f"Initializing VideoWriter: Path={self.output_path}, "
+            f"FOURCC={fourcc}, FPS={fps}, "
+            f"Dimensions={frame_width}x{frame_height}"
+        )
+
+        # Validate parameters before opening
+        if frame_width <= 0 or frame_height <= 0:
+            logger.error(f"Invalid frame dimensions: {frame_width}x{frame_height}")
+            return False
+            
+        if fps <= 0:
+            logger.error(f"Invalid FPS: {fps}")
+            return False
+
         self.video_writer = cv2.VideoWriter(
             self.output_path, fourcc, fps, (frame_width, frame_height)
         )
 
         if not self.video_writer.isOpened():
-            logger.error("Failed to open video writer")
+            logger.error("Failed to open video writer. Check if codec is available and path is writable.")
             return False
 
         # Reset counters

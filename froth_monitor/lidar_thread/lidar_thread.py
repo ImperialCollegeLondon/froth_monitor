@@ -10,6 +10,7 @@ import threading
 import time
 from datetime import datetime
 from typing import Optional
+import numpy as np
 from PySide6.QtCore import QObject, Signal
 from froth_monitor.handlers.logger_config import get_logger
 
@@ -44,22 +45,20 @@ class LidarThread(QObject):
         self.running = False
         self.paused = False
         self.thread_: Optional[threading.Thread] = None
-
+        
         # LiDAR configuration
         self.port = "COM3"  # Default port
         self.baudrate = 115200
         self.timeout = 1.0
-
+        
         # Data storage
         self.full_timestamps = []
         self.full_distances = []
-
+        
         # Offset for distance measurements (in mm)
         self.distance_offset = 0.0
 
-    def start_lidar_capture(
-        self, port: str = "COM3", baudrate: int = 38400, timeout: float = 1.0
-    ) -> bool:
+    def start_lidar_capture(self, port: str = "COM3", baudrate: int = 38400, timeout: float = 1.0) -> bool:
         """
         Start reading LiDAR data from the specified serial port.
 
@@ -86,28 +85,29 @@ class LidarThread(QObject):
                 port=self.port,
                 baudrate=self.baudrate,
                 timeout=self.timeout,
-                bytesize=serial.EIGHTBITS,
+                bytesize=serial.EIGHTBITS, 
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
             )
-
+            
             # Clear any existing data in the buffer
             # self.serial_connection.flushInput()
             self.serial_connection.reset_input_buffer()
-
+            
             # Start the reading thread
             self.running = True
             self.paused = False
-
-            self.serial_connection.write(f"iSET:7,{10}\r\n".encode())
-            time.sleep(0.1)
-            self.serial_connection.write(b"iFACM\r\n")
-
+            
+            # Remember to uncomment the following lines to set the LiDAR to manual mode
+            # self.serial_connection.write(f"iSET:7,{10}\r\n".encode())
+            # time.sleep(0.1)
+            # self.serial_connection.write(b"iFACM\r\n")
+            
             self.thread_ = threading.Thread(target=self._lidar_loop, daemon=True)
             self.thread_.start()
-
+            
             return True
-
+            
         except Exception as e:
             logger.error(f"Failed to start LiDAR capture: {e}")
             self.serial_connection = None
@@ -120,6 +120,7 @@ class LidarThread(QObject):
         Supports pausing without closing the serial connection.
         """
         while self.running and self.serial_connection:
+
             try:
                 # If paused, just sleep a bit and continue the loop without reading
                 if self.paused:
@@ -129,41 +130,38 @@ class LidarThread(QObject):
                 # Read data from serial port
                 while self.serial_connection.in_waiting:
                     # line = self.serial_connection.readline().decode('utf-8').strip()
-                    line = (
-                        self.serial_connection.readline()
-                        .decode("ascii", errors="ignore")
-                        .strip()
-                    )
+                    line = self.serial_connection.readline().decode("ascii", errors="ignore").strip()
 
                     if line:
                         # Parse LiDAR data (expecting format like "D=1.234m")
                         distance_mm = self._parse_lidar_data(line)
 
                         if distance_mm is not None:
+                            distance_raw = distance_mm
                             # Apply offset
-                            distance_mm += self.distance_offset
-
+                            distance_mm = self.distance_offset - distance_mm
+                            
                             # Create timestamp
                             timestamp = datetime.now().strftime("%H:%M:%S.%f")
-
+                            
                             # Store data
                             self.full_timestamps.append(timestamp)
                             self.full_distances.append(distance_mm)
-
+                            
                             # Prepare data dictionary
                             lidar_data = {
-                                "timestamp": timestamp,
-                                "distance_mm": distance_mm,
-                                "distance_mm_inverted": -distance_mm,  # For compatibility
-                                "formatted_timestamp": timestamp,
+                                'timestamp': timestamp,
+                                'calibrated_reading(mm)': distance_mm,
+                                'raw_reading(mm)': distance_raw,
+                                'distance_mm_inverted': -distance_mm,  # For compatibility
                             }
-
+                            
                             # Emit signal with new data
                             self.data_available.emit(lidar_data)
                 else:
                     # No data available, sleep briefly
                     time.sleep(0.01)
-
+                    
             except Exception as e:
                 logger.error(f"Error in LiDAR reading loop: {e}")
                 time.sleep(0.1)  # Sleep on error to avoid busy loop
@@ -171,18 +169,18 @@ class LidarThread(QObject):
     def _parse_lidar_data(self, line: str) -> Optional[float]:
         """
         Parse LiDAR data from a line of text.
-
+        
         Expected format: "D=X.XXXm" where X.XXX is the distance in meters.
-
+        
         Args:
             line (str): Raw line from LiDAR sensor
-
+            
         Returns:
             Optional[float]: Distance in millimeters, or None if parsing failed
         """
         try:
             # Look for pattern "D=X.XXXm"
-            if line.startswith("D=") and line.endswith("m"):
+            if line.startswith('D=') and line.endswith('m'):
                 # Extract the numeric part
                 distance_str = line[2:-1]  # Remove "D=" and "m"
                 distance_m = float(distance_str)
@@ -192,7 +190,7 @@ class LidarThread(QObject):
 
         except (ValueError, IndexError):
             pass
-
+        
         return None
 
     def pause_lidar_capture(self):
@@ -218,11 +216,11 @@ class LidarThread(QObject):
         if self.running:
             self.running = False
             self.paused = False
-
+            
             # Wait for thread to finish
             if self.thread_ and self.thread_.is_alive():
                 self.thread_.join(timeout=2.0)
-
+            
             # Close serial connection
             if self.serial_connection:
                 try:
@@ -231,13 +229,13 @@ class LidarThread(QObject):
                     logger.error(f"Error closing serial connection: {e}")
                 finally:
                     self.serial_connection = None
-
+            
             logger.info("LiDAR capture stopped")
 
     def is_running(self) -> bool:
         """
         Check if the LiDAR thread is currently running.
-
+        
         Returns:
             bool: True if running, False otherwise.
         """
@@ -246,7 +244,7 @@ class LidarThread(QObject):
     def set_distance_offset(self, offset_mm: float):
         """
         Set the distance offset for LiDAR measurements.
-
+        
         Args:
             offset_mm (float): Offset in millimeters to add to all measurements
         """
@@ -256,58 +254,50 @@ class LidarThread(QObject):
     def get_latest_data(self) -> Optional[dict]:
         """
         Get the latest LiDAR measurement.
-
+        
         Returns:
             Optional[dict]: Latest measurement data or None if no data available
         """
         if self.full_timestamps and self.full_distances:
             latest_timestamp = self.full_timestamps[-1]
             latest_distance = self.full_distances[-1]
-
+            
             return {
-                "timestamp": latest_timestamp,
-                "distance_mm": latest_distance,
-                "distance_mm_inverted": -latest_distance,
-                "formatted_timestamp": latest_timestamp.strftime(
-                    "%Y/%m/%d %H:%M:%S.%f"
-                )[:-3],
+                'timestamp': latest_timestamp,
+                'distance_mm': latest_distance,
+                'distance_mm_inverted': -latest_distance,
+                'formatted_timestamp': latest_timestamp.strftime("%Y/%m/%d %H:%M:%S.%f")[:-3]
             }
-
+        
         return None
 
     def export_data(self, filename: str) -> bool:
         """
         Export collected LiDAR data to a CSV file.
-
+        
         Args:
             filename (str): Path to the output CSV file
-
+            
         Returns:
             bool: True if export was successful, False otherwise
         """
         try:
             import csv
-
-            with open(filename, "w", newline="") as csvfile:
+            
+            with open(filename, 'w', newline='') as csvfile:
                 writer = csv.writer(csvfile)
-
+                
                 # Write header
-                writer.writerow(["timestamp", "distance_mm"])
-
+                writer.writerow(['timestamp', 'distance_mm'])
+                
                 # Write data
-                for timestamp, distance in zip(
-                    self.full_timestamps, self.full_distances
-                ):
-                    formatted_timestamp = timestamp.strftime("%Y/%m/%d %H:%M:%S.%f")[
-                        :-3
-                    ]
-                    writer.writerow(
-                        [formatted_timestamp, distance]
-                    )  # Inverted for compatibility
-
+                for timestamp, distance in zip(self.full_timestamps, self.full_distances):
+                    formatted_timestamp = timestamp.strftime("%Y/%m/%d %H:%M:%S.%f")[:-3]
+                    writer.writerow([formatted_timestamp, distance])  # Inverted for compatibility
+            
             logger.info(f"LiDAR data exported to {filename}")
             return True
-
+            
         except Exception as e:
             logger.error(f"Failed to export LiDAR data: {e}")
             return False

@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
     QSizePolicy,
+    QComboBox,
 )
 from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QIcon, QFont
@@ -43,10 +44,13 @@ class MainGUIWindow(QMainWindow):
         """
         super(MainGUIWindow, self).__init__()
         self.setWindowTitle("Froth Monitor")
-        self.setMinimumSize(800, 600)
-        self.resize(1200, 800)  # Default size, but resizable
+        # Set minimum and default window size
+        # Minimum: Left panel (250px) + Video container (700px) + Right table (~350px) + margins (~50px) = ~1350px
+        self.setMinimumSize(1350, 700)  # Ensures all UI elements are visible
+        self.resize(1400, 850)  # Default size for comfortable viewing
         # self.showMaximized()
         self.setStyleSheet("background-color: #f0f0f0;")
+        # self.setStyleSheet("background-color: black;")
         self._create_stylesheets()
 
         # Initialize overlay related attributes
@@ -388,28 +392,23 @@ class MainGUIWindow(QMainWindow):
         Returns:
             QGroupBox: The video source group box with radio buttons.
         """
-        source_group = QGroupBox("Main Control")
-        source_group.setStyleSheet("font-weight: bold; font-size: 15px; color: black")
+        source_group = QGroupBox("Video Source")
+        source_group.setStyleSheet("font-weight: bold; font-size: 15px; color: black; background-color: transparent;")
         source_layout = QVBoxLayout(source_group)
         source_layout.setSpacing(10)
 
-        # Radio buttons for video source
+        # # Radio buttons for video source
         # self.webcam_radio = QRadioButton("Webcam")
         # self.webcam_radio.setStyleSheet(
-        #     "font-weight: normal; font-size: 12px; color: black"
+        #     "font-weight: normal; font-size: 12px; color: black; background-color: transparent;"
         # )
         # self.prerecorded_radio = QRadioButton("Pre-recorded")
         # self.prerecorded_radio.setStyleSheet(
-        #     "font-weight: normal; font-size: 12px; color: black"
+        #     "font-weight: normal; font-size: 12px; color: black; background-color: transparent;"
         # )
         # self.webcam_radio.setChecked(True)
-        # self.jetson_radio = QRadioButton("Jetson")
-        # self.jetson_radio.setStyleSheet(
-        #     "font-weight: normal; font-size: 12px; color: black"
-        # )
-        # self.jetson_radio.setChecked(True)
 
-        self.import_button = QPushButton("Start")
+        self.import_button = QPushButton("Start Capture")
         self.import_button.setStyleSheet(
             self.ENABLED_BUTTON_STYLE
         )
@@ -430,9 +429,6 @@ class MainGUIWindow(QMainWindow):
         
         # source_layout.addWidget(self.webcam_radio)
         # source_layout.addWidget(self.prerecorded_radio)
-        # source_layout.addWidget(
-        #     self.jetson_radio
-        # )  # Add this line to add the Jetson radio button to the layout
         source_layout.addWidget(self.import_button)
 
         return source_group
@@ -583,9 +579,9 @@ class MainGUIWindow(QMainWindow):
 
     def _add_reset_buttons(self, layout: QVBoxLayout) -> None:
         """Add responsive reset buttons."""
-        self.record_button = QPushButton("  Start Recording")
+        self.record_button = QPushButton("  Start Video Recording")
         self.record_button.setIcon(
-            QIcon(self.resource_path("froth_monitor/gui_resources/camera_icon.ico"))
+            QIcon(self.resource_path("froth_monitor/resources/camera_icon.ico"))
         )
         self.record_button.setIconSize(QSize(24, 24))
         self.record_button.setStyleSheet(
@@ -606,7 +602,7 @@ class MainGUIWindow(QMainWindow):
         )
         layout.addWidget(self.record_button)
 
-        self.simple_reset_button = QPushButton("Reset")
+        self.simple_reset_button = QPushButton("End Session and Save")
         self.simple_reset_button.setStyleSheet(
             self.ENABLED_BUTTON_STYLE
         )
@@ -640,11 +636,23 @@ class MainGUIWindow(QMainWindow):
         self.video_container.setStyleSheet(
             "background-color: #333333; border-radius: 4px;"
         )
+        
+        # Use QVBoxLayout with proper margins to prevent overflow
         video_container_layout = QVBoxLayout(self.video_container)
+        video_container_layout.setContentsMargins(5, 5, 5, 5)  # Add margins
+        video_container_layout.setSpacing(0)  # No spacing needed
 
+        # Video canvas label - this holds the actual video frame
         self.video_canvas_label = QLabel("")
         self.video_canvas_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_canvas_label.setStyleSheet("background-color: #333333;")
+        
+        # Critical: Set size policy to prevent label from expanding beyond container
+        self.video_canvas_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self.video_canvas_label.setScaledContents(False)  # Don't scale contents, we handle that
+        
         video_container_layout.addWidget(self.video_canvas_label)
 
         # Table container (right side)--------------------------------------------------
@@ -665,11 +673,22 @@ class MainGUIWindow(QMainWindow):
         self._create_air_flow_control_panel(table_layout)
 
         # Add to horizontal layout
-        video_table_layout.addWidget(self.video_container, 1)
+        # Create a vertical container for the left side (Video + Controls)
+        left_column_widget = QWidget()
+        left_column_layout = QVBoxLayout(left_column_widget)
+        left_column_layout.setContentsMargins(0, 0, 0, 0)
+        left_column_layout.setSpacing(5)
+
+        # Add video container to left column
+        left_column_layout.addWidget(self.video_container)
+
+        # Add controls to left column (below video)
+        self._create_media_controls(left_column_layout)
+
+        video_table_layout.addWidget(left_column_widget, 1)
         video_table_layout.addWidget(table_container, 0)
 
         layout.addWidget(video_table_container)
-        self._create_media_controls(layout)
 
     def _create_table_group(self, layout) -> None:
         table_label_1 = QLabel("Average froth data over the last second")
@@ -679,23 +698,24 @@ class MainGUIWindow(QMainWindow):
         example_2d_data = [["N/A", "N/A", "N/A", "N/A"]]
         self.velo_widget = pg.TableWidget()
         self.velo_widget.setData(example_2d_data)
-        self.velo_widget.setHorizontalHeaderLabels(["timestamp", "v(mm/s)", "f_height(mm)", "air_rec(%)"])
+        self.velo_widget.setHorizontalHeaderLabels(["timestamp", "v(mm/s)", "f_h(mm)", "air_rec(%)"])
         self.velo_widget.setFormat("%.2f")
         self.velo_widget.setMinimumHeight(80)
-        self.velo_widget.setMinimumWidth(50)  # Fixed width
+        self.velo_widget.setMinimumWidth(30)  # Fixed width
         self.velo_widget.setStyleSheet(
             """
             background-color: #f0f0f0; 
             font-size: 10px;
             border: 1px solid #ccc;
-            border-radius: 4px;
+            border-radius: 2px;
             """
         )
 
         # Set minimum column width
-        self.velo_widget.setColumnWidth(0, 80)
-        self.velo_widget.setColumnWidth(1, 80)
-        self.velo_widget.setColumnWidth(2, 80)
+        self.velo_widget.setColumnWidth(0, 70)
+        self.velo_widget.setColumnWidth(1, 70)
+        self.velo_widget.setColumnWidth(2, 70)
+        self.velo_widget.setColumnWidth(3, 70)
 
         # self.velo_widget.setFixedHeight(80) 
         self.velo_widget.setSizePolicy(
@@ -744,7 +764,6 @@ class MainGUIWindow(QMainWindow):
         )
         self.ar_plot_widget.showAxis("left")
         self.ar_plot_widget.showAxis("bottom")
-
 
         # Apply custom fonts
         self.ar_plot_widget.setLabel("left", "Air Recovery", units="%", **self.plot_label_style)
@@ -856,7 +875,7 @@ class MainGUIWindow(QMainWindow):
         export_layout.setSpacing(10)
 
         # roi_layout = QHBoxLayout()
-        self.export_button = QPushButton("Export/Recording Settings")
+        self.export_button = QPushButton("Export & Recording Settings")
         self.export_button.setStyleSheet(
             self.ENABLED_BUTTON_STYLE
         )
@@ -932,7 +951,7 @@ class MainGUIWindow(QMainWindow):
 
         self.play_pause_button = QPushButton()
         self.play_pause_button.setIcon(
-            QIcon(self.resource_path("froth_monitor/gui_resources/pause_icon.ico"))
+            QIcon(self.resource_path("froth_monitor/resources/pause_icon.ico"))
         )
         self.play_pause_button.setIconSize(QSize(24, 24))
         self.play_pause_button.setStyleSheet(
@@ -954,18 +973,50 @@ class MainGUIWindow(QMainWindow):
         self.play_pause_button.setToolTip("Play/Pause Video")
 
         self.refresh_graph_button = QPushButton("Refresh Graphs")
+        self.refresh_graph_button.setFixedHeight(35)
         self.refresh_graph_button.setStyleSheet(
             self.DISABLED_BUTTON_STYLE
         )
 
+        # Resolution Dropdown
+        self.resolution_combo = QComboBox()
+        self.resolution_combo.addItems(["Original", "High", "Medium", "Low"])
+        self.resolution_combo.setCurrentText("Medium") # Default to Medium
+        self.resolution_combo.setStyleSheet("""
+            QComboBox {
+                background-color: white;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 5px;
+                min-width: 120px;
+                font-size: 11px;
+                color: black;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 2px solid #333;
+                border-bottom: 2px solid #333;
+                width: 6px;
+                height: 6px;
+                margin-right: 5px;
+                transform: rotate(-45deg); /* Simple arrow styling */
+            }
+        """)
+        self.resolution_combo.setToolTip("Select Processing Resolution")
+
+        # Add label for resolution
+        res_label = QLabel("Processing Quality:")
+        res_label.setStyleSheet("color: black; font-size: 12px; margin-right: 5px;")
+
         media_controls_layout.addWidget(self.play_pause_button)
         media_controls_layout.addWidget(self.refresh_graph_button)
         media_controls_layout.addStretch()
+        media_controls_layout.addWidget(res_label)
+        media_controls_layout.addWidget(self.resolution_combo)
         layout.addWidget(media_controls_container)
-
-    def _trigger_jetson_mode(self) -> None:
-        self.froth_height_label.setVisible(True)
-        self.froth_height_plot_widget.setVisible(True)
 
     def _trigger_lidar_mode(self) -> None:
         self.froth_height_label.setVisible(True)
@@ -979,7 +1030,8 @@ class MainGUIWindow(QMainWindow):
 
     def _update_guidance(self, event: str) -> None:
         if event == "step_1":
-            self.statusBar().showMessage("Step 1: Import a Video Source")
+            self.statusBar().showMessage("GUI Window: Step 1: Import a Video Source")
+            logger.info("GUI Window: Step 1: Import a Video Source")
             self.algorithm_configuration.setStyleSheet(
                 self.DISABLED_BUTTON_STYLE
             )
@@ -1021,6 +1073,8 @@ class MainGUIWindow(QMainWindow):
             # self.save_button.setDisabled(True)
 
         if event == "step_2":
+            self.statusBar().showMessage("GUI Window: Step 2: Calibration and Arrow Confirmation")
+            logger.info("GUI Window: Step 2: Calibration and Arrow Confirmation")
             self.algorithm_configuration.setStyleSheet(
                 self.ENABLED_BUTTON_STYLE
             )
@@ -1052,8 +1106,8 @@ class MainGUIWindow(QMainWindow):
             self.refresh_graph_button.setDisabled(False)
 
         if event == "step_3":
-            self.statusBar().showMessage("Step 3: ROI drawing")
-            print("ROI drawing enabled")
+            self.statusBar().showMessage("GUI Window: Step 3: ROI drawing")
+            logger.info("GUI Window: Step 3: ROI drawing")
             self.roi_group.setStyleSheet(
                 self.ENABLED_ROI_BUTTON_STYLE
             )

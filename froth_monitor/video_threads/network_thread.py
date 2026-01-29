@@ -181,8 +181,10 @@ class NetworkThread(QObject):
         total_frames_received = 0
         
         try:
+            logger.info("Try to start network receiver loop")
             # Use DataReceiver's generator approach like testbench
             if self.data_receiver is None:
+                logger.error("Data receiver not initialized")
                 raise RuntimeError("Data receiver not initialized")
                 
             logger.info("Starting network receiver loop")
@@ -318,6 +320,13 @@ class NetworkThread(QObject):
 
     def get_frame_dimensions(self):
         return (1280, 720)
+
+    def get_fps(self):
+        """
+        Get the frames per second rate of the network video source.
+        Returns 30.0 as a default for network streams if not specifically tracked.
+        """
+        return 30.0
 
     def release_buffer(self):
         """Decrement buffer counter when frame processing completes"""
