@@ -1030,8 +1030,14 @@ class MainGUIWindow(QMainWindow):
 
     def _update_guidance(self, event: str) -> None:
         if event == "step_1":
-            self.statusBar().showMessage("GUI Window: Step 1: Import a Video Source")
-            logger.info("GUI Window: Step 1: Import a Video Source")
+            # self.statusBar().showMessage("GUI Window: Step 1: Import a Video Source")
+            # logger.info("GUI Window: Step 1: Import a Video Source")
+            self.statusBar().showMessage("GUI Window: Step 1: start capture")
+            logger.info("GUI Window: Step 1: Ready to start capture")
+            self.import_button.setStyleSheet(
+                self.ENABLED_BUTTON_STYLE
+            )
+            self.import_button.setDisabled(False)
             self.algorithm_configuration.setStyleSheet(
                 self.DISABLED_BUTTON_STYLE
             )
@@ -1075,6 +1081,10 @@ class MainGUIWindow(QMainWindow):
         if event == "step_2":
             self.statusBar().showMessage("GUI Window: Step 2: Calibration and Arrow Confirmation")
             logger.info("GUI Window: Step 2: Calibration and Arrow Confirmation")
+            self.import_button.setStyleSheet(
+                self.DISABLED_BUTTON_STYLE
+            )
+            self.import_button.setDisabled(True)
             self.algorithm_configuration.setStyleSheet(
                 self.ENABLED_BUTTON_STYLE
             )
