@@ -35,7 +35,7 @@ class LidarHandler:
     def start_lidar_capture(self, port: str = "COM3", baudrate: int = 115200):
         """Start LiDAR data capture."""
         try:
-            port = "/dev/ttys055"
+            # port = "/dev/ttys055"
             port = port
             success = self.lidar_thread.start_lidar_capture(port, baudrate)
             logger.info(f"""
