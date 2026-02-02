@@ -74,6 +74,7 @@ class LidarThread(QObject):
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
+        logger.info(f"Lidar Thread: LiDAR configuration: {self.port}, {self.baudrate}, {self.timeout}")
 
         # If already running, stop first
         if self.running:
@@ -99,13 +100,14 @@ class LidarThread(QObject):
             self.paused = False
             
             # Remember to uncomment the following lines to set the LiDAR to manual mode
-            # self.serial_connection.write(f"iSET:7,{10}\r\n".encode())
-            # time.sleep(0.1)
-            # self.serial_connection.write(b"iFACM\r\n")
+            self.serial_connection.write(f"iSET:7,{10}\r\n".encode())
+            time.sleep(0.1)
+            self.serial_connection.write(b"iFACM\r\n")
             
             self.thread_ = threading.Thread(target=self._lidar_loop, daemon=True)
             self.thread_.start()
-            
+            logger.info("Lidar Thread: LiDAR loop started")
+            logger.info(f"Lidar Thread: LiDAR loop started {self.thread_}")
             return True
             
         except Exception as e:
@@ -119,6 +121,15 @@ class LidarThread(QObject):
         Continuously reads distance measurements and emits signals when new data is available.
         Supports pausing without closing the serial connection.
         """
+        logger.info("Lidar Thread: LiDAR loop is running")
+        logger.info(f"Lidar Thread: LiDAR port is {self.port}")
+        logger.info(f"Lidar Thread: LiDAR baudrate is {self.baudrate}")
+        logger.info(f"Lidar Thread: LiDAR timeout is {self.timeout}")
+        logger.info(f"Lidar Thread: LiDAR serial connection is {self.serial_connection}")
+        logger.info(f"Lidar Thread: LiDAR running is {self.running}")
+        logger.info(f"Lidar Thread: LiDAR paused is {self.paused}")
+        logger.info(f"Lidar Thread: LiDAR thread is {self.thread_}")
+
         while self.running and self.serial_connection:
 
             try:
@@ -158,6 +169,7 @@ class LidarThread(QObject):
                             
                             # Emit signal with new data
                             self.data_available.emit(lidar_data)
+                            logger.info(f"Lidar Thread: Emitted data: {lidar_data}")
                 else:
                     # No data available, sleep briefly
                     time.sleep(0.01)
