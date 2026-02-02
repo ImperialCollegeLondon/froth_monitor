@@ -379,10 +379,10 @@ class EventHandler:
         # ) // v2_residue
 
         self.video_thread.frame_available.connect(
-            self.frame_processor.process_new_frame
+            lambda frame: self.frame_processor.process_new_frame(frame)
         )
         self.video_thread.lidar_data_available.connect( # type: ignore
-            self.lidar_data_processor.process_lidar_data
+            lambda data: self.lidar_data_processor.process_lidar_data(data)
         ) 
 
         self.gui.confirm_arrow_button.clicked.connect(self.calibration_handler.confirm_arrow_n_ruler)

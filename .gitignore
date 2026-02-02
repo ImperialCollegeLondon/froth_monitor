@@ -7,6 +7,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+logs/
 froth_monitor/dummy_jetson/dummy_video.mp4
 .Python
 build/
