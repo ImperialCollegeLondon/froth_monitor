@@ -4,14 +4,13 @@ This module provides a GUI dialog for controlling air recovery functionality,
 including configuration settings, real-time monitoring, and data management.
 """
 
-import os
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QPushButton, QLabel, QLineEdit, QSpinBox, QDoubleSpinBox,
+    QPushButton, QLabel, QDoubleSpinBox,
     QComboBox, QTextEdit, QGroupBox, QFileDialog,
-    QMessageBox, QCheckBox, QRadioButton, QButtonGroup
+    QMessageBox, QRadioButton, QButtonGroup
 )
-from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QFont
 from froth_monitor.handlers.logger_config import get_logger
 

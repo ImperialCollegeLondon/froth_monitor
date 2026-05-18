@@ -134,7 +134,7 @@ class VideoHandler(QObject):
             
         self.last_video_source = file_path
         
-        if self.camera_thread.is_running:
+        if self.camera_thread.is_running():
             self.camera_thread.reset()
         
         if self.camera_thread.start_capture(file_path):
@@ -154,7 +154,7 @@ class VideoHandler(QObject):
         Args:
             camera_index: The camera device index (0, 1, 2, etc.)
         """
-        if self.camera_thread.is_running:
+        if self.camera_thread.is_running():
             self.camera_thread.reset()
         
         if self.camera_thread.start_capture(camera_index):
@@ -203,12 +203,12 @@ class VideoHandler(QObject):
 
             # If the thread is not running, we need to restart it
             elif hasattr(self, "last_video_source") and self.last_video_source is not None:
-                if self.if_jetson:
-                    self.video_thread.start_network_capture(  # type: ignore[attr-defined]
+                if self.if_jetson and isinstance(self.video_thread, NetworkThread):
+                    self.video_thread.start_network_capture(
                         self.jetson_source_address, self.jetson_source_port
                     )
-                else:
-                    self.video_thread.start_capture(self.last_video_source)  # type: ignore[arg-type]
+                elif not self.if_jetson and isinstance(self.video_thread, CameraThread):
+                    self.video_thread.start_capture(self.last_video_source)
                 self.playing = True
                 self.video_started.emit()
             else:

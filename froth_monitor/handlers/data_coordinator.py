@@ -1,10 +1,8 @@
-from typing import cast
 from PySide6.QtCore import QObject, Signal
 
 from froth_monitor.processing import FrameModel, ROI
 from froth_monitor.lidar_thread.lidar_data_processor import LidarDataProcessor
 from froth_monitor.air_recovery.air_recovery_data_processor import AirRecoveryDataProcessor
-from froth_monitor.handlers.realtime_export import RealtimeExporter
 from froth_monitor.handlers.logger_config import get_logger
 from froth_monitor.handlers.data_matcher import VelocityLidarMatcher
 from froth_monitor.utils.performance_monitor import PerformanceMonitor

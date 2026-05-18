@@ -5,11 +5,10 @@ tracks frame numbers, and manages ROI processing.
 """
 
 import numpy as np
-import time
 import cv2
 import threading
 import logging
-from PySide6.QtCore import QObject, Signal, QTimer
+from PySide6.QtCore import QObject, Signal
 from typing import TYPE_CHECKING
 from datetime import datetime
 from PySide6.QtCore import QRect
@@ -63,8 +62,8 @@ class FrameModel(QObject):
         self.export_enable = False
         self.exporter: 'RealtimeExporter | None' = None
 
-        self.roi_list = []
-        self.last_processed_time = None
+        self.roi_list: list[ROI] = []
+        self.last_processed_time: str | None = None
         
         # Thread safety: Lock for protecting roi_list and algorithm parameters
         self._processing_lock = threading.RLock()
@@ -166,6 +165,8 @@ class FrameModel(QObject):
                 roi.id = roi_id + 1
 
                 # Get the ROI coordinates
+                if roi.coordinate is None:
+                    continue
                 x1 = roi.coordinate[0]
                 y1 = roi.coordinate[1]
                 x2 = roi.coordinate[2]
@@ -178,9 +179,9 @@ class FrameModel(QObject):
 
                     # Pass the cropped frame to the ROI's process_frame method
                     _new_velo, _new_average = roi.process_frame(cropped_frame)
-                    if _new_velo == True:
+                    if _new_velo:
                         if_new_velo += 1
-                    if _new_average == True:
+                    if _new_average:
                         if_new_average += 1
                 
                 if self.export_enable:

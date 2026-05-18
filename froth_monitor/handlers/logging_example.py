@@ -31,7 +31,7 @@ def demonstrate_logging():
     # Simulating error handling
     try:
         # This will raise an exception
-        result = 10 / 0
+        pass
     except ZeroDivisionError as e:
         logger.error(f"Mathematical error occurred: {e}")
     

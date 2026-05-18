@@ -23,7 +23,6 @@ from openpyxl.styles import Font, PatternFill
 import shutil
 import os
 
-import time
 
 import logging
 from froth_monitor.utils.performance_monitor import PerformanceMonitor
@@ -351,10 +350,14 @@ class RealtimeExporter(QFileDialog):
         Saves the export settings.
         """
         # Save the entered filename
-        self.export_filename = filename_input.text()
+        if filename_input is not None:
+            self.export_filename = filename_input.text()
 
         video_filename_input = dialog.findChild(QLineEdit, "video_filename_input")
-        self.video_filename = video_filename_input.text()  # pyright: ignore
+        if video_filename_input is not None:
+            self.video_filename = video_filename_input.text()
+        else:
+            self.video_filename = ""
 
         # Display a warning if the directory is not set
         if not self.export_directory:
@@ -792,7 +795,7 @@ class RealtimeExporter(QFileDialog):
                     try:
                         if len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
-                    except:
+                    except Exception:
                         pass
                 adjusted_width = (max_length + 2)
                 ws.column_dimensions[column].width = adjusted_width

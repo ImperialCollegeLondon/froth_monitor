@@ -1,6 +1,5 @@
 """Unit tests for FrameResampleHandler."""
 
-import pytest
 import numpy as np
 from froth_monitor.handlers.frame_resample_handler import (
     FrameResampleHandler,

@@ -6,6 +6,7 @@ resolution from display resolution to optimize performance.
 
 import cv2
 from enum import Enum
+from typing import Any, Dict
 from PySide6.QtCore import QObject, Signal
 from froth_monitor.handlers.logger_config import get_logger
 
@@ -26,7 +27,7 @@ class ResolutionPreset(Enum):
 
 
 # Preset configuration mappings
-PRESET_CONFIG = {
+PRESET_CONFIG: Dict[ResolutionPreset, Dict[str, Any]] = {
     ResolutionPreset.ORIGINAL: {
         "scale": 1.0,
         "max_width": None,

@@ -10,15 +10,9 @@ The handler is completely decoupled from GUI and other handlers, communicating
 exclusively through Qt signals for maximum testability and reusability.
 """
 
-from typing import cast
-from PySide6.QtWidgets import (
-    QMessageBox,
-)
 from PySide6.QtCore import QObject, Signal
-from cv2 import log
 
 # Import MainGUIWindow at the beginning
-from froth_monitor.handlers.realtime_export import RealtimeExporter
 from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
@@ -446,7 +440,7 @@ class CalibrationHandler(QObject):
         # Emit confirmation signal
         self.calibration_confirmed.emit()
 
-        if self.export_enable == True:
+        if self.export_enable:
             self.release_export_data.emit(self.arrow_direction, self.display_px2mm)
         
         # Notify user
@@ -516,6 +510,6 @@ class CalibrationHandler(QObject):
         self.export_enable = state
 
         # If both calibration and export are ready, export immediately
-        if self.confirm_calibration == True and self.export_enable == True:
+        if self.confirm_calibration and self.export_enable:
             logger.info(f"Exporting calibration data: arrow direction = {self.arrow_direction:.2f}°, px2mm = {self.display_px2mm:.2f}")
             self.release_export_data.emit(self.arrow_direction, self.display_px2mm)

@@ -1,1 +1,1 @@
-from .windows_receiver import VideoReceiver
+from .windows_receiver import VideoReceiver as VideoReceiver

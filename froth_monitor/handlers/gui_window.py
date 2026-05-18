@@ -23,13 +23,12 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QComboBox,
 )
-from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QFont
-from pkg_resources import non_empty_lines
 import pyqtgraph as pg
 import sys
-import numpy as np
 import os
+from typing import Any
 from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
@@ -54,11 +53,11 @@ class MainGUIWindow(QMainWindow):
         self._create_stylesheets()
 
         # Initialize overlay related attributes
-        self.overlay_widget = None
-        self.video_rect = None
+        self.overlay_widget: QWidget | None = None
+        self.video_rect: Any = None
 
         # Initialize notification overlay
-        self.notification_overlay = None
+        self.notification_overlay: QWidget | None = None
         self.window_size_locked = False
 
         # Define UI elements

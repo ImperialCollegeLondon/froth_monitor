@@ -7,7 +7,7 @@ It handles data buffering, averaging, and GUI updates.
 
 from typing import cast, List
 import time
-from datetime import date, datetime
+from datetime import datetime
 from PySide6.QtCore import QObject, Signal
 from froth_monitor.handlers.logger_config import get_logger
 from froth_monitor.handlers.realtime_export import RealtimeExporter

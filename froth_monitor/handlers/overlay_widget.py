@@ -11,7 +11,6 @@ from PySide6.QtGui import QPainter, QFont, QColor, QPen, QPolygon
 import time
 import math
 
-from cv2 import log
 from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module
@@ -572,7 +571,7 @@ class OverlayWidget(QWidget):
 
         painter.setPen(QPen(QColor(255, 255, 255, 230)))  # White with 90% opacity
 
-        if self.algo_delta_pixels is not (None, None):
+        if self.algo_delta_pixels != (None, None):
             
             try: 
                 delta_x, delta_y = self.algo_delta_pixels

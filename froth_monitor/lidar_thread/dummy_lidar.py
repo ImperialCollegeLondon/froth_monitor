@@ -2,7 +2,6 @@ import os
 import pty
 import time
 import random
-import sys
 
 def main():
     """
@@ -13,7 +12,7 @@ def main():
     master, slave = pty.openpty()
     s_name = os.ttyname(slave)
     
-    print(f"Dummy LiDAR started.")
+    print("Dummy LiDAR started.")
     print(f"Connect to this serial port: {s_name}")
     print("Press Ctrl+C to stop.")
 
@@ -55,7 +54,7 @@ def main():
         try:
             os.close(master)
             os.close(slave)
-        except:
+        except Exception:
             pass
         print("Disconnected.")
 

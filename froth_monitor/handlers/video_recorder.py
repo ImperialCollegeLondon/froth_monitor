@@ -64,6 +64,7 @@ class VideoRecorder(QObject):
         self.previous_frame = cast(
             np.ndarray, None
         )  # Store the previous frame for comparison
+        self.previous_frame_time = 0.0  # Time when the previous frame was recorded
 
     def start_recording(
         self,

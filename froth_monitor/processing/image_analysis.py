@@ -86,7 +86,7 @@ class VideoAnalysis:
             The y direction for the scrolling axis (positive is down, negative is up).
         """
 
-        self.previous_frame = None  # Store the previous frame for motion analysis
+        self.previous_frame: np.ndarray | None = None  # Store the previous frame for motion analysis
         self.current_velocity = 0
         self.arrow_dir_x = arrow_dir_x
         self.arrow_dir_y = arrow_dir_y
@@ -109,7 +109,7 @@ class VideoAnalysis:
 
         # Initialize DIS Optical Flow
         self.dis_preset = "Medium"
-        self.dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+        self.dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)  # type: ignore
 
     def set_dis_preset(self, preset: str):
         if preset == self.dis_preset:
@@ -123,7 +123,7 @@ class VideoAnalysis:
         else: # Medium
             val = cv2.DISOPTICAL_FLOW_PRESET_MEDIUM
             
-        self.dis = cv2.DISOpticalFlow_create(val)
+        self.dis = cv2.DISOpticalFlow_create(val)  # type: ignore
 
     def analyze(self, current_frame: np.ndarray) -> tuple[float, float]:
         if self.previous_frame is None:

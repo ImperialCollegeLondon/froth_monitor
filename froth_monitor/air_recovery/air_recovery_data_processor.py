@@ -126,6 +126,7 @@ class AirRecoveryDataProcessor:
 
         except Exception as e:
             logger.error(f"Error processing air recovery data: {e}")
+            return None
 
     def _calculate_air_recovery(self, velocity: float, froth_height: float) -> float:
         """
@@ -251,7 +252,7 @@ class AirRecoveryDataProcessor:
         try:
             # Update status bar with current reading
             if hasattr(self.gui, 'statusBar'):
-                status_text = f"Air Recovery: {self.current_air_recovery:.1f}% | V: {self.current_velocity:.1f} mm/s | FH: {self.current_froth_height:.1f} mm"
+                pass
                 # Note: This might interfere with other status updates, consider a dedicated display area
                 
         except Exception as e:

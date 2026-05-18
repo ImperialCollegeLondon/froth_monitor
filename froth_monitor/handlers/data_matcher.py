@@ -4,7 +4,7 @@ from typing import cast
 from PySide6.QtCore import QObject, Signal, QTimer
 
 # Import FrameModel from fm_model module
-from froth_monitor.processing import FrameModel, ROI
+from froth_monitor.processing import ROI
 from froth_monitor.handlers.logger_config import get_logger
 
 # Initialize logger for this module

@@ -4,14 +4,13 @@ This module provides a GUI dialog for controlling LiDAR functionality,
 including starting/stopping capture, configuring settings, and viewing data.
 """
 
-import os
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QPushButton, QLabel, QLineEdit, QSpinBox, QDoubleSpinBox,
+    QPushButton, QLabel, QSpinBox, QDoubleSpinBox,
     QComboBox, QTextEdit, QGroupBox, QFileDialog,
-    QMessageBox, QProgressBar, QCheckBox
+    QMessageBox
 )
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QFont
 from froth_monitor.handlers.logger_config import get_logger
 

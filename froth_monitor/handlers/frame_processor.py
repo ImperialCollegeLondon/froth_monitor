@@ -1,13 +1,10 @@
-import cv2
 import queue
-from PySide6.QtCore import Qt, QRect, QObject, Signal, QTimer
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtCore import QObject, Signal
 
 # Import MainGUIWindow at the beginning
-from froth_monitor.handlers.gui_window import MainGUIWindow
 
 # Import FrameModel from fm_model module
-from froth_monitor.processing import FrameModel, ROI
+from froth_monitor.processing import FrameModel
 from froth_monitor.utils.performance_monitor import PerformanceMonitor
 
 # Import the camera and network threads
@@ -23,7 +20,6 @@ from froth_monitor.handlers.logger_config import get_logger
 
 from froth_monitor.handlers.roi_handler import ROIHandler
 from froth_monitor.handlers.recorder_thread import VideoRecordingWorker 
-from froth_monitor.handlers.video_recorder import VideoRecorder
 # from froth_monitor.handlers.data_handler import DataHandler
 from froth_monitor.utils.frame_converter import FrameConverter
 from froth_monitor.handlers.frame_display_manager import FrameDisplayManager
@@ -54,7 +50,7 @@ class FrameProcessor(QObject):
         self.display_manager = display_manager
         
         # Initialize and start the video recording worker thread
-        self.video_queue = queue.Queue(maxsize=30)
+        self.video_queue: queue.Queue = queue.Queue(maxsize=30)
         self.video_recording_worker = VideoRecordingWorker(
             self.video_recorder, self.video_queue
         )
@@ -166,7 +162,7 @@ class FrameProcessor(QObject):
             while not self.video_queue.empty():
                 try:
                     self.video_queue.get_nowait()
-                except:
+                except queue.Empty:
                     break
             logger.debug("FrameProcessor: Video queue cleared")
         

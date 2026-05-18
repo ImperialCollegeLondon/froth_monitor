@@ -4,7 +4,6 @@ import pytest
 import numpy as np
 import cv2
 from PySide6.QtGui import QImage
-from PySide6.QtCore import Qt
 from froth_monitor.utils.frame_converter import FrameConverter
 
 

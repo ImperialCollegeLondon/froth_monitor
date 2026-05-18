@@ -16,10 +16,9 @@ from PySide6.QtCore import Qt, QRect
 from PySide6.QtGui import QImage, QPixmap
 
 # Import MainGUIWindow at the beginning
-from froth_monitor.handlers.gui_window import MainGUIWindow
 
 # Import FrameModel from fm_model module
-from froth_monitor.processing import FrameModel, ROI
+from froth_monitor.processing import FrameModel
 
 # Import the custom overlay widget
 from froth_monitor.handlers.overlay_widget import OverlayWidget
@@ -403,7 +402,7 @@ class AlgorithmConfigurationHandler:
         self.video_thread.if_release = True
 
         # Display the frame on the canvas
-        pixmap = self._display_frame_on_canvas(scaled_image)
+        self._display_frame_on_canvas(scaled_image)
 
         self.previous_process_time = time.time() - time_start
         self._update_info_bar()

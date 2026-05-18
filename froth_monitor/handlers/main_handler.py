@@ -14,11 +14,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QDialog,
     QComboBox,
-    QHBoxLayout,
-    QLabel,
-    QDoubleSpinBox,
     QMessageBox,
-    QTableWidget,
     QPushButton,
     QVBoxLayout,
 )
@@ -103,24 +99,24 @@ class EventHandler:
     def update_guidance(self):
         
         # if no video is imported
-        if self.video_thread.is_running() == False:
+        if not self.video_thread.is_running():
             self.gui._update_guidance("step_1")
 
         else:
             # if video is imported but calibration not finished
-            if self.calibration_handler.confirm_calibration == False:
+            if not self.calibration_handler.confirm_calibration:
                 self.gui._update_guidance("step_2")
 
             else:
                 # if calibration is finished but ROI not drawn
-                if self.step_ROI_drawing == False:
+                if not self.step_ROI_drawing:
                     self.gui._update_guidance("step_3")
                     
         # if export setting finished
-        if self.exporter.finish_save_setting == True:
+        if self.exporter.finish_save_setting:
             self.gui._update_guidance("finish_export_setting")
 
-            if self.exporter.record_video == True:
+            if self.exporter.record_video:
                 self.gui._update_guidance("enable_recording")
 
     # ============= Different mode trigger ==============
@@ -162,8 +158,7 @@ class EventHandler:
         self.network_thread = NetworkThread()
         
         # Active video source (defaults to camera thread)
-        self.video_thread: NetworkThread | CameraThread = \
-            cast(NetworkThread | CameraThread, CameraThread())
+        self.video_thread = cast(NetworkThread | CameraThread, self.camera_thread)
 
         # Recording infrastructure
         self.video_recorder = VideoRecorder()
@@ -239,7 +234,7 @@ class EventHandler:
         self.video_handler.thread_activate.connect(self.start_playing)
 
         # Frame resampling configuration (decouples processing from display resolution)
-        from froth_monitor.handlers.frame_resample_handler import FrameResampleHandler, ResolutionPreset
+        from froth_monitor.handlers.frame_resample_handler import FrameResampleHandler
         self.frame_resample_handler = FrameResampleHandler()
         logger.info(f"MainHandler: FrameResampleHandler initialized with {self.frame_resample_handler.current_preset.value} preset")
         
