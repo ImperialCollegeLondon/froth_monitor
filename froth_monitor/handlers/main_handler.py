@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QLabel,
 )
 from PySide6.QtCore import QRect
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QFont
 
 # Import MainGUIWindow at the beginning
 from froth_monitor.handlers.gui_window import MainGUIWindow
@@ -77,9 +77,22 @@ class EventHandler:
     def __init__(self, gui: MainGUIWindow):
         self.gui = gui
         
-        # Initialize status bar FPS display
-        self.fps_label = QLabel("Proc FPS: 0.0")
-        self.gui.statusBar().addPermanentWidget(self.fps_label)
+        # Initialize status bar display with Monospace font for data
+        data_font = QFont("Consolas", 10)
+        
+        self.cap_fps_label = QLabel("Cap FPS: 0.0")
+        self.cap_fps_label.setFont(data_font)
+        
+        self.proc_fps_label = QLabel("Proc FPS: 0.0")
+        self.proc_fps_label.setFont(data_font)
+        
+        self.dropped_label = QLabel("Dropped: 0")
+        self.dropped_label.setFont(data_font)
+        
+        status_bar = self.gui.statusBar()
+        status_bar.addPermanentWidget(self.cap_fps_label)
+        status_bar.addPermanentWidget(self.proc_fps_label)
+        status_bar.addPermanentWidget(self.dropped_label)
         
         self.initialize_level_one_handlers()
         self.initialize_level_two_handlers()
@@ -375,6 +388,8 @@ class EventHandler:
             self.frame_processor.process_new_frame
         )
         self.frame_processor.processing_fps_updated.connect(self._update_fps_status)
+        self.camera_thread.capture_performance_updated.connect(self._update_capture_status)
+        self.network_thread.capture_performance_updated.connect(self._update_capture_status)
 
         # ROI creation signal routing
         # self.overlay_widget.roi_created.connect(
@@ -501,10 +516,14 @@ class EventHandler:
         self.gui.refresh_graph_button.clicked.connect(self.visualization_handler.clear_display)
 
     # ============= Video Handlers signal and related GUI interaction =============
-    def _resource_path(self,relative_path):
+    def _resource_path(self, relative_path):
+        """Get absolute path to resource, works for dev and for PyInstaller."""
         if hasattr(sys, "_MEIPASS"):
-            return os.path.join(sys._MEIPASS, relative_path)  # type: ignore
-        return relative_path
+            return os.path.join(sys._MEIPASS, relative_path)
+        
+        # project_root is two levels up from this file (main_handler.py is in froth_monitor/handlers/)
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        return os.path.join(project_root, relative_path)
 
     def _on_import_button_clicked(self):
         """Handle import button click by reading GUI state and calling handler."""
@@ -638,7 +657,12 @@ class EventHandler:
 
     def _update_fps_status(self, fps: float):
         """Update the processing FPS label in the status bar."""
-        self.fps_label.setText(f"Proc FPS: {fps:.1f}")
+        self.proc_fps_label.setText(f"Proc FPS: {fps:>4.1f}")
+
+    def _update_capture_status(self, cap_fps: float, dropped: int):
+        """Update the capture performance labels in the status bar."""
+        self.cap_fps_label.setText(f"Cap FPS: {cap_fps:>4.1f}")
+        self.dropped_label.setText(f"Dropped: {dropped:<6d}")
 
     def _warning_box(self, message):
         QMessageBox.warning(self.gui, "Warning", message)

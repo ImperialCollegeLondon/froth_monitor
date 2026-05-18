@@ -36,6 +36,7 @@ class NetworkThread(QObject):
     data_available = Signal(
         dict, np.ndarray
     )  # Combined signal for both frame and sensor data
+    capture_performance_updated = Signal(float, int)  # cap_fps, dropped_total
 
     def __init__(self):
         """
@@ -52,6 +53,11 @@ class NetworkThread(QObject):
         self.max_buffer = 5  # Allow 5 frames in buffer
         self.buffer_lock = threading.Lock()
         self.if_release = True
+
+        # Performance tracking
+        self.dropped_frames = 0
+        self.cap_fps_ema = 0.0
+        self.alpha = 0.1  # Smoothing for EMA
 
     def start_network_capture(self, address="0.0.0.0", port=5001, verbose_level=1):
         """
@@ -145,7 +151,6 @@ class NetworkThread(QObject):
 
                 # Emit signals with the received data
                 if self.if_release:
-
                     if frame is not None:
                         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                         self.frame_available.emit(frame)
@@ -154,6 +159,12 @@ class NetworkThread(QObject):
                         self.sensor_data_available.emit(server_data)
                     # Combined signal for convenience
                     self.data_available.emit(server_data, frame)
+                else:
+                    self.dropped_frames += 1
+
+                # Update capture performance stats
+                # For simplicity in network mode, we'll just track drops for now or use loop time
+                self.capture_performance_updated.emit(0.0, self.dropped_frames)
 
                 # Small delay to prevent maxing out CPU
                 time.sleep(0.001)

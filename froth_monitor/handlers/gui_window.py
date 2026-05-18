@@ -48,9 +48,36 @@ class MainGUIWindow(QMainWindow):
         self.setMinimumSize(1350, 700)  # Ensures all UI elements are visible
         self.resize(1400, 850)  # Default size for comfortable viewing
         # self.showMaximized()
-        self.setStyleSheet("background-color: #f0f0f0;")
+        self.setStyleSheet("background-color: #f8f9fa;")
         # self.setStyleSheet("background-color: black;")
         self._create_stylesheets()
+
+        # Global stylesheet for specific components to ensure visibility
+        self.setStyleSheet(self.styleSheet() + """
+            QRadioButton {
+                color: black;
+                font-size: 12px;
+                padding: 2px;
+            }
+            QRadioButton::indicator {
+                width: 16px;
+                height: 16px;
+            }
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #d1d1d1;
+                border-radius: 6px;
+                margin-top: 1.1em;
+                padding-top: 10px;
+                background-color: #ffffff;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 3px 0 3px;
+                color: #4682B4;
+            }
+        """)
 
         # Initialize overlay related attributes
         self.overlay_widget: QWidget | None = None
@@ -125,14 +152,14 @@ class MainGUIWindow(QMainWindow):
         self.ENABLED_BUTTON_STYLE = \
         """
             QPushButton {
-                background-color: #4285f4;
+                background-color: #4682B4;
                 color: white;
                 font-size: 12px;
                 padding: 5px;
                 border-radius: 4px;
             }
             QPushButton:hover {
-                background-color: #3367d6;
+                background-color: #3b6b94;
             }
         """
         
@@ -155,11 +182,11 @@ class MainGUIWindow(QMainWindow):
         self.ENABLED_ROI_BUTTON_STYLE = \
         """
             QPushButton {
-                background-color: #4285f4; color: white; font-size: 18px;
+                background-color: #4682B4; color: white; font-size: 18px;
                 font-weight: bold; padding: 5px; border-radius: 4px;
             }
             QPushButton:hover {
-                background-color: #3367d6;
+                background-color: #3b6b94;
             }
             QLabel{
                 background-color: #3c4043; color: white; font-size: 14px;
@@ -392,19 +419,12 @@ class MainGUIWindow(QMainWindow):
             QGroupBox: The video source group box with radio buttons.
         """
         source_group = QGroupBox("Video Source")
-        source_group.setStyleSheet("font-weight: bold; font-size: 15px; color: black; background-color: transparent;")
         source_layout = QVBoxLayout(source_group)
         source_layout.setSpacing(10)
 
         # Radio buttons for video source
         self.webcam_radio = QRadioButton("Webcam")
-        self.webcam_radio.setStyleSheet(
-            "font-weight: normal; font-size: 12px; color: black; background-color: transparent;"
-        )
         self.prerecorded_radio = QRadioButton("Pre-recorded")
-        self.prerecorded_radio.setStyleSheet(
-            "font-weight: normal; font-size: 12px; color: black; background-color: transparent;"
-        )
         self.webcam_radio.setChecked(True)
 
         self.import_button = QPushButton("Import")
@@ -435,9 +455,6 @@ class MainGUIWindow(QMainWindow):
     def _create_calibration_controls(self) -> QGroupBox:
         """Create responsive calibration controls."""
         calibration_group = QGroupBox("Calibration/ROI")
-        calibration_group.setStyleSheet(
-            "font-weight: bold; font-size: 15px; color: black"
-        )
         calibration_layout = QVBoxLayout(calibration_group)
         calibration_layout.setSpacing(10)
 
@@ -472,7 +489,7 @@ class MainGUIWindow(QMainWindow):
 
         px2mm_label_2 = QLabel("Result ratio \n(edible):")
         px2mm_label_2.setStyleSheet(
-            "background-color: #3c4043; color: white; font-size: 10px; "
+            "background-color: #4682B4; color: white; font-size: 10px; "
             "padding: 8px; border-radius: 4px;"
         )
         px2mm_label_2.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -572,9 +589,13 @@ class MainGUIWindow(QMainWindow):
         # Helper to get resource path
 
     def resource_path(self, relative_path):
+        """Get absolute path to resource, works for dev and for PyInstaller."""
         if hasattr(sys, "_MEIPASS"):
-            return os.path.join(sys._MEIPASS, relative_path)  # type: ignore
-        return relative_path
+            return os.path.join(sys._MEIPASS, relative_path)
+        
+        # project_root is two levels up from this file's directory (gui_window.py is in froth_monitor/handlers/)
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        return os.path.join(project_root, relative_path)
 
     def _add_reset_buttons(self, layout: QVBoxLayout) -> None:
         """Add responsive reset buttons."""
@@ -956,11 +977,11 @@ class MainGUIWindow(QMainWindow):
         self.play_pause_button.setStyleSheet(
             """
             QPushButton {
-                background-color: #4285f4; color: white; font-size: 14px;
+                background-color: #4682B4; color: white; font-size: 14px;
                 padding: 8px; border-radius: 4px;
             }
             QPushButton:hover {
-                background-color: #3367d6;
+                background-color: #3b6b94;
             }
             """
         )

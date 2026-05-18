@@ -55,7 +55,8 @@ class ROI:
     def _init_optical_flow(self) -> None:
         """Initialize optical flow components."""
         self.analysis = VideoAnalysis(0, 0)
-        self.delta_pixels: tuple[float, float] | None = (0.0, 0.0)
+        self.delta_pixels: tuple[float, float] = (0.0, 0.0)
+        self.latest_delta: tuple[float, float] = (0.0, 0.0)  # For display only
         self.cross_position: Any | None = None
         self.matcher: Any | None = None
     
@@ -147,8 +148,10 @@ class ROI:
         self.delta_pixels = self.analysis.analyze(analysis_frame)
 
         if self.delta_pixels == (None, None):
+            self.latest_delta = (0.0, 0.0)
             return False, False
 
+        self.latest_delta = self.delta_pixels
         self.calibrated_delta = self.project_delta_on_direction(self.delta_pixels)
 
         # Update timestamp

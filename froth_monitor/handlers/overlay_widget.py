@@ -538,6 +538,13 @@ class OverlayWidget(QWidget):
 
                 roi.cross_position = cross_x, cross_y
 
+                # Draw Velocity Vector Arrow
+                if hasattr(roi, 'latest_delta'):
+                    dx, dy = roi.latest_delta
+                    # Only draw if there is significant movement
+                    if abs(dx) > 0.1 or abs(dy) > 0.1:
+                        self.drawVelocityVector(painter, x1, y1, width, height, dx, dy)
+
     def drawROI_algo(self, painter):
         """
         Helper method to draw ROIs on the overlay.
@@ -611,6 +618,26 @@ class OverlayWidget(QWidget):
             
             except Exception as e:
                 print(f"Error in drawROI_algo: {e}")
+
+    def drawVelocityVector(self, painter, x1, y1, width, height, delta_x, delta_y):
+        """Draw a vector arrow indicating movement direction."""
+        center_x = x1 + width // 2
+        center_y = y1 + height // 2
+        
+        # Scale the vector for visibility
+        scale_factor = 5.0 
+        end_x = center_x + int(delta_x * scale_factor)
+        end_y = center_y + int(delta_y * scale_factor)
+        
+        start_point = QPoint(center_x, center_y)
+        end_point = QPoint(end_x, end_y)
+        
+        # Draw the line
+        painter.setPen(QPen(QColor(0, 255, 100, 255), 2)) # Bright green
+        painter.drawLine(start_point, end_point)
+        
+        # Draw arrowhead
+        self.draw_arrowhead(painter, start_point, end_point)
 
     def reset(self) -> None:
         """

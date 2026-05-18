@@ -27,8 +27,9 @@ class CameraThread(QObject):
         thread: Thread object for the capture loop.
     """
 
-    # Signal to emit when a new frame is available
+    # Signals to emit when a new frame is available
     frame_available = Signal(np.ndarray)
+    capture_performance_updated = Signal(float, int)  # cap_fps, dropped_total
 
     def __init__(self):
         """
@@ -49,6 +50,11 @@ class CameraThread(QObject):
         self.buffer_lock = threading.Lock()
 
         self.if_release = True
+
+        # Performance tracking
+        self.dropped_frames = 0
+        self.cap_fps_ema = 0.0
+        self.alpha = 0.1  # Smoothing for EMA
 
     def start_capture(self, video_source):
         """
@@ -158,6 +164,22 @@ class CameraThread(QObject):
             # Emit signal with the captured frame
             if self.if_release:
                 self.frame_available.emit(frame)
+            else:
+                self.dropped_frames += 1
+
+            # Update capture performance stats
+            loop_duration = time.time() - current_time
+            if loop_duration > 0:
+                current_fps = 1.0 / loop_duration
+                if self.cap_fps_ema == 0:
+                    self.cap_fps_ema = current_fps
+                else:
+                    self.cap_fps_ema = (self.alpha * current_fps) + (
+                        (1 - self.alpha) * self.cap_fps_ema
+                    )
+                self.capture_performance_updated.emit(
+                    self.cap_fps_ema, self.dropped_frames
+                )
 
             # Update last frame time
             last_frame_time = time.time()

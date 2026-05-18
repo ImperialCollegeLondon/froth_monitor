@@ -22,6 +22,7 @@ class PlotHelper:
     def update_plot_widget(widget, series_list: list[dict], window_size=30, y_range_padding=1.1, y_axis_label=""):
         """
         Update a plot widget with multiple data series.
+        Includes automatic downsampling for performance.
         """
         widget.clear()
         
@@ -30,6 +31,9 @@ class PlotHelper:
 
         all_values = []
         max_val = 0
+        
+        # Performance Threshold: Downsample if more than this many points
+        DOWNSAMPLE_THRESHOLD = 2000 
         
         # Collect all valid data to determine ranges
         processed_series = []
@@ -47,8 +51,14 @@ class PlotHelper:
                 else:
                     sanitized.append(0.0)
             
-            # Trim to window size
+            # Downsample for display if history is very large
             history_length = len(sanitized)
+            if history_length > DOWNSAMPLE_THRESHOLD:
+                # Keep every Nth point to stay under threshold
+                step = history_length // DOWNSAMPLE_THRESHOLD
+                sanitized = sanitized[::step]
+            
+            # Trim to window size for scrolling effect
             if history_length > window_size:
                 sanitized = sanitized[-window_size:]
                 
