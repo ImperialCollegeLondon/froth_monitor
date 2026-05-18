@@ -1,4 +1,5 @@
 import queue
+import time
 from PySide6.QtCore import QObject, Signal
 
 # Import MainGUIWindow at the beginning
@@ -30,6 +31,7 @@ logger = get_logger(__name__)
 class FrameProcessor(QObject):
 
     update_velocity_plot = Signal(list)
+    processing_fps_updated = Signal(float)
 
     def __init__(
         self,
@@ -57,6 +59,11 @@ class FrameProcessor(QObject):
         self.video_recording_worker.start()
         self.perf_monitor = PerformanceMonitor()
 
+        # Processing performance tracking
+        self.last_proc_time = 0.0
+        self.proc_fps_ema = 0.0
+        self.alpha = 0.1  # Smoothing factor for EMA
+
 
     def set_playback_state(self, playing: bool):
         self.playing = playing
@@ -74,6 +81,8 @@ class FrameProcessor(QObject):
         """
         if not self.playing:  # Access playing state from VideoHandler
             return
+
+        start_time = time.perf_counter()
 
         # Store the current frame for potential further processing
         self.current_frame = frame
@@ -108,6 +117,17 @@ class FrameProcessor(QObject):
         if self.video_recorder.is_active():
             self.video_recording_worker.add_frame(frame)
         self.perf_monitor.stop_timer("frame_recording")
+
+        # Calculate processing FPS
+        duration = time.perf_counter() - start_time
+        if duration > 0:
+            current_fps = 1.0 / duration
+            if self.proc_fps_ema == 0:
+                self.proc_fps_ema = current_fps
+            else:
+                self.proc_fps_ema = (self.alpha * current_fps) + ((1 - self.alpha) * self.proc_fps_ema)
+            
+            self.processing_fps_updated.emit(self.proc_fps_ema)
 
 
     # Note: Utility methods extracted to dedicated classes:

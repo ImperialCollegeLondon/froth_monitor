@@ -10,6 +10,7 @@ import time
 import logging
 from typing import Any
 from datetime import datetime
+from collections import deque
 from froth_monitor.processing.image_analysis import VideoAnalysis
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class ROIConstants:
     MAX_VALID_DELTA = 1e6  # Maximum valid delta/velocity
     DEFAULT_PX2MM = 1.0
     DEFAULT_DEGREE = -90.0
+    HISTORY_MAXLEN = 21600  # 6 hours at 1 sample/sec
 
 
 class ROI:
@@ -69,11 +71,14 @@ class ROI:
         self.arrow_dir = 0.0
     
     def _init_history_tracking(self) -> None:
-        """Initialize history tracking lists."""
-        self.delta_history: list = []
-        self.sum_history: list = []
-        self.velo_history: list[float] = []
-        self.velo_history_with_time: list = []
+        """Initialize history tracking with bounded buffers."""
+        # per-frame movement data (6 hours at 30fps = ~650k samples)
+        self.delta_history: deque = deque(maxlen=ROIConstants.HISTORY_MAXLEN * 30)
+        # Summary data (per-second usually)
+        self.sum_history: list = []  # Keep as list for full export
+        # Per-second velocity data (6 hours = 21600 samples)
+        self.velo_history: deque[float] = deque(maxlen=ROIConstants.HISTORY_MAXLEN)
+        self.velo_history_with_time: deque = deque(maxlen=ROIConstants.HISTORY_MAXLEN)
         self.current_velocity = 0.0
         self.average_velocity_past_30s: float | None = None
     
@@ -85,12 +90,12 @@ class ROI:
     # ============ Properties for Backward Compatibility ============
     
     @property
-    def velo_only_history(self) -> list[float]:
+    def velo_only_history(self) -> deque[float]:
         """Alias for velo_history."""
         return self.velo_history
     
     @property
-    def velo_only_history_for_display(self) -> list[float]:
+    def velo_only_history_for_display(self) -> deque[float]:
         """DEPRECATED: Use velo_history directly."""
         return self.velo_history
     
@@ -126,7 +131,7 @@ class ROI:
     def update_id(self, id: int):
         self.id = id
 
-    def process_frame(self, frame: np.ndarray) -> tuple[bool, bool]:
+    def process_frame(self, frame: np.ndarray, gray_frame: np.ndarray | None = None) -> tuple[bool, bool]:
         """
         Process a cropped frame using the VideoAnalysis.analyze function and store the results.
 
@@ -134,9 +139,12 @@ class ROI:
         ----------
         frame : np.ndarray
             The cropped video frame to process.
+        gray_frame : np.ndarray, optional
+            The cropped grayscale frame to process. If None, the color frame will be used.
         """
 
-        self.delta_pixels = self.analysis.analyze(frame)
+        analysis_frame = gray_frame if gray_frame is not None else frame
+        self.delta_pixels = self.analysis.analyze(analysis_frame)
 
         if self.delta_pixels == (None, None):
             return False, False
@@ -249,8 +257,9 @@ class ROI:
         if len(self.velo_history) % window_size != 0:
             return False
         
-        # Get recent values
-        recent_values = self.velo_history[-window_size:]
+        # Get recent values (deque doesn't support slicing directly)
+        history_list = list(self.velo_history)
+        recent_values = history_list[-window_size:]
         # Filter valid values only
         valid_values = [v for v in recent_values if self._is_valid_delta(v)]
         

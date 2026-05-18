@@ -148,7 +148,7 @@ class CoordinateMapper:
             scaled_x = delta_x / self.scale_x
             scaled_y = delta_y / self.scale_y
         else:
-            # Display → Processing: multiply by scale factor
+            # Display -> Processing: multiply by scale factor
             scaled_x = delta_x * self.scale_x
             scaled_y = delta_y * self.scale_y
         

@@ -41,7 +41,7 @@ class CalibrationHandler(QObject):
         4. Results emitted via signals for consumption by FrameModel/GUI
     
     Signals:
-        Outbound (CalibrationHandler → External):
+        Outbound (CalibrationHandler -> External):
             ruler_draw_start: Request overlay widget to start ruler drawing mode
             arrow_draw_start: Request overlay widget to start arrow drawing mode
             release_px2mm: Emit calculated px2mm for processing resolution
@@ -54,7 +54,7 @@ class CalibrationHandler(QObject):
             set_textbox_px2mm: Update GUI textbox with px2mm value
             set_textbox_arrow_direction: Update GUI textbox with arrow direction
         
-        Inbound (External → CalibrationHandler via update methods):
+        Inbound (External -> CalibrationHandler via update methods):
             update_display_px2mm: Manual px2mm entry from GUI
             update_distance_mm: Reference distance entry from GUI
             update_arrow_direction: Manual arrow direction entry from GUI

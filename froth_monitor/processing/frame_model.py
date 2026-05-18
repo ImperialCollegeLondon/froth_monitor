@@ -160,6 +160,9 @@ class FrameModel(QObject):
 
         # Acquire lock to prevent race condition with confirm_algorithm_n_params()
         with self._processing_lock:
+            # Optimization: Convert to grayscale once for all ROIs
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
             # Process each ROI in the roi_list
             for roi_id, roi in enumerate(self.roi_list):
                 roi.id = roi_id + 1
@@ -175,10 +178,11 @@ class FrameModel(QObject):
                 # Crop the frame according to the ROI coordinates
                 # Ensure the coordinates are within the frame boundaries
                 if x1 >= 0 and y1 >= 0 and x2 > 0 and y2 > 0:
-                    cropped_frame = frame[y1 : y1 + y2, x1 : x1 + x2]
+                    cropped_frame = frame[y1 : y1 + y2, x1 : x1 + x2].copy()
+                    cropped_gray = gray_frame[y1 : y1 + y2, x1 : x1 + x2].copy()
 
                     # Pass the cropped frame to the ROI's process_frame method
-                    _new_velo, _new_average = roi.process_frame(cropped_frame)
+                    _new_velo, _new_average = roi.process_frame(cropped_frame, cropped_gray)
                     if _new_velo:
                         if_new_velo += 1
                     if _new_average:

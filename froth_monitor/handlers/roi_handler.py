@@ -35,7 +35,7 @@ class ROIHandler(QObject):
         - Dynamically tracks resolution changes
     
     Signals:
-        Outbound (ROIHandler → External):
+        Outbound (ROIHandler -> External):
             roi_draw_start: Request overlay widget to enter ROI drawing mode
             roi_added: Emit ROI coordinates (display_coords, processing_coords)
             roi_deleted: Notify that last ROI was deleted
@@ -63,14 +63,14 @@ class ROIHandler(QObject):
     
     # ROI data flow
     roi_added = Signal(tuple, tuple)  # (display_coords, proc_coords) -> FrameModel
-    roi_deleted = Signal()  # Last ROI deleted → FrameModel
+    roi_deleted = Signal()  # Last ROI deleted -> FrameModel
 
     # User feedback
-    status_message = Signal(str)  # Status bar messages → MainHandler
-    warning_box = Signal(str)  # Warning dialogs → MainHandler
+    status_message = Signal(str)  # Status bar messages -> MainHandler
+    warning_box = Signal(str)  # Warning dialogs -> MainHandler
     
     # UI updates
-    request_overlay_update = Signal()  # Request overlay redraw → OverlayWidget
+    request_overlay_update = Signal()  # Request overlay redraw -> OverlayWidget
 
     def __init__(self, display_res, processing_res, video_running=False):
         """Initialize ROI handler with resolution data only.

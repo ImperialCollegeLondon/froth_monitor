@@ -262,7 +262,7 @@ class FrameResampleHandler(QObject):
         if self.processing_resolution != (new_proc_w, new_proc_h):
             self.processing_resolution = (new_proc_w, new_proc_h)
             
-            logger.info(f"FrameResampleHandler: Processing resolution updated: {src_w}x{src_h} → "
+            logger.info(f"FrameResampleHandler: Processing resolution updated: {src_w}x{src_h} -> "
                        f"{new_proc_w}x{new_proc_h} "
                        f"({(new_proc_w/src_w)*100:.1f}% scale)")
             

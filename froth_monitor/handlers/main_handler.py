@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QVBoxLayout,
+    QLabel,
 )
 from PySide6.QtCore import QRect
 from PySide6.QtGui import QIcon
@@ -75,6 +76,11 @@ class EventHandler:
 
     def __init__(self, gui: MainGUIWindow):
         self.gui = gui
+        
+        # Initialize status bar FPS display
+        self.fps_label = QLabel("Proc FPS: 0.0")
+        self.gui.statusBar().addPermanentWidget(self.fps_label)
+        
         self.initialize_level_one_handlers()
         self.initialize_level_two_handlers()
 
@@ -368,6 +374,7 @@ class EventHandler:
         self.video_thread.frame_available.connect(
             self.frame_processor.process_new_frame
         )
+        self.frame_processor.processing_fps_updated.connect(self._update_fps_status)
 
         # ROI creation signal routing
         # self.overlay_widget.roi_created.connect(
@@ -628,6 +635,10 @@ class EventHandler:
     
     def _status_message(self, message):
         self.gui.statusBar().showMessage(message)
+
+    def _update_fps_status(self, fps: float):
+        """Update the processing FPS label in the status bar."""
+        self.fps_label.setText(f"Proc FPS: {fps:.1f}")
 
     def _warning_box(self, message):
         QMessageBox.warning(self.gui, "Warning", message)

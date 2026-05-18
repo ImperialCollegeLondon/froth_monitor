@@ -131,8 +131,16 @@ class VideoAnalysis:
             self.prev_pts = None
             return cast(float, None), cast(float, None)
 
-        gray_current: MatLike = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
-        gray_previous: MatLike = cv2.cvtColor(self.previous_frame, cv2.COLOR_BGR2GRAY)
+        # Optimization: Check if frames are already grayscale
+        if len(current_frame.shape) == 2:
+            gray_current = current_frame
+        else:
+            gray_current = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
+
+        if len(self.previous_frame.shape) == 2:
+            gray_previous = self.previous_frame
+        else:
+            gray_previous = cv2.cvtColor(self.previous_frame, cv2.COLOR_BGR2GRAY)
 
         # Helper function to validate and sanitize flow values
         def sanitize_flow_value(value):
